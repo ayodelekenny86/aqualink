@@ -1,8 +1,12 @@
 {
-  "name": "codespaces-react",
+  "name": "aqualink",
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@12.6.0",
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "@dataconnect/generated": "link:src/dataconnect-generated",
     "@supabase/ssr": "^0.12.5",
