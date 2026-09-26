@@ -105,15 +105,16 @@ export function randomHex(byteLength = 16) {
 /* ------------------------------------------------------------------ */
 
 /**
- * Single check character (mod 37 over CODE_ALPHABET) so a mistyped code is
- * rejected before it is ever compared against a real one.
+ * Single check character so a mistyped code is rejected before it is ever
+ * compared against a real one. The modulus is the alphabet size, which keeps
+ * the result a valid character, and 33 is odd so it mixes the whole body in.
  */
 export function checkCharacter(body) {
   let remainder = 0;
   for (const char of body) {
     const index = CODE_ALPHABET.indexOf(char);
     if (index === -1) throw new Error(`Cannot checksum unexpected character: ${char}`);
-    remainder = (remainder * 31 + index) % 37;
+    remainder = (remainder * 33 + index) % CODE_ALPHABET.length;
   }
   return CODE_ALPHABET[remainder];
 }

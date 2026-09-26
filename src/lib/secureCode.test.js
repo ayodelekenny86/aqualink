@@ -68,12 +68,21 @@ describe('random source', () => {
 
 describe('booking codes', () => {
   test('increments past the highest existing reference', () => {
-    expect(generateBookingCode([])).toBe('AQ-1000-1');
-    expect(generateBookingCode(['AQ-1048-1', 'AQ-1051-2'])).toBe('AQ-1052-3');
+    expect(generateBookingCode([])).toBe('AQ-1000-2');
+    expect(generateBookingCode(['AQ-1048-1', 'AQ-1051-2'])).toBe('AQ-1052-9');
   });
 
   test('ignores malformed codes when finding the high water mark', () => {
-    expect(generateBookingCode(['garbage', null, 'AQ-3'])).toBe('AQ-1000-1');
+    expect(generateBookingCode(['garbage', null, 'AQ-3'])).toBe('AQ-1000-2');
+  });
+
+  test('checkCharacter always returns a real alphabet character', () => {
+    // Regression: the modulus once exceeded the alphabet size, which could
+    // produce `undefined` for some inputs.
+    for (let n = 0; n < 5000; n += 1) {
+      const body = `AQ${n}`;
+      expect(CODE_ALPHABET).toContain(checkCharacter(body));
+    }
   });
 
   test('generated codes are well formed and detect single-character typos', () => {
@@ -250,6 +259,7 @@ describe('otp challenges', () => {
     challenge = (await verifyOtpChallenge(challenge, '222222', SECRET)).challenge;
 
     const locked = await verifyOtpChallenge(challenge, '333333', SECRET);
+    expect(locked.ok).toBe(false);
     expect(locked.reason).toBe('locked');
     expect(locked.attemptsLeft).toBe(0);
 
