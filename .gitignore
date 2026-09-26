@@ -1,0 +1,5 @@
+.vscode/azure-service-auth.json
+**/*auth*.json
+.env
+*.pem
+*.key
