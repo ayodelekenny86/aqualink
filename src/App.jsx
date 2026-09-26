@@ -5,6 +5,7 @@ import useAuth from './hooks/useAuth';
 import useBooking from './hooks/useBooking';
 import useAquaAi, { aiQuickActions } from './hooks/useAquaAi';
 import useReports from './hooks/useReports';
+import { formatPhoneForDisplay, normalizePhone } from './lib/accounts';
 
 const roles = [
   ['buyer', 'Buyer app', 'Book reliable water'],
@@ -25,12 +26,12 @@ function App() {
   const t = translations[language] ?? translations.en;
 
   const {
-    role, selectRole, notice, showNotice, dismissNotice,
-    buyerAuthenticated, setBuyerAuthenticated,
-    buyerPhone, buyerCode, buyerError, startBuyerOtp, confirmBuyerOtp, signOutBuyer,
-    adminAuthenticated, adminCredentials, setAdminCredentials, loginAdmin,
-    provisionAdminPassword, signOutAdmin,
-    authStep, email, setEmail, emailCode, sendOtp, verifyOtp,
+    ready, role, selectRole, notice, showNotice, dismissNotice,
+    session, signOut, accountExists,
+    buyerAuthenticated, adminAuthenticated, sellerAuthenticated,
+    startPhoneSignIn, confirmPhoneCode, signInWithPassword, registerAccount,
+    phoneCode, phoneIdentifier, signInError, demoCredentials,
+    authStep, email, setEmail, emailCode, sendOtp,
     sellerProfile, setSellerProfile, sellerApproved, sellerCode, issueSellerCode, approveSeller,
     available, setAvailable,
   } = useAuth();
@@ -134,19 +135,17 @@ function SellerAccessGate({ sellerProfile, setSellerProfile, onApproved, issueCo
   return <section className="access-gate panel seller-gate"><span className="access-lock">↗</span><p className="eyebrow">Seller signup & approval</p><h1>Create your seller account.</h1><p>Complete your business and vehicle details. Your seller workspace stays locked until Admin approves the application.</p><form onSubmit={(event) => { event.preventDefault(); setSubmitted(true); }}><input aria-label="Business name" name="business" value={sellerProfile.business} onChange={update} placeholder="Business or trading name" /><input aria-label="Seller phone" name="phone" value={sellerProfile.phone} onChange={update} placeholder="Registered phone number" /><input aria-label="Vehicle registration" name="vehicle" value={sellerProfile.vehicle} onChange={update} placeholder="Vehicle registration" /><select aria-label="Tank capacity" name="capacity" value={sellerProfile.capacity} onChange={update}><option>1,000 gallons</option><option>2,000 gallons</option><option>5,000 gallons</option></select><button className="primary-button" type="submit">Submit signup for review →</button></form><small>Required controls: ID, vehicle registration, tank capacity, water-source evidence, approval audit trail, and payout verification.</small></section>;
 }
 
-function AdminAccessGate({ credentials, setCredentials, loginAdmin, provision, signOut }) {
-  const [issued, setIssued] = useState('');
+function AdminAccessGate({ onSignIn, error, demo }) {
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
 
-  async function handleProvision() {
-    const password = await provision();
-    setIssued(password ?? 'A credential already exists. Sign in with it.');
+  async function handleSubmit(event) {
+    event.preventDefault();
+    const result = await onSignIn(identifier, password);
+    if (result?.ok) setPassword('');
   }
 
-  if (issued) {
-    return <section className="access-gate panel admin-gate"><span className="access-lock">▣</span><p className="eyebrow">Admin credential issued</p><h1>Your generated password.</h1><p>AquaLink created this password on your device. Only a salted PBKDF2 hash is stored, so it cannot be shown again.</p><div className="otp-delivery"><strong data-testid="admin-password">{issued}</strong><small>Copy it now, then sign in below.</small></div><form onSubmit={loginAdmin}><input aria-label="Admin username" value={credentials.username} onChange={(event) => setCredentials({ ...credentials, username: event.target.value })} placeholder="Admin username" autoComplete="username" /><input aria-label="Admin password" value={credentials.password} onChange={(event) => setCredentials({ ...credentials, password: event.target.value })} placeholder="Admin password" type="password" autoComplete="current-password" /><button className="primary-button" type="submit">Open admin console →</button></form></section>;
-  }
-
-  return <section className="access-gate panel admin-gate"><span className="access-lock">▣</span><p className="eyebrow">Restricted admin area</p><h1>Operations data needs a verified admin.</h1><p>Sign in with your admin username and password. Every report and operational action should be audit logged in production.</p><form onSubmit={loginAdmin}><input aria-label="Admin username" value={credentials.username} onChange={(event) => setCredentials({ ...credentials, username: event.target.value })} placeholder="Admin username" autoComplete="username" /><input aria-label="Admin password" value={credentials.password} onChange={(event) => setCredentials({ ...credentials, password: event.target.value })} placeholder="Admin password" type="password" autoComplete="current-password" /><button className="primary-button" type="submit">Open admin console →</button></form><button className="outline-button" type="button" onClick={handleProvision}>Generate admin password</button><small>The password is generated by this app and stored only as a PBKDF2 hash. This is local access control, not server-side identity: anyone with access to the browser profile can read the same storage.</small></section>;
+  return <section className="access-gate panel admin-gate"><span className="access-lock">▣</span><p className="eyebrow">Restricted admin area</p><h1>Operations data needs a verified admin.</h1><p>Sign in with the account registered for ops. The identifier is matched against the account registry and the password is checked against a salted PBKDF2 hash.</p><form onSubmit={handleSubmit}><input aria-label="Admin account" value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder="Admin email or phone" autoComplete="username" /><input aria-label="Admin password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" type="password" autoComplete="current-password" />{error && <p className="form-error" role="alert">{error}</p>}<button className="primary-button" type="submit">Open admin console →</button></form>{demo && <div className="demo-credentials"><span className="section-kicker">DEMO OPS ACCOUNT</span><strong>{demo.ops.identifier}</strong><small>Password (shown once): <code data-testid="demo-ops-password">{demo.ops.password}</code></small></div>}<small>Five failed attempts lock the account for five minutes. This is local access control, not server-side identity: anyone with access to the browser profile can read the same storage.</small></section>;
 }
 
 function ReportActions({ downloadReport }) {
