@@ -1,48 +1,78 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   createOtpChallenge,
   ensureDeviceSecret,
-  generateConfirmationCode,
   generatePassword,
-  generateSalt,
-  hashPassword,
-  verifyOtpChallenge,
-  verifyPassword,
 } from '../lib/secureCode';
+import {
+  beginPhoneSignIn,
+  completePhoneSignIn,
+  authenticateWithPassword,
+  createAccount,
+  findAccount,
+  formatPhoneForDisplay,
+  seedDemoAccounts,
+  validateIdentifier,
+} from '../lib/accounts';
 import { persistedState, readValue, writeValue } from '../lib/storage';
 
 const initialSellerProfile = { business: '', phone: '', vehicle: '', capacity: '2,000 gallons', document: 'ID document not uploaded' };
 
 /**
- * Owns role switching, the workspace notice banner, and access for buyer,
- * seller and admin (ops) sessions.
+ * Owns the signed-in account, role switching and the workspace notice banner.
  *
- * Access is entirely self-issued: the browser's Web Crypto API mints the
- * one-time codes, the admin password and the seller approval code, and verifies
- * them locally against salted PBKDF2 hashes. Nothing is sent anywhere and no
- * third party is involved. Because secrets live in the browser this guards
- * against guessing, replay and stale hashes rather than acting as a server-side
- * identity system.
+ * Every sign-in path resolves the identifier to a real, active, unlocked
+ * account in the local registry before any credential is checked, so an
+ * unregistered phone number or unknown email can never reach a workspace.
+ * Credentials and one-time codes are verified locally with Web Crypto; there is
+ * no third-party identity provider.
+ *
+ * Because accounts and sessions live in the browser this is local access
+ * control, not server-side identity: it stops unknown accounts, wrong
+ * credentials, replay and brute force, but anyone with access to the browser
+ * profile can read the same storage.
  */
 export function useAuth() {
   const secret = useMemo(() => ensureDeviceSecret(), []);
 
   const [role, setRole] = useState('buyer');
   const [notice, setNotice] = useState('');
-  const [buyerAuthenticated, setBuyerAuthenticated] = useState(persistedState('auth.buyer', false));
-  const [adminAuthenticated, setAdminAuthenticated] = useState(persistedState('auth.admin', false));
-  const [adminCredentials, setAdminCredentials] = useState({ username: '', password: '' });
-  const [authStep, setAuthStep] = useState('verified');
+  const [session, setSession] = useState(persistedState('session', null));
   const [email, setEmail] = useState('alex@example.com');
-  const [sellerProfile, setSellerProfile] = useState(() => readValue('seller.profile', initialSellerProfile));
-  const [sellerApproved, setSellerApproved] = useState(persistedState('auth.seller', false));
   const [available, setAvailable] = useState(true);
+  const [demoCredentials, setDemoCredentials] = useState(null);
+  const [ready, setReady] = useState(false);
 
-  // Buyer one-time code state.
-  const [buyerChallenge, setBuyerChallenge] = useState(null);
-  const [buyerCode, setBuyerCode] = useState('');
-  const [buyerPhone, setBuyerPhone] = useState('');
-  const [buyerError, setBuyerError] = useState('');
+  // Phone sign-in state.
+  const [phoneChallenge, setPhoneChallenge] = useState(null);
+  const [phoneIdentifier, setPhoneIdentifier] = useState('');
+  const [phoneCode, setPhoneCode] = useState('');
+  const [signInError, setSignInError] = useState('');
+
+  // Email verification strip.
+  const [emailChallenge, setEmailChallenge] = useState(null);
+  const [emailCode, setEmailCode] = useState('');
+  const [authStep, setAuthStep] = useState('verified');
+
+  // Seller profile and approval.
+  const [sellerProfile, setSellerProfileState] = useState(() => readValue('seller.profile', initialSellerProfile));
+  const [sellerApproved, setSellerApproved] = useState(persistedState('auth.seller', false));
+  const [sellerCode, setSellerCode] = useState(() => readValue('seller.code', ''));
+
+  // Creates the starter accounts on first run and reveals their passwords once.
+  useEffect(() => {
+    let cancelled = false;
+    seedDemoAccounts()
+      .then((seeded) => {
+        if (!cancelled && seeded) setDemoCredentials(seeded);
+      })
+      .finally(() => {
+        if (!cancelled) setReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const showNotice = useCallback((message) => setNotice(message), []);
   const dismissNotice = useCallback(() => setNotice(''), []);
@@ -52,115 +82,174 @@ export function useAuth() {
     setNotice('');
   }, []);
 
+  const signedInAs = (roleName) => session?.role === roleName;
+  const buyerAuthenticated = signedInAs('buyer');
+  const adminAuthenticated = signedInAs('ops');
+  const sellerAuthenticated = signedInAs('seller') && sellerApproved;
+
+  const startSession = useCallback((account) => {
+    setSession({
+      identifier: account.identifier,
+      identifierType: account.identifierType,
+      displayName: account.displayName,
+      role: account.role,
+      signedInAt: new Date().toISOString(),
+    });
+    writeValue('session', {
+      identifier: account.identifier,
+      identifierType: account.identifierType,
+      displayName: account.displayName,
+      role: account.role,
+      signedInAt: new Date().toISOString(),
+    });
+    setSignInError('');
+  }, []);
+
+  const signOut = useCallback(() => {
+    setSession(null);
+    writeValue('session', null);
+    setPhoneChallenge(null);
+    setPhoneIdentifier('');
+    setPhoneCode('');
+  }, []);
+
   /* ---------------------------------------------------------------- */
-  /* Buyer: app-generated one-time code                                 */
+  /* Phone sign-in (one-time code)                                     */
   /* ---------------------------------------------------------------- */
 
   /**
-   * Mints a six-digit code. With no SMS provider the app delivers it to its own
-   * in-app inbox, which is returned so the UI can display it.
+   * Validates the number and confirms it belongs to an account before any code
+   * is generated. Returns the code so the app can display it in place of SMS.
    */
-  const startBuyerOtp = useCallback(async (phone) => {
-    const { code, challenge } = await createOtpChallenge({ secret, purpose: 'buyer-login' });
-    setBuyerPhone(phone);
-    setBuyerChallenge(challenge);
-    setBuyerCode(code);
-    setBuyerError('');
-    showNotice(`Code ${code} generated for ${phone}. It expires in 5 minutes.`);
-    return code;
+  const startPhoneSignIn = useCallback(async (identifier) => {
+    setSignInError('');
+    let parsed;
+    try {
+      parsed = validateIdentifier(identifier);
+    } catch (error) {
+      setSignInError(error.message);
+      return { ok: false, reason: 'invalid-identifier' };
+    }
+
+    if (parsed.type !== 'phone') {
+      setSignInError('Enter the phone number on your account, not an email address.');
+      return { ok: false, reason: 'wrong-type' };
+    }
+
+    const begun = await beginPhoneSignIn(parsed.normalized, secret);
+    if (!begun.ok) {
+      setSignInError(begun.detail);
+      return begun;
+    }
+
+    setPhoneChallenge(begun.challenge);
+    setPhoneIdentifier(parsed.normalized);
+    setPhoneCode(begun.code);
+    showNotice(`Code ${begun.code} generated for ${formatPhoneForDisplay(parsed.normalized)}. It expires in 5 minutes.`);
+    return begun;
   }, [secret, showNotice]);
 
-  const confirmBuyerOtp = useCallback(async (input) => {
-    if (!buyerChallenge) {
-      setBuyerError('Request a code first.');
+  const confirmPhoneCode = useCallback(async (code) => {
+    if (!phoneChallenge) {
+      setSignInError('Request a code first.');
       return { ok: false, reason: 'no-challenge' };
     }
-    const result = await verifyOtpChallenge(buyerChallenge, input, secret);
-    if (result.ok) {
-      setBuyerAuthenticated(true);
-      writeValue('auth.buyer', true);
-      setBuyerCode('');
-      setBuyerChallenge(null);
-      setBuyerError('');
-      showNotice('Code accepted. Buyer workspace unlocked.');
-    } else {
-      setBuyerError(result.reason === 'locked'
-        ? 'Too many attempts. Request a new code.'
-        : result.reason === 'expired'
-          ? 'That code expired. Request a new one.'
-          : `Incorrect code. ${result.attemptsLeft ?? 0} attempt(s) left.`);
-      if (result.challenge) setBuyerChallenge(result.challenge);
+    const done = await completePhoneSignIn({ identifier: phoneIdentifier, challenge: phoneChallenge, code, secret });
+    if (!done.ok) {
+      setSignInError(done.detail);
+      return done;
     }
-    return result;
-  }, [buyerChallenge, secret, showNotice]);
-
-  const signOutBuyer = useCallback(() => {
-    setBuyerAuthenticated(false);
-    writeValue('auth.buyer', false);
-    setBuyerChallenge(null);
-    setBuyerCode('');
-  }, []);
+    startSession(done.account);
+    setPhoneChallenge(null);
+    setPhoneCode('');
+    showNotice(`Signed in as ${done.account.displayName || formatPhoneForDisplay(done.account.identifier)}.`);
+    return done;
+  }, [phoneChallenge, phoneIdentifier, secret, startSession, showNotice]);
 
   /* ---------------------------------------------------------------- */
-  /* Admin: app-generated password, stored only as a PBKDF2 hash         */
+  /* Password sign-in (ops, institution, seller)                        */
+  /* ---------------------------------------------------------------- */
+
+  const signInWithPassword = useCallback(async (identifier, password) => {
+    setSignInError('');
+    let parsed;
+    try {
+      parsed = validateIdentifier(identifier);
+    } catch (error) {
+      setSignInError(error.message);
+      return { ok: false, reason: 'invalid-identifier' };
+    }
+
+    const result = await authenticateWithPassword(parsed.normalized, password);
+    if (!result.ok) {
+      setSignInError(result.detail);
+      return result;
+    }
+    startSession(result.account);
+    showNotice(`Signed in as ${result.account.displayName || result.account.identifier}.`);
+    return result;
+  }, [startSession, showNotice]);
+
+  /* ---------------------------------------------------------------- */
+  /* Registration                                                      */
   /* ---------------------------------------------------------------- */
 
   /**
-   * Creates the admin password on first use and keeps only its salt and hash.
-   * The plaintext is shown once in-app and never stored.
+   * Creates an account and returns a generated password. The plaintext is shown
+   * once and only a PBKDF2 hash is kept.
    */
-  const provisionAdminPassword = useCallback(async () => {
-    const stored = readValue('auth.adminCredential', null);
-    if (stored) return null;
-    const password = generatePassword({ length: 20 });
-    const record = { salt: generateSalt(), hash: await hashPassword(password, secret), createdAt: new Date().toISOString() };
-    writeValue('auth.adminCredential', record);
-    return password;
-  }, [secret]);
-
-  const loginAdmin = useCallback(async (event) => {
-    event?.preventDefault?.();
-    const username = adminCredentials.username.trim();
-    const password = adminCredentials.password;
-
-    if (!username || !password) {
-      showNotice('Enter both admin username and password.');
-      return { ok: false, reason: 'incomplete' };
+  const registerAccount = useCallback(async ({ identifier, role: accountRole = 'buyer', displayName = '' }) => {
+    setSignInError('');
+    try {
+      const password = generatePassword({ length: 16 });
+      const account = await createAccount({ identifier, role: accountRole, displayName, password });
+      showNotice(`Account created for ${account.identifier}. Copy your generated password now.`);
+      return { ok: true, account, password };
+    } catch (error) {
+      setSignInError(error.message);
+      return { ok: false, error: error.message };
     }
+  }, [showNotice]);
 
-    const record = readValue('auth.adminCredential', null);
-    if (!record) {
-      showNotice('No admin credential exists yet. Generate one to continue.');
-      return { ok: false, reason: 'not-provisioned' };
+  const accountExists = useCallback((identifier) => Boolean(findAccount(identifier)), []);
+
+  /* ---------------------------------------------------------------- */
+  /* Email verification strip                                           */
+  /* ---------------------------------------------------------------- */
+
+  const sendOtp = useCallback(async () => {
+    let parsed;
+    try {
+      parsed = validateIdentifier(email);
+    } catch (error) {
+      showNotice(error.message);
+      return { ok: false };
     }
-
-    const valid = await verifyPassword(password, record.salt, record.hash);
-    if (!valid) {
-      showNotice('Incorrect admin password.');
-      return { ok: false, reason: 'bad-password' };
+    const account = findAccount(parsed.normalized);
+    if (!account) {
+      showNotice('No account uses that email address yet.');
+      return { ok: false };
     }
-
-    setAdminAuthenticated(true);
-    writeValue('auth.admin', true);
-    setAdminCredentials({ username: '', password: '' });
-    showNotice('Admin session verified. Access is logged for this demo workspace.');
+    const { code, challenge } = await createOtpChallenge({ secret, purpose: 'email-verify' });
+    setEmailCode(code);
+    setEmailChallenge(challenge);
+    setAuthStep('otp');
+    showNotice(`Verification code ${code} generated for ${account.identifier}.`);
     return { ok: true };
-  }, [adminCredentials, secret, showNotice]);
+  }, [email, secret, showNotice]);
 
-  const signOutAdmin = useCallback(() => {
-    setAdminAuthenticated(false);
-    writeValue('auth.admin', false);
+  /* ---------------------------------------------------------------- */
+  /* Seller onboarding and approval                                    */
+  /* ---------------------------------------------------------------- */
+
+  const setSellerProfile = useCallback((profile) => {
+    setSellerProfileState(profile);
+    writeValue('seller.profile', profile);
   }, []);
-
-  /* ---------------------------------------------------------------- */
-  /* Seller: app-generated approval code                                */
-  /* ---------------------------------------------------------------- */
-
-  const [sellerCode, setSellerCode] = useState(() => readValue('seller.code', ''));
 
   /** Issues the one-time approval code Ops would otherwise send by email. */
   const issueSellerCode = useCallback(() => {
-    const code = generateConfirmationCode('seller', 8);
+    const code = `SEL-${generatePassword({ length: 12 }).replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()}`;
     setSellerCode(code);
     writeValue('seller.code', code);
     showNotice(`Approval code ${code} issued. Share it with the seller to unlock the workspace.`);
@@ -183,77 +272,43 @@ export function useAuth() {
     return { ok: true };
   }, [showNotice]);
 
-  const updateSellerProfile = useCallback((profile) => {
-    setSellerProfile(profile);
-    writeValue('seller.profile', profile);
-  }, []);
-
-  /* ---------------------------------------------------------------- */
-  /* Email verification (kept, now backed by a generated code)          */
-  /* ---------------------------------------------------------------- */
-
-  const [emailChallenge, setEmailChallenge] = useState(null);
-  const [emailCode, setEmailCode] = useState('');
-
-  const sendOtp = useCallback(async () => {
-    const { code, challenge } = await createOtpChallenge({ secret, purpose: 'email-verify' });
-    setEmailCode(code);
-    setEmailChallenge(challenge);
-    setAuthStep('otp');
-    showNotice(`Verification code ${code} generated for ${email}.`);
-  }, [email, secret, showNotice]);
-
-  const verifyOtp = useCallback(async (input) => {
-    if (!emailChallenge) {
-      showNotice('Send a code first.');
-      return { ok: false, reason: 'no-challenge' };
-    }
-    const result = await verifyOtpChallenge(emailChallenge, input, secret);
-    if (result.ok) {
-      setAuthStep('verified');
-      setEmailCode('');
-      setEmailChallenge(null);
-      showNotice('Email verified. Your account is ready to book.');
-    } else {
-      showNotice('That code did not match. Request a new one.');
-      if (result.challenge) setEmailChallenge(result.challenge);
-    }
-    return result;
-  }, [emailChallenge, secret, showNotice]);
-
   return {
+    ready,
     role,
     selectRole,
     notice,
     showNotice,
     dismissNotice,
+    session,
+    signOut,
+    accountExists,
+
     buyerAuthenticated,
-    setBuyerAuthenticated,
-    buyerPhone,
-    buyerCode,
-    buyerError,
-    startBuyerOtp,
-    confirmBuyerOtp,
-    signOutBuyer,
     adminAuthenticated,
-    adminCredentials,
-    setAdminCredentials,
-    loginAdmin,
-    provisionAdminPassword,
-    signOutAdmin,
+    sellerAuthenticated,
+    startPhoneSignIn,
+    confirmPhoneCode,
+    signInWithPassword,
+    registerAccount,
+    phoneCode,
+    phoneIdentifier,
+    signInError,
+
+    demoCredentials,
+
     authStep,
     email,
     setEmail,
     emailCode,
     sendOtp,
-    verifyOtp,
+
     sellerProfile,
-    updateSellerProfile,
-    setSellerProfile: updateSellerProfile,
+    setSellerProfile,
     sellerApproved,
     sellerCode,
     issueSellerCode,
     approveSeller,
+
     available,
     setAvailable,
   };

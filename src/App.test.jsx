@@ -190,6 +190,28 @@ test('shows seller net payout and commission', async () => {
   expect(screen.getByText(/20% seller fee/i)).toBeInTheDocument();
 });
 
+test('rejects a wrong admin password and never stores the plaintext', async () => {
+  const user = userEvent.setup();
+  render(<App />);
+
+  await user.click(screen.getByRole('button', { name: /admin authorized operations access/i }));
+  await user.click(screen.getByRole('button', { name: /generate admin password/i }));
+  const password = (await screen.findByTestId('admin-password')).textContent;
+
+  // The stored credential must be a salt plus a hash, never the password.
+  const record = JSON.parse(localStorage.getItem('aqualink.v1.auth.adminCredential'));
+  expect(record.salt).toMatch(/^[0-9a-f]{32}$/);
+  expect(record.hash).toMatch(/^[0-9a-f]{64}$/);
+  expect(JSON.stringify(record)).not.toContain(password);
+
+  await user.type(screen.getByRole('textbox', { name: /admin username/i }), 'admin');
+  await user.type(screen.getByLabelText(/admin password/i), 'not-the-password');
+  await user.click(screen.getByRole('button', { name: /open admin console/i }));
+
+  expect(await screen.findByRole('status')).toHaveTextContent(/incorrect admin password/i);
+  expect(screen.queryByText(/manual ops mode/i)).not.toBeInTheDocument();
+});
+
 test('shows institution billing and ops revenue control tower', async () => {
   const user = userEvent.setup();
   render(<App />);
