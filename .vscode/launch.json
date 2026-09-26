@@ -2,14 +2,6 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Launch Integrated Browser",
-      "request": "launch",
-      "type": "editor-browser",
-      "url": "http://localhost:3000",
-      "webRoot": "${workspaceFolder}"
-    },
-    
-    {
       "name": "Run application",
       "type": "node",
       "request": "launch",
@@ -25,12 +17,42 @@
       ]
     },
     {
-      "type": "java",
-      "name": "Launch Java Program with .env",
+      "name": "Launch Integrated Browser",
       "request": "launch",
+      "type": "editor-browser",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}"
+    },
+    {
+      "name": "Launch Edge",
+      "request": "launch",
+      "type": "msedge",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}"
+    },
+    {
+      "name": "Launch Chrome",
+      "request": "launch",
+      "type": "chrome",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}"
+    },
+    {
+      "name": "Run unit tests",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run-script",
+        "test",
+        "--",
+        "--run",
+        "--reporter=verbose"
+      ],
       "cwd": "${workspaceFolder}",
-      "mainClass": "com.mySample.App",
-      "envFile": "${workspaceFolder}/.env"
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "disableOptimisticBPs": true
     }
   ]
 }
