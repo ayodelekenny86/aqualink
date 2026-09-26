@@ -1,4 +1,4 @@
-import { beforeEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App';
@@ -9,8 +9,14 @@ import { clearAll } from './lib/storage';
  * They read the code the UI displays, type it back, and wait for the gate to
  * open rather than asserting synchronously against an async handler.
  */
-async function verifyBuyer(user) {
-  await user.type(screen.getByRole('textbox', { name: /buyer phone number/i }), '0545009046');
+/** Waits for the account registry to finish generating before interacting. */
+async function waitForRegistry() {
+  await screen.findByRole('heading', { name: /sign in to view your orders|application awaiting approval|operations data needs a verified admin|create your seller account/i });
+}
+
+async function verifyBuyer(user, identifier = '0545009046') {
+  await waitForRegistry();
+  await user.type(screen.getByRole('textbox', { name: /buyer phone number/i }), identifier);
   await user.click(screen.getByRole('button', { name: /send otp/i }));
 
   const code = (await screen.findByTestId('otp-code')).textContent;
@@ -21,23 +27,25 @@ async function verifyBuyer(user) {
   await screen.findByRole('heading', { name: /good morning, alex/i });
 }
 
-/** Provisions the generated admin password, then signs in with it. */
+/** Signs in to ops with the seeded admin account and its generated password. */
 async function signInAdmin(user) {
-  await user.click(screen.getByRole('button', { name: /generate admin password/i }));
-  const password = (await screen.findByTestId('admin-password')).textContent;
+  await waitForRegistry();
+  const password = (await screen.findByTestId('demo-ops-password')).textContent;
   expect(password.length).toBeGreaterThanOrEqual(8);
 
-  await user.type(screen.getByRole('textbox', { name: /admin username/i }), 'admin');
+  await user.type(screen.getByRole('textbox', { name: /admin account/i }), 'ops@aqualink.gh');
   await user.type(screen.getByLabelText(/admin password/i), password);
   await user.click(screen.getByRole('button', { name: /open admin console/i }));
   // Password verification is async (PBKDF2), so wait for the console itself.
   await screen.findByText(/manual ops mode/i);
 }
 
-/** Submits the seller application and approves it with a generated code. */
+/** Applies as a seller, is approved with a generated code, and signs in. */
 async function approveSeller(user) {
+  await waitForRegistry();
   await user.click(screen.getByRole('button', { name: /seller app manage your fleet/i }));
   await user.type(screen.getByRole('textbox', { name: /business name/i }), 'AquaFlow Tankers');
+  await user.type(screen.getByRole('textbox', { name: /seller phone/i }), '0244000000');
   await user.click(screen.getByRole('button', { name: /submit signup for review/i }));
 
   await screen.findByText(/pending manual review/i);
@@ -51,6 +59,12 @@ async function approveSeller(user) {
 }
 
 beforeEach(() => {
+  clearAll();
+});
+
+// Seeding hashes a password asynchronously, so a promise from a finished test
+// can still write storage. Clearing again stops that leaking into the next test.
+afterEach(() => {
   clearAll();
 });
 
@@ -114,6 +128,7 @@ test('lets a seller submit onboarding details', async () => {
   const user = userEvent.setup();
   render(<App />);
 
+  await waitForRegistry();
   await user.click(screen.getByRole('button', { name: /seller app manage your fleet/i }));
   await user.type(screen.getByRole('textbox', { name: /business name/i }), 'AquaFlow Tankers');
   await user.type(screen.getByRole('textbox', { name: /seller phone/i }), '0244000000');
@@ -195,21 +210,46 @@ test('rejects a wrong admin password and never stores the plaintext', async () =
   render(<App />);
 
   await user.click(screen.getByRole('button', { name: /admin authorized operations access/i }));
-  await user.click(screen.getByRole('button', { name: /generate admin password/i }));
-  const password = (await screen.findByTestId('admin-password')).textContent;
+  const password = (await screen.findByTestId('demo-ops-password')).textContent;
 
   // The stored credential must be a salt plus a hash, never the password.
-  const record = JSON.parse(localStorage.getItem('aqualink.v1.auth.adminCredential'));
-  expect(record.salt).toMatch(/^[0-9a-f]{32}$/);
-  expect(record.hash).toMatch(/^[0-9a-f]{64}$/);
-  expect(JSON.stringify(record)).not.toContain(password);
+  const [record] = JSON.parse(localStorage.getItem('aqualink.v1.accounts.list'));
+  expect(record.passwordSalt).toMatch(/^[0-9a-f]{32}$/);
+  expect(record.passwordHash).toMatch(/^[0-9a-f]{64}$/);
+  expect(localStorage.getItem('aqualink.v1.accounts.list')).not.toContain(password);
 
-  await user.type(screen.getByRole('textbox', { name: /admin username/i }), 'admin');
+  await user.type(screen.getByRole('textbox', { name: /admin account/i }), 'ops@aqualink.gh');
   await user.type(screen.getByLabelText(/admin password/i), 'not-the-password');
   await user.click(screen.getByRole('button', { name: /open admin console/i }));
 
-  expect(await screen.findByRole('status')).toHaveTextContent(/incorrect admin password/i);
+  expect(await screen.findByRole('alert')).toHaveTextContent(/incorrect details/i);
   expect(screen.queryByText(/manual ops mode/i)).not.toBeInTheDocument();
+});
+
+test('refuses an unregistered identifier and issues no code for it', async () => {
+  const user = userEvent.setup();
+  render(<App />);
+
+  await waitForRegistry();
+  await user.type(screen.getByRole('textbox', { name: /buyer phone number/i }), '0545999999');
+  await user.click(screen.getByRole('button', { name: /send otp/i }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(/no account matches/i);
+  // Crucially, no code is generated or displayed for an unknown account.
+  expect(screen.queryByTestId('otp-code')).not.toBeInTheDocument();
+  expect(screen.getByText(/no account uses that number yet/i)).toBeInTheDocument();
+});
+
+test('rejects a malformed phone number before any lookup', async () => {
+  const user = userEvent.setup();
+  render(<App />);
+
+  await waitForRegistry();
+  await user.type(screen.getByRole('textbox', { name: /buyer phone number/i }), '12345');
+  await user.click(screen.getByRole('button', { name: /send otp/i }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(/valid ghana number/i);
+  expect(screen.queryByTestId('otp-code')).not.toBeInTheDocument();
 });
 
 test('shows institution billing and ops revenue control tower', async () => {

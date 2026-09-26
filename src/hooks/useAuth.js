@@ -3,6 +3,7 @@ import {
   createOtpChallenge,
   ensureDeviceSecret,
   generatePassword,
+  verifyOtpChallenge,
 } from '../lib/secureCode';
 import {
   beginPhoneSignIn,
@@ -238,6 +239,25 @@ export function useAuth() {
     return { ok: true };
   }, [email, secret, showNotice]);
 
+  /** Confirms the email verification code and returns the strip to verified. */
+  const confirmEmailCode = useCallback(async (code) => {
+    if (!emailChallenge) {
+      showNotice('Send a code first.');
+      return { ok: false, reason: 'no-challenge' };
+    }
+    const result = await verifyOtpChallenge(emailChallenge, code, secret);
+    if (!result.ok) {
+      showNotice('That code did not match. Request a new one.');
+      if (result.challenge) setEmailChallenge(result.challenge);
+      return result;
+    }
+    setAuthStep('verified');
+    setEmailCode('');
+    setEmailChallenge(null);
+    showNotice('Email verified. Your account is ready to book.');
+    return result;
+  }, [emailChallenge, secret, showNotice]);
+
   /* ---------------------------------------------------------------- */
   /* Seller onboarding and approval                                    */
   /* ---------------------------------------------------------------- */
@@ -272,6 +292,56 @@ export function useAuth() {
     return { ok: true };
   }, [showNotice]);
 
+  /**
+   * Verifies the approval code, makes sure a real seller account exists for the
+   * number on the application, and signs that account in. The seller workspace is
+   * therefore only reachable through a valid account, not just an approval.
+   */
+  const completeSellerApproval = useCallback(async (code) => {
+    const expected = readValue('seller.code', '');
+    if (!expected) {
+      showNotice('Issue an approval code first.');
+      return { ok: false, reason: 'not-issued' };
+    }
+    if (String(code ?? '').trim().toUpperCase() !== expected.toUpperCase()) {
+      showNotice('That approval code does not match.');
+      return { ok: false, reason: 'mismatch' };
+    }
+
+    let parsed;
+    try {
+      parsed = validateIdentifier(sellerProfile.phone);
+    } catch (error) {
+      showNotice(error.message);
+      return { ok: false, reason: 'invalid-identifier' };
+    }
+    if (parsed.type !== 'phone') {
+      showNotice('Enter a valid phone number on the application before approving.');
+      return { ok: false, reason: 'wrong-type' };
+    }
+
+    // Approval is what creates the seller account, so an unknown number is
+    // expected here. An existing account must still be a seller.
+    const existing = findAccount(parsed.normalized);
+    if (existing && existing.role !== 'seller') {
+      showNotice('That number already belongs to a different kind of account.');
+      return { ok: false, reason: 'role-mismatch' };
+    }
+
+    const account = existing ?? await createAccount({
+      identifier: parsed.normalized,
+      role: 'seller',
+      displayName: sellerProfile.business || 'Seller',
+      status: 'active',
+    });
+
+    setSellerApproved(true);
+    writeValue('auth.seller', true);
+    startSession(account);
+    showNotice('Seller approved and signed in.');
+    return { ok: true, account };
+  }, [sellerProfile, accountExists, startSession, showNotice]);
+
   return {
     ready,
     role,
@@ -301,6 +371,7 @@ export function useAuth() {
     setEmail,
     emailCode,
     sendOtp,
+    confirmEmailCode,
 
     sellerProfile,
     setSellerProfile,
@@ -308,6 +379,7 @@ export function useAuth() {
     sellerCode,
     issueSellerCode,
     approveSeller,
+    completeSellerApproval,
 
     available,
     setAvailable,

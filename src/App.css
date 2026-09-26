@@ -189,6 +189,11 @@ button { cursor: pointer; }
 .otp-delivery strong { font-family: 'DM Mono', monospace; font-size: 26px; letter-spacing: .18em; color: #1d5c4e; }
 .otp-delivery small { color: var(--muted); font-size: 9px; }
 .form-error { margin: 0; color: #a55752; font-size: 10px; font-weight: 600; }
+.form-hint { margin: 8px 0 0; color: #a66c20; font-size: 9px; font-weight: 600; }
+.demo-credentials { display: grid; gap: 4px; padding: 12px 14px; background: #f5eff9; border: 1px solid #dfd1e9; border-radius: 5px; }
+.demo-credentials strong { font-size: 12px; }
+.demo-credentials small { color: var(--muted); font-size: 9px; }
+.demo-credentials code { font-family: 'DM Mono', monospace; font-size: 10px; color: #4e3c60; word-break: break-all; }
 .confirm-row { display: inline-flex; gap: 6px; align-items: center; margin-top: 6px; }
 .confirm-row input { width: 130px; padding: 6px 8px; font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: .08em; border: 1px solid #cddbd8; border-radius: 3px; }
 .handover-panel { display: flex; gap: 18px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 20px; }
