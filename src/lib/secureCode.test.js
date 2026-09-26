@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
+  CODE_ALPHABET,
   checkCharacter,
   createOtpChallenge,
   ensureDeviceSecret,
