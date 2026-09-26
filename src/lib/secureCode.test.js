@@ -266,7 +266,9 @@ describe('otp challenges', () => {
 
     // Even the correct code is refused once the challenge is locked.
     const { code } = await createOtpChallenge({ secret: SECRET });
-    await expect(verifyOtpChallenge(challenge, code, SECRET)).resolves.toEqual({ ok: false, reason: 'locked' });
+    const afterLock = await verifyOtpChallenge(challenge, code, SECRET);
+    expect(afterLock.ok).toBe(false);
+    expect(afterLock.reason).toBe('locked');
   });
 
   test('a challenge is bound to its issuing secret', async () => {
