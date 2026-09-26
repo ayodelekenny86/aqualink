@@ -182,3 +182,19 @@ button { cursor: pointer; }
   .primary-button:hover { background: var(--teal); }
   .product-card button:hover { background: var(--teal); }
 }
+
+/* Self-issued codes: OTPs, admin passwords, delivery and approval codes.
+   These are shown in-app because there is no SMS or email provider. */
+.otp-delivery { display: grid; gap: 6px; padding: 14px 16px; background: #edf6f1; border: 1px dashed #9fcdb9; border-radius: 5px; }
+.otp-delivery strong { font-family: 'DM Mono', monospace; font-size: 26px; letter-spacing: .18em; color: #1d5c4e; }
+.otp-delivery small { color: var(--muted); font-size: 9px; }
+.form-error { margin: 0; color: #a55752; font-size: 10px; font-weight: 600; }
+.confirm-row { display: inline-flex; gap: 6px; align-items: center; margin-top: 6px; }
+.confirm-row input { width: 130px; padding: 6px 8px; font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: .08em; border: 1px solid #cddbd8; border-radius: 3px; }
+.handover-panel { display: flex; gap: 18px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 20px; }
+.handover-panel h2 { margin: 6px 0 4px; font-size: 17px; }
+.handover-panel p { margin: 0; color: var(--muted); font-size: 10px; }
+.handover-actions { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; }
+.issued-code { padding: 8px 12px; font-family: 'DM Mono', monospace; font-size: 15px; letter-spacing: .14em; color: #1d5c4e; background: #edf6f1; border: 1px solid #c9e0d4; border-radius: 4px; }
+@media (max-width: 650px) { .handover-panel { flex-direction: column; align-items: flex-start; } }
+
