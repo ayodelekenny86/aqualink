@@ -3,12 +3,26 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App';
 import { clearAll } from './lib/storage';
+import { installFakeApi, teardownFakeApi } from './testServer';
 
 /**
  * The app mints its own one-time codes, so tests cannot hardcode a value.
  * They read the code the UI displays, type it back, and wait for the gate to
  * open rather than asserting synchronously against an async handler.
+ *
+ * Bookings are created server-side so the server owns the price, so each test
+ * installs a stub server.
  */
+beforeEach(() => {
+  clearAll();
+  localStorage.clear();
+  installFakeApi();
+});
+
+afterEach(() => {
+  teardownFakeApi();
+  clearAll();
+});
 /** Waits for the account registry to finish generating before interacting. */
 async function waitForRegistry() {
   await screen.findByRole('heading', { name: /sign in to view your orders|application awaiting approval|operations data needs a verified admin|create your seller account/i });
@@ -88,16 +102,6 @@ async function approveSeller(user) {
   await screen.findByRole('heading', { name: /ready for the next job/i });
 }
 
-beforeEach(() => {
-  clearAll();
-});
-
-// Seeding hashes a password asynchronously, so a promise from a finished test
-// can still write storage. Clearing again stops that leaking into the next test.
-afterEach(() => {
-  clearAll();
-});
-
 test('renders the buyer booking workspace', async () => {
   const user = userEvent.setup();
   render(<App />);
@@ -118,7 +122,23 @@ test('answers a buyer question with Aqua AI', async () => {
   await user.type(screen.getByRole('textbox', { name: /ask aqua ai/i }), 'What is the delivery price?');
   await user.click(screen.getByRole('button', { name: /^ask/i }));
 
-  expect(screen.getByText(/standard water price is GH₵300/i)).toBeInTheDocument();
+  // With no orders there is no price to quote, and the panel must say that
+  // rather than inventing one.
+  expect(screen.getByText(/you have no orders yet/i)).toBeInTheDocument();
+  expect(screen.queryByText(/standard water price/i)).not.toBeInTheDocument();
+});
+
+test('the Aqua panel refuses to invent forecasts or driver positions', async () => {
+  const user = userEvent.setup();
+  render(<App />);
+
+  await user.click(screen.getByRole('button', { name: /aqua ai/i }));
+  await user.type(screen.getByRole('textbox', { name: /ask aqua ai/i }), "what's tomorrow's demand forecast?");
+  await user.click(screen.getByRole('button', { name: /^ask/i }));
+
+  expect(screen.getByText(/cannot forecast demand or track drivers/i)).toBeInTheDocument();
+  // The old answer named a district and a truck count that came from nowhere.
+  expect(screen.queryByText(/stage 6 trucks|pre-position 6/i)).not.toBeInTheDocument();
 });
 
 test('creates a delivery booking and switches workspaces', async () => {
@@ -132,14 +152,15 @@ test('creates a delivery booking and switches workspaces', async () => {
 
   expect(screen.getByRole('status')).toHaveTextContent(/booking confirmed/i);
   expect(screen.getByText('Labone, Accra')).toBeInTheDocument();
-  expect(screen.getByText('Confirmed')).toBeInTheDocument();
+  // An order is not confirmed until Paystack has settled it.
+  expect(screen.getByText('Awaiting payment')).toBeInTheDocument();
 
   await user.click(screen.getByRole('button', { name: /seller app manage your fleet/i }));
   await approveSeller(user);
   expect(screen.getByRole('button', { name: /online and accepting jobs/i })).toBeInTheDocument();
 });
 
-test('issues a checksummed booking reference for each new order', async () => {
+test('issues a server-issued reference for each new order', async () => {
   const user = userEvent.setup();
   render(<App />);
 
@@ -149,9 +170,44 @@ test('issues a checksummed booking reference for each new order', async () => {
   await user.click(screen.getByRole('button', { name: /confirm booking/i }));
 
   const notice = await screen.findByRole('status');
-  expect(notice).toHaveTextContent(/your reference is AQ-\d{4}-[0-9A-Z]/i);
-  // The seeded orders top out at AQ-1051, so the next reference continues past it.
-  expect(notice).toHaveTextContent(/AQ-1052-/i);
+  // The reference is minted by the server now, not continued from a local
+  // counter. There is no local sequence to collide with, so it just has to be
+  // the server's shape.
+  expect(notice).toHaveTextContent(/your reference is AQ-[0-9A-F]{6}/i);
+});
+
+test('never invents a saved address the user did not enter', async () => {
+  const user = userEvent.setup();
+  render(<App />);
+
+  await verifyBuyer(user);
+
+  // The address list starts empty. Adding one saves the location that was
+  // actually typed, rather than inserting a placeholder.
+  expect(screen.queryByRole('button', { name: /⌖/ })).not.toBeInTheDocument();
+
+  await user.type(screen.getByPlaceholderText(/enter an address/i), 'Labone, Accra');
+  await user.click(screen.getByRole('button', { name: /save this address/i }));
+
+  await user.click(screen.getByRole('combobox', { name: /water volume/i }));
+  await user.click(screen.getByRole('button', { name: /⌖ labone, accra/i }));
+  expect(screen.getByRole('textbox', { name: /delivery location/i })).toHaveValue('Labone, Accra');
+});
+
+test('supports repeat booking and language switching', async () => {
+  const user = userEvent.setup();
+  render(<App />);
+
+  await verifyBuyer(user);
+
+  // Save a real address first, then rebook from it.
+  await user.type(screen.getByPlaceholderText(/enter an address/i), 'East Legon, Accra');
+  await user.click(screen.getByRole('button', { name: /save this address/i }));
+  await user.click(screen.getByRole('button', { name: /⌖ east legon, accra/i }));
+  expect(screen.getByRole('textbox', { name: /delivery location/i })).toHaveValue('East Legon, Accra');
+
+  await user.selectOptions(screen.getByRole('combobox', { name: /language/i }), 'tw');
+  expect(screen.getByRole('heading', { name: /Ɛhe na yɛmfa nsuo nkɔ/i })).toBeInTheDocument();
 });
 
 test('lets a seller submit onboarding details', async () => {
@@ -179,19 +235,6 @@ test('shows human support channels to a buyer', async () => {
   expect(screen.getByRole('link', { name: /whatsapp 0545009046/i })).toHaveAttribute('href', 'https://wa.me/233545009046');
 });
 
-test('supports repeat booking and language switching', async () => {
-  const user = userEvent.setup();
-  render(<App />);
-
-  await verifyBuyer(user);
-
-  await user.click(screen.getByRole('button', { name: /home · east legon/i }));
-  expect(screen.getByRole('textbox', { name: /delivery location/i })).toHaveValue('East Legon, Accra');
-
-  await user.selectOptions(screen.getByRole('combobox', { name: /language/i }), 'tw');
-  expect(screen.getByRole('heading', { name: /ɛhe na yɛmfa nsuo nkɔ/i })).toBeInTheDocument();
-});
-
 test('shows AI business health signals in ops', async () => {
   const user = userEvent.setup();
   await createOpsAccount();
@@ -215,25 +258,43 @@ test('refreshes a buyer live driver update', async () => {
   expect(screen.getByText(/driver kojo · en route from east legon/i)).toBeInTheDocument();
 });
 
-test('shows buyer commission and savings', async () => {
+test('buyer finance shows real aggregates and an honest empty state', async () => {
   const user = userEvent.setup();
   render(<App />);
 
   await verifyBuyer(user);
 
-  expect(screen.getByText(/buyer finance/i)).toBeInTheDocument();
-  expect(screen.getByText('GH₵37.50')).toBeInTheDocument();
-  expect(screen.getByText(/15% convenience fee/i)).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: /your money, explained/i })).toBeInTheDocument();
+  // No paid orders yet, so the panel says so rather than showing an invented
+  // fee of GH₵37.50 and a 15% rate that the configured charge never was.
+  expect(screen.getByText(/no paid orders yet/i)).toBeInTheDocument();
+  expect(screen.queryByText('GH₵37.50')).not.toBeInTheDocument();
+  expect(screen.queryByText(/15% convenience fee/i)).not.toBeInTheDocument();
 });
 
-test('shows seller net payout and commission', async () => {
+test('buyer finance totals the real service charges on a paid order', async () => {
+  const user = userEvent.setup();
+  render(<App />);
+
+  await verifyBuyer(user);
+  await user.type(screen.getByPlaceholderText(/enter an address/i), 'Labone, Accra');
+  await user.click(screen.getByRole('button', { name: /confirm booking/i }));
+  await screen.findByRole('status');
+
+  // Booked but not paid, so still nothing to report as collected. The order is
+  // listed as outstanding instead.
+  expect(screen.getByText(/no paid orders yet/i)).toBeInTheDocument();
+});
+
+test('seller finance shows an honest empty state, not an invented payout', async () => {
   const user = userEvent.setup();
   render(<App />);
 
   await user.click(screen.getByRole('button', { name: /seller app manage your fleet/i }));
-  expect(screen.getByText(/seller finance/i)).toBeInTheDocument();
-  expect(screen.getByText('GH₵6,904.40')).toBeInTheDocument();
-  expect(screen.getByText(/20% seller fee/i)).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: /know what you take home/i })).toBeInTheDocument();
+  expect(screen.getByText(/no paid orders yet/i)).toBeInTheDocument();
+  expect(screen.queryByText('GH₵6,904.40')).not.toBeInTheDocument();
+  expect(screen.queryByText(/20% seller fee/i)).not.toBeInTheDocument();
 });
 
 test('rejects a wrong admin password and never stores the plaintext', async () => {
@@ -283,17 +344,19 @@ test('rejects a malformed phone number before any lookup', async () => {
   expect(screen.queryByTestId('otp-code')).not.toBeInTheDocument();
 });
 
-test('shows institution billing and ops revenue control tower', async () => {
+test('institution finance and the ops tower report real figures or none at all', async () => {
   const user = userEvent.setup();
   await createOpsAccount();
   render(<App />);
 
   await user.click(screen.getByRole('button', { name: /institution plan your supply/i }));
   expect(screen.getByText(/institution finance/i)).toBeInTheDocument();
-  expect(screen.getAllByText('GH₵3,500').length).toBeGreaterThan(0);
+  expect(screen.getByText(/no paid orders yet/i)).toBeInTheDocument();
+  // The old dashboard showed a GH₵3,500 plan and GH₵4,820 in escrow; neither
+  // came from an order and there is no escrow.
+  expect(screen.queryByText('GH₵3,500')).not.toBeInTheDocument();
 
   await user.click(screen.getByRole('button', { name: /admin authorized operations access/i }));
   await signInAdmin(user);
   expect(screen.getByText(/revenue control tower/i)).toBeInTheDocument();
-  expect(screen.getByText('GH₵4,820')).toBeInTheDocument();
 });

@@ -8,7 +8,8 @@ import useReports from './hooks/useReports';
 import useNotifications from './hooks/useNotifications';
 import { formatPhoneForDisplay, normalizePhone } from './lib/accounts';
 import { seedProducts } from './lib/collections';
-import RevenueBreakdown from './components/RevenueBreakdown';
+import { formatCedi } from './lib/money';
+import { summarise } from './lib/summary';
 import ContactButtons from './components/ContactButtons';
 import useAdminPricing from './hooks/useAdminPricing';
 import GoogleSignInButton from './components/GoogleSignInButton';
@@ -31,11 +32,16 @@ const ROLE_ICONS = { buyer: '⌂', seller: '↗', institution: '▦', ops: '◈'
 
 const SUPPORT_PHONE = '0545009046';
 
-const finance = {
-  buyer: { transaction: 'GH₵250', fee: 'GH₵37.50', feeRate: '15%', savings: 'GH₵50.00', wallet: 'GH₵24.50' },
-  seller: { gross: 'GH₵8,420', commission: 'GH₵1,684.00', commissionRate: '20%', bonus: 'GH₵168.40', net: 'GH₵6,904.40' },
-  institution: { plan: 'GH₵3,500', nextInvoice: '21 Sep 2026', monthSpend: 'GH₵3,500', deliveries: '14' },
-};
+/**
+ * Money shown to buyers, sellers and institutions, computed from the orders that
+ * actually exist.
+ *
+ * This was a literal object of invented figures: a seller "net GH₵6,904.40", an
+ * institution on a "GH₵3,500 plan", a buyer fee of 15% when the configured
+ * service charge is 10%. None of it came from an order, so a business reading
+ * its own dashboard was reading fiction. Every figure now comes from
+ * `summarise`, which sums real orders.
+ */
 
 function App() {
   const [language, setLanguage] = useState('en');
@@ -70,10 +76,11 @@ function App() {
 
   const { aiOpen, toggleAi, closeAi, aiInput, setAiInput, aiMessages, askAi } = useAquaAi({
     language,
-    requestRefund,
+    orders,
+    split,
   });
 
-  const { downloadReport } = useReports({ region, onNotice: showNotice });
+  const { downloadReport } = useReports({ region, orders, onNotice: showNotice });
 
   const roleNotifications = forRole(role);
   const roleUnread = unreadCount(role);
@@ -100,7 +107,7 @@ function App() {
         {notice && <div className="notice" role="status"><span>✓</span>{notice}<button type="button" aria-label="Dismiss notification" onClick={dismissNotice}>×</button></div>}
         {aiOpen && <AiPanel role={role} input={aiInput} setInput={setAiInput} messages={aiMessages} askAi={askAi} close={closeAi} />}
         {!ready && <section className="access-gate panel"><span className="access-lock">⌁</span><p className="eyebrow">Preparing secure workspace</p><h1>Setting up your accounts.</h1><p>AquaLink is generating the local account registry and its credentials on this device. This takes a moment and needs no network access.</p></section>}
-        {ready && role === 'buyer' && (buyerAuthenticated ? <><BuyerView booking={booking} updateBooking={updateBooking} requestDelivery={requestDelivery} orders={orders} showNotice={showNotice} authStep={authStep} email={email} setEmail={setEmail} emailCode={emailCode} sendOtp={sendOtp} confirmEmailCode={confirmEmailCode} confirmDelivery={confirmDelivery} requestRefund={requestRefund} savedAddresses={savedAddresses} repeatBooking={repeatBooking} setSavedAddresses={setSavedAddresses} t={t} driverUpdate={driverUpdate} refreshDriverUpdate={refreshDriverUpdate} /><BuyerFinance showNotice={showNotice} /></> : <BuyerAccessGate onSignedIn={() => {}} startSignIn={startPhoneSignIn} confirmCode={confirmPhoneCode} generatedCode={phoneCode} identifier={phoneIdentifier} error={signInError} onRegister={(value) => registerAccount({ identifier: value, role: 'buyer', displayName: 'Buyer' })} accountExists={accountExists} onGoogle={signInWithGoogleIdentity} showNotice={showNotice} />)}
+        {ready && role === 'buyer' && (buyerAuthenticated ? <><BuyerView booking={booking} updateBooking={updateBooking} requestDelivery={requestDelivery} orders={orders} showNotice={showNotice} authStep={authStep} email={email} setEmail={setEmail} emailCode={emailCode} sendOtp={sendOtp} confirmEmailCode={confirmEmailCode} confirmDelivery={confirmDelivery} requestRefund={requestRefund} savedAddresses={savedAddresses} repeatBooking={repeatBooking} setSavedAddresses={setSavedAddresses} t={t} driverUpdate={driverUpdate} refreshDriverUpdate={refreshDriverUpdate} /><BuyerFinance orders={orders} showNotice={showNotice} /></> : <BuyerAccessGate onSignedIn={() => {}} startSignIn={startPhoneSignIn} confirmCode={confirmPhoneCode} generatedCode={phoneCode} identifier={phoneIdentifier} error={signInError} onRegister={(value) => registerAccount({ identifier: value, role: 'buyer', displayName: 'Buyer' })} accountExists={accountExists} onGoogle={signInWithGoogleIdentity} showNotice={showNotice} />)}
         {notificationsOpen && (
           <Suspense fallback={null}>
             <NotificationsPanel
@@ -135,9 +142,10 @@ function App() {
           </Suspense>
         )}
         {ready && role === 'seller' && (sellerAuthenticated ? <SellerView available={available} setAvailable={setAvailable} showNotice={showNotice} orders={orders} updateOrderStatus={(id, status) => updateOrderStatus(id, status, notify)} issueDeliveryCode={issueDeliveryCode} sellerProfile={sellerProfile} setSellerProfile={setSellerProfile} /> : <SellerAccessGate sellerProfile={sellerProfile} setSellerProfile={setSellerProfile} onApproved={completeSellerApproval} issueCode={issueSellerCode} currentCode={sellerCode} />)}
-        {role === 'seller' && <SellerFinance showNotice={showNotice} />}
+        {role === 'seller' && <SellerFinance orders={orders} showNotice={showNotice} />}
         {role === 'seller' && <LiveAgentCard role="seller" showNotice={showNotice} />}
-        {role === 'institution' && <InstitutionView showNotice={showNotice} />}        {role === 'institution' && <InstitutionFinance showNotice={showNotice} />}
+        {role === 'institution' && <InstitutionView showNotice={showNotice} />}
+        {role === 'institution' && <InstitutionFinance orders={orders} showNotice={showNotice} />}
         {role === 'institution' && <InstitutionAgentCard showNotice={showNotice} />}
         {ready && role === 'ops' && (adminAuthenticated ? <OpsView downloadReport={downloadReport} /> : <AdminAccessGate onSignIn={signInWithPassword} error={signInError} onGoogle={signInWithGoogleIdentity} showNotice={showNotice} />)}
         {ready && role === 'ops' && adminAuthenticated && <ReportActions downloadReport={downloadReport} />}
@@ -226,7 +234,7 @@ function BuyerView({ booking, updateBooking, requestDelivery, orders, showNotice
   return <>
     <PageHeader eyebrow="Tuesday, 21 August 2026" title="Good morning, Alex." copy="Get your next delivery sorted in a few taps." action={<button className="outline-button" type="button" onClick={() => showNotice('Referral link copied to your clipboard.')}>↗ Invite a friend <span>+GH₵20</span></button>} />
     <section className="auth-strip panel"><div><span className="section-kicker">ACCOUNT & SECURITY</span><strong>{authStep === 'verified' ? 'Email verified' : 'Enter your generated code'}</strong><small>{authStep === 'verified' ? 'OTP login enabled · no password required' : `AquaLink generated ${emailCode} for ${email}`}</small></div>{authStep === 'verified' ? <form className="auth-form" onSubmit={(event) => { event.preventDefault(); sendOtp(); }}><input aria-label="Email address" value={email} onChange={(event) => setEmail(event.target.value)} type="email" /><button className="outline-button" type="submit">Send OTP</button></form> : <form className="auth-form" onSubmit={async (event) => { event.preventDefault(); const result = await confirmEmailCode(emailOtp); if (result?.ok) setEmailOtp(''); }}><input aria-label="OTP code" value={emailOtp} onChange={(event) => setEmailOtp(event.target.value)} placeholder="Enter 6-digit OTP" inputMode="numeric" /><button className="primary-button" type="submit">Verify</button></form>}</section>
-    <section className="saved-addresses panel"><div><span className="section-kicker">FAST REBOOK</span><strong>Saved addresses</strong><small>Repeat a trusted delivery without typing it again.</small></div><div className="saved-address-list">{savedAddresses.map((address) => <button type="button" key={address} onClick={() => repeatBooking(address)}>⌖ {address}</button>)}<button type="button" onClick={() => { const address = 'New address · Tema, Ghana'; setSavedAddresses([...savedAddresses, address]); showNotice('New saved address added.'); }}>+ Add address</button></div></section>
+    <section className="saved-addresses panel"><div><span className="section-kicker">FAST REBOOK</span><strong>Saved addresses</strong><small>Repeat a trusted delivery without typing it again.</small></div><div className="saved-address-list">{savedAddresses.map((address) => <button type="button" key={address} onClick={() => repeatBooking(address)}>⌖ {address}</button>)}<button type="button" onClick={() => { const typed = booking.location.trim(); if (!typed) { showNotice('Type a delivery location first, then save it here.'); return; } if (savedAddresses.includes(typed)) { showNotice('That address is already saved.'); return; } setSavedAddresses([...savedAddresses, typed]); showNotice(`Saved ${typed} for quick rebooking.`); }}>+ Save this address</button></div></section>
     <div className="buyer-grid">
       <section className="panel booking-panel"><div className="panel-title"><div><span className="section-kicker">NEW BOOKING · {t.book}</span><h2>{t.location}</h2></div><span className="verified-pill">✓ Verified sellers</span></div><form onSubmit={requestDelivery}><label>Delivery location<div className="input-wrap"><span>⌖</span><input name="location" value={booking.location} onChange={updateBooking} placeholder="Enter an address or landmark" /></div></label><label>WhatsApp number <small className="field-hint">(optional, if different from your phone)</small><div className="input-wrap"><span>✆</span><input name="whatsapp" value={booking.whatsapp} onChange={updateBooking} placeholder="e.g. 0551234567" inputMode="tel" /></div></label><div className="form-row"><label>Water volume<select name="volume" value={booking.volume} onChange={updateBooking}><option>1,000 gallons</option><option>2,000 gallons</option><option>5,000 gallons</option></select></label><label>Delivery window<select name="window" value={booking.window} onChange={updateBooking}><option>As soon as possible</option><option>Today, 12:00–14:00</option><option>Tomorrow morning</option></select></label></div><div className="quote"><span><small>LIST PRICE · BUYER PRICE</small><strong>GH₵300 · GH₵250</strong></span><span className="quote-note">GH₵50 discount<br />No surge fees</span></div><label className="payment-label">Payment method<select name="payment" value={booking.payment} onChange={updateBooking}><option>Hubtel mobile money</option><option>Cash on delivery fallback</option></select></label><p className="escrow-note">Funds are held securely in escrow until you confirm receipt.</p><button className="primary-button full" type="submit">{t.book} <span>→</span></button></form></section>
       <div className="side-stack"><section className="panel rewards-panel"><div className="panel-title"><div><span className="section-kicker">YOUR REWARDS</span><h2>Silver tier</h2></div><span className="tier-badge">✦</span></div><div className="reward-progress"><strong>340</strong><span>/ 500 points to Gold</span><div><i /></div></div><div className="reward-foot"><span>2% cashback available</span><button type="button" onClick={() => showNotice('Your wallet balance is GH₵24.50.')}>View wallet →</button></div></section><LiveAgentCard role="buyer" driverUpdate={driverUpdate} refreshDriverUpdate={refreshDriverUpdate} showNotice={showNotice} /></div>
@@ -271,16 +279,43 @@ function OperationalRiskPanel() {
   return <section className="operational-risk panel"><div className="section-heading"><div><span className="ai-label">✦ AQUA AI EARLY WARNING</span><h2>Business health signals</h2></div><span className="queue-count">Updated now</span></div><div className="risk-grid"><article><span className="risk-icon warning">!</span><div><strong>Seller slowdown</strong><p>S-019 declined 6 jobs this week. Estimated GMV exposure: GH₵420.</p></div><button type="button">Diagnose →</button></article><article><span className="risk-icon alert">◌</span><div><strong>Buyer dissatisfaction</strong><p>3 East Legon buyers reported late deliveries. Churn risk is rising.</p></div><button type="button">Open cohort →</button></article><article><span className="risk-icon good">✓</span><div><strong>Payment health</strong><p>GH₵4,820 remains in escrow across 31 orders. 4 need manual review.</p></div><button type="button">Review queue →</button></article></div></section>;
 }
 
-function BuyerFinance({ showNotice }) {
-  return <section className="finance-workspace"><div className="finance-heading"><div><span className="section-kicker">BUYER FINANCE</span><h2>Your money, explained.</h2><p>Clear fees, savings, and wallet credits on every booking.</p></div><button className="outline-button" type="button" onClick={() => showNotice('Buyer statement ready: 8 bookings, GH₵1,170 spent, GH₵96.50 saved.')}>Download statement ↓</button></div><div className="finance-grid buyer-finance"><article><span>LAST TRANSACTION</span><strong>{finance.buyer.transaction}</strong><small>Water delivery · AQ-1048</small></article><article><span>AQUALINK FEE</span><strong>{finance.buyer.fee}</strong><small>{finance.buyer.feeRate} convenience fee</small></article><article><span>LOYALTY SAVINGS</span><strong>{finance.buyer.savings}</strong><small>Cashback + fixed-price savings</small></article><article><span>WALLET BALANCE</span><strong>{finance.buyer.wallet}</strong><small>Available for future bookings</small></article></div></section>;
+function FinanceEmpty({ title, copy }) {
+  return (
+    <section className="finance-workspace">
+      <div className="finance-heading">
+        <div><span className="section-kicker">FINANCE</span><h2>{title}</h2><p>{copy}</p></div>
+      </div>
+      <p className="empty-feed" role="note">
+        No paid orders yet, so there is nothing to report. These figures are summed from real orders and
+        are deliberately left at zero rather than filled with sample numbers.
+      </p>
+    </section>
+  );
 }
 
-function SellerFinance({ showNotice }) {
-  return <section className="finance-workspace"><div className="finance-heading"><div><span className="section-kicker">SELLER FINANCE</span><h2>Know what you take home.</h2><p>Commission, bonuses, and payout timing are visible per month and per job.</p></div><button className="outline-button" type="button" onClick={() => showNotice('Seller payout statement downloaded for August 2026.')}>Download payout statement ↓</button></div><div className="finance-grid seller-finance"><article><span>GROSS EARNINGS</span><strong>{finance.seller.gross}</strong><small>52 completed deliveries</small></article><article><span>PLATFORM COMMISSION</span><strong>-{finance.seller.commission}</strong><small>{finance.seller.commissionRate} seller fee</small></article><article><span>PERFORMANCE BONUSES</span><strong>+{finance.seller.bonus}</strong><small>2% volume + rating incentives</small></article><article className="finance-highlight"><span>ESTIMATED NET PAYOUT</span><strong>{finance.seller.net}</strong><small>Next payout: daily batch · within 24 hours</small></article></div></section>;
+function BuyerFinance({ orders, showNotice }) {
+  const summary = summarise(orders);
+  if (!summary.paidCount) {
+    return <FinanceEmpty title="Your money, explained." copy="Fees on every booking, once one is paid." />;
+  }
+  const lastPaid = orders.find((order) => order.status === 'Paid');
+  return <section className="finance-workspace"><div className="finance-heading"><div><span className="section-kicker">BUYER FINANCE</span><h2>Your money, explained.</h2><p>What you paid, and what AquaLink charged, across your paid orders.</p></div><button className="outline-button" type="button" onClick={() => showNotice(`${summary.paidCount} paid order(s), ${formatCedi(summary.chargedMinor)} total including fees.`)}>Summarise ↓</button></div><div className="finance-grid buyer-finance"><article><span>LAST PAID ORDER</span><strong>{formatCedi(lastPaid?.chargedMinor ?? 0)}</strong><small>{lastPaid?.code ?? '—'}</small></article><article><span>SERVICE CHARGES PAID</span><strong>{formatCedi(summary.serviceChargeMinor)}</strong><small>Across {summary.paidCount} paid order(s)</small></article><article><span>TOTAL PAID</span><strong>{formatCedi(summary.chargedMinor)}</strong><small>Order value plus fees</small></article><article><span>STILL TO PAY</span><strong>{formatCedi(summary.unpaidMinor)}</strong><small>{summary.unpaidCount} unpaid order(s)</small></article></div></section>;
 }
 
-function InstitutionFinance({ showNotice }) {
-  return <section className="finance-workspace"><div className="finance-heading"><div><span className="section-kicker">INSTITUTION FINANCE</span><h2>Plan the month with confidence.</h2><p>Subscription billing, invoice history, and delivery usage in one view.</p></div><button className="outline-button" type="button" onClick={() => showNotice('Invoice INV-2026-08 downloaded.')}>Download invoice ↓</button></div><div className="finance-grid institution-finance"><article className="finance-highlight"><span>ACTIVE PLAN</span><strong>{finance.institution.plan}<small> / month</small></strong><small>Reliability Plus</small></article><article><span>NEXT INVOICE</span><strong>{finance.institution.nextInvoice}</strong><small>Auto-pay · Hubtel</small></article><article><span>MONTHLY COMMITMENT</span><strong>{finance.institution.monthSpend}</strong><small>Fixed pricing protected</small></article><article><span>DELIVERIES REMAINING</span><strong>{finance.institution.deliveries}</strong><small>Included this cycle</small></article></div></section>;
+function SellerFinance({ orders, showNotice }) {
+  const summary = summarise(orders);
+  if (!summary.paidCount) {
+    return <FinanceEmpty title="Know what you take home." copy="Your share of each paid delivery, once there is one." />;
+  }
+  return <section className="finance-workspace"><div className="finance-heading"><div><span className="section-kicker">SELLER FINANCE</span><h2>Know what you take home.</h2><p>Your allocated share of orders that have been paid.</p></div><button className="outline-button" type="button" onClick={() => showNotice(`Seller share across ${summary.paidCount} paid order(s): ${formatCedi(summary.sellerReceivesMinor)}.`)}>Summarise ↓</button></div><div className="finance-grid seller-finance"><article><span>YOUR SHARE</span><strong>{formatCedi(summary.sellerReceivesMinor)}</strong><small>Water seller allocation</small></article><article><span>ORDER VALUE</span><strong>{formatCedi(summary.grossMinor)}</strong><small>Before fees, {summary.paidCount} paid order(s)</small></article><article><span>AQUALINK COMMISSION</span><strong>-{formatCedi(summary.platformCommissionMinor)}</strong><small>Platform allocation</small></article><article className="finance-highlight"><span>PENDING PAYOUT</span><strong>{formatCedi(summary.sellerReceivesMinor)}</strong><small>Paid orders not yet paid out to sellers</small></article></div></section>;
+}
+
+function InstitutionFinance({ orders, showNotice }) {
+  const summary = summarise(orders);
+  if (!summary.paidCount) {
+    return <FinanceEmpty title="Plan the month with confidence." copy="Delivery spend and usage, once orders are paid." />;
+  }
+  return <section className="finance-workspace"><div className="finance-heading"><div><span className="section-kicker">INSTITUTION FINANCE</span><h2>Plan the month with confidence.</h2><p>Spend and delivery volume, summed from paid orders.</p></div><button className="outline-button" type="button" onClick={() => showNotice(`${summary.paidCount} paid order(s), ${formatCedi(summary.chargedMinor)} total.`)}>Summarise ↓</button></div><div className="finance-grid institution-finance"><article className="finance-highlight"><span>TOTAL SPEND</span><strong>{formatCedi(summary.chargedMinor)}</strong><small>Paid orders including fees</small></article><article><span>DELIVERIES</span><strong>{summary.deliveredCount}</strong><small>Confirmed at handover</small></article><article><span>ORDERS IN FLIGHT</span><strong>{summary.unpaidCount}</strong><small>Awaiting payment</small></article><article><span>AVG ORDER VALUE</span><strong>{formatCedi(summary.paidCount ? Math.round(summary.grossMinor / summary.paidCount) : 0)}</strong><small>Before fees</small></article></div></section>;
 }
 
 function RevenueFinance({ showNotice }) {

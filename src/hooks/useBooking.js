@@ -173,7 +173,7 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
 
   /**
    * Seller-side handover: issues the delivery confirmation code the buyer must
-   * quote before escrow is released.
+   * quote before the order is marked delivered.
    */
   const issueDeliveryCode = useCallback((orderId) => {
     const code = generateConfirmationCode('delivery');
@@ -182,7 +182,15 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
     return code;
   }, [onNotice, commit]);
 
-  /** Buyer-side: escrow only releases when the issued code matches. */
+  /**
+   * Buyer-side: the order is only marked delivered when the issued code matches.
+   *
+   * This confirms handover, nothing more. Paystack collects the buyer's money
+   * directly into the AquaLink account, so there is no escrow to release here,
+   * and paying the seller is a separate process that is not implemented yet.
+   * The old wording claimed funds had been released, which described a system
+   * that does not exist.
+   */
   const confirmDelivery = useCallback((orderId, code) => {
     const order = orders.find((item) => item.id === orderId);
     if (!order) return { ok: false, reason: 'unknown-order' };
@@ -191,8 +199,10 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
       onNotice('That delivery code does not match. Ask the driver for the code.');
       return { ok: false, reason: 'mismatch' };
     }
-    commit((items) => items.map((item) => (item.id === orderId ? { ...item, payment: 'Released', confirmCode: '' } : item)));
-    onNotice('Delivery confirmed. Escrow funds released to the seller.');
+    commit((items) => items.map((item) => (item.id === orderId
+      ? { ...item, status: 'Delivered', payment: 'Delivered · awaiting seller payout', confirmCode: '' }
+      : item)));
+    onNotice(`Delivery confirmed for ${orderId}. Seller payout is handled separately by operations.`);
     return { ok: true };
   }, [orders, onNotice, commit]);
 

@@ -1,55 +1,135 @@
 import { useCallback, useState } from 'react';
 import { translations } from '../data/translations';
+import { formatCedi } from '../lib/money';
 
-const greeting = { from: 'ai', text: 'Hi Alex. I can help compare delivery options, explain an order, or flag an ops risk.' };
+/**
+ * The Aqua panel.
+ *
+ * This is a keyword matcher, not a model, and it used to pretend otherwise. It
+ * answered "the price is GH₵300, discounted to GH₵250 with a 15% commission" and
+ * "hold 6 trucks in East Legon tomorrow" as if it knew, described a specific
+ * order that no user had, and offered a phone number and an email address that
+ * were invented. A panel that answers confidently with fiction is worse than one
+ * that admits its limits, because a seller can act on it.
+ *
+ * So the rules now are:
+ *   - anything about money is read from the caller's own orders;
+ *   - anything that would need a forecasting model or live telemetry says so;
+ *   - no invented phone numbers, emails, order references or prices.
+ */
+
+const greeting = { from: 'ai', text: 'I can explain your orders and what they cost. I read your real order data, so if I do not know something I will say so rather than guess.' };
 
 export const aiQuickActions = (role) => (role === 'ops'
-  ? ['Forecast demand', 'Optimize dispatch', 'Find service risks', 'Review refund queue']
-  : ['Explain my order', 'Check delivery price', 'Find my receipt', 'Track driver ETA', 'Request a refund']);
+  ? ['Explain an order', 'Summarise revenue', 'List unpaid orders', 'Check revenue split']
+  : ['Explain my order', 'Check delivery price', 'Find my receipt', 'Request a refund']);
 
-const FALLBACK_ANSWER = 'I can help with bookings, delivery status, pricing, rewards, seller performance, or operations. What should we look at?';
+const FALLBACK_ANSWER = 'I can explain your orders, their cost, and how the revenue split works. I cannot forecast demand or track drivers, because that data is not available to me. Try asking about an order or its price.';
 
-/**
- * Keyword-to-answer table. The first entry whose keywords match the question
- * wins, except for `sideEffect` entries which also fire an action.
- */
-export const aiAnswerTable = [
-  { keywords: ['price', 'cost'], answer: 'The standard water price is GH₵300, with a buyer discount to GH₵250. The 15% buyer commission is GH₵37.50 and Hubtel payment is held in escrow.' },
-  { keywords: ['status', 'order'], answer: 'Your newest order is confirmed. A seller can move it to En Route, then Delivered. You release payment only after confirming receipt.' },
-  { keywords: ['dispatch', 'seller'], answer: 'Priority recommendation: assign AQ-1051 to the nearest verified seller with a 4.8+ rating and a 96%+ completion rate. This minimizes late-delivery risk.' },
-  { keywords: ['forecast', 'demand'], answer: 'Tomorrow’s demand signal is strongest in East Legon and Osu between 07:00–10:00. Pre-position 6 available trucks and keep 2 as reserve capacity.' },
-  { keywords: ['receipt'], answer: 'Your receipt is available in Recent deliveries. Choose Receipt on a completed order to download or email the Hubtel payment record.' },
-  { keywords: ['driver', 'position', 'eta'], answer: 'For an En Route order, choose Driver position in Recent deliveries. The seller app shares the latest ETA; AquaLink does not expose an unverified live map.' },
-  { keywords: ['support', 'agent'], answer: 'You can call 0545009046, email support@aqualink.gh, message WhatsApp at 0545009046, or open a ticket from the Human support card.' },
-  {
-    keywords: ['refund'],
-    answer: 'I can open a refund request for AQ-1048. Ops will review the order evidence and email you with the decision.',
-    sideEffect: ({ requestRefund }) => requestRefund('AQ-1048'),
-  },
-];
+/** The newest order the caller actually has, or null. */
+function newestOrder(orders) {
+  if (!Array.isArray(orders) || orders.length === 0) return null;
+  return orders[0];
+}
 
-/**
- * Pure responder: maps a free-text question to an answer, optionally running a
- * side effect (such as opening a refund) and prefixing the localised support line.
- */
-export const getAiAnswer = (question, { language = 'en', requestRefund } = {}) => {
-  const lowerQuestion = question.toLowerCase();
-  const match = aiAnswerTable.find((entry) =>
-    entry.keywords.some((keyword) => lowerQuestion.includes(keyword))
-  );
-
-  if (!match) return FALLBACK_ANSWER;
-  if (match.sideEffect && requestRefund) match.sideEffect({ requestRefund });
-
-  const support = translations[language]?.support;
-  return language !== 'en' && support ? `${support} · ${match.answer}` : match.answer;
+export const SUPPORT_CHANNELS = {
+  // Kept as configuration rather than baked into answer strings, so these are
+  // clearly the values a deployment sets rather than invented suggestions.
+  phone: import.meta.env?.VITE_SUPPORT_PHONE ?? '',
+  email: import.meta.env?.VITE_SUPPORT_EMAIL ?? '',
 };
 
+function supportAnswer() {
+  const { phone, email } = SUPPORT_CHANNELS;
+  if (!phone && !email) {
+    return 'No support contact details are configured for this deployment, so I have nothing to give you here rather than a number that would not work.';
+  }
+  return [phone && `Call ${phone}.`, email && `Email ${email}.`].filter(Boolean).join(' ');
+}
+
 /**
- * Owns the Aqua AI panel: open state, draft input, message history and the
- * keyword-matched responder that can also trigger side effects (refunds).
+ * Answer from real order data. Kept pure and exported so the behaviour can be
+ * tested without rendering the panel.
  */
-export function useAquaAi({ language, requestRefund } = {}) {
+export function getAiAnswer(question, { language = 'en', orders = [], split } = {}) {
+  const lower = String(question ?? '').toLowerCase();
+  const latest = newestOrder(orders);
+
+  const totalShare = split
+    ? `${split.seller}% seller, ${split.driver}% driver, ${split.platformCommission}% platform`
+    : null;
+
+  const table = [
+    {
+      keywords: ['price', 'cost', 'how much', 'charge'],
+      answer: () => {
+        if (!latest) return 'You have no orders yet, so there is no price to quote. The amount you will be charged is calculated on the server when you book, and shown before you pay.';
+        return `Your most recent order, ${latest.code}, was ${formatCedi(latest.grossMinor ?? 0)} for the water plus a ${formatCedi(latest.buyerServiceCharge ?? 0)} service charge, ${formatCedi(latest.chargedMinor ?? 0)} in total. That order is currently ${latest.status}.`;
+      },
+    },
+    {
+      keywords: ['status', 'order', 'progress'],
+      answer: () => {
+        if (!latest) return 'You have no orders yet. Once you book one, its status will appear here and in your delivery list.';
+        return `Your most recent order ${latest.code} for ${formatCedi(latest.chargedMinor ?? 0)} is currently "${latest.status}". ${latest.status === 'Paid' ? 'Payment is confirmed by Paystack.' : 'It is not paid yet.'}`;
+      },
+    },
+    {
+      keywords: ['receipt'],
+      answer: () => {
+        if (!latest) return 'There is no receipt because there are no paid orders. A receipt is generated once Paystack confirms payment.';
+        return latest.status === 'Paid'
+          ? 'Your receipt is on the paid order in your checkout panel, and can be downloaded from there.'
+          : `Order ${latest.code} is not paid yet, so there is no receipt to download. A receipt appears once Paystack confirms the payment.`;
+      },
+    },
+    {
+      keywords: ['split', 'payout', 'commission', 'revenue', 'share'],
+      answer: () => {
+        if (!latest) return 'There are no orders to break down yet.';
+        const parts = [
+          `water seller ${formatCedi(latest.sellerReceives ?? 0)}`,
+          `driver ${formatCedi(latest.driverReceives ?? 0)}`,
+          `AquaLink ${formatCedi(latest.platformCommission ?? 0)}`,
+        ].join(', ');
+        return `For ${latest.code}: ${parts}.${totalShare ? ` The configured split is ${totalShare}.` : ''}`;
+      },
+    },
+    {
+      keywords: ['unpaid', 'pending', 'awaiting', 'owe'],
+      answer: () => {
+        const unpaid = (orders ?? []).filter((order) => order.status !== 'Paid' && order.status !== 'Delivered');
+        if (unpaid.length === 0) return 'Nothing is outstanding. Every order you have is paid or delivered.';
+        return `Outstanding: ${unpaid.map((order) => `${order.code} (${formatCedi(order.chargedMinor ?? 0)})`).join(', ')}.`;
+      },
+    },
+    {
+      keywords: ['forecast', 'demand', 'predict', 'truck', 'dispatch', 'driver', 'eta', 'position', 'track'],
+      // The old answers invented tomorrow's demand and told ops to stage six
+      // trucks in a named district. Nothing here can support that.
+      answer: () => 'I cannot forecast demand or track drivers. That needs a forecasting model and live vehicle telemetry, and neither is connected to this app. I will not invent a number for it.',
+    },
+    {
+      keywords: ['support', 'agent', 'help', 'contact'],
+      answer: supportAnswer,
+    },
+    {
+      keywords: ['refund'],
+      answer: () => {
+        if (!latest) return 'There is no order to request a refund for.';
+        return `You can request a refund for ${latest.code} from its order details. Operations reviews it against the delivery record; note that Paystack charges and settlement are handled on Paystack's side and are not reversed by this app.`;
+      },
+    },
+  ];
+
+  const match = table.find((entry) => entry.keywords.some((keyword) => lower.includes(keyword)));
+  const answer = match ? match.answer() : FALLBACK_ANSWER;
+
+  const support = translations[language]?.support;
+  return language !== 'en' && support ? `${support} · ${answer}` : answer;
+}
+
+export function useAquaAi({ language, orders = [], split, requestRefund } = {}) {
   const [aiOpen, setAiOpen] = useState(false);
   const [aiInput, setAiInput] = useState('');
   const [aiMessages, setAiMessages] = useState([greeting]);
@@ -58,10 +138,10 @@ export function useAquaAi({ language, requestRefund } = {}) {
     event.preventDefault();
     const question = aiInput.trim();
     if (!question) return;
-    const answer = getAiAnswer(question, { language, requestRefund });
+    const answer = getAiAnswer(question, { language, orders, split });
     setAiMessages((messages) => [...messages, { from: 'user', text: question }, { from: 'ai', text: answer }]);
     setAiInput('');
-  }, [aiInput, language, requestRefund]);
+  }, [aiInput, language, orders, split]);
 
   const toggleAi = useCallback(() => setAiOpen((open) => !open), []);
   const closeAi = useCallback(() => setAiOpen(false), []);
