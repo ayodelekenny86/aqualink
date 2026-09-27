@@ -203,16 +203,21 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
   }, [onNotice]);
 
   const updateOrderStatus = useCallback(async (orderId, status, notify) => {
+    // Stamp the timing the reliability engine reads. An order that was never
+    // assigned has no delivery window to measure, and that is reported as
+    // unmeasured rather than given an invented one.
     const updates = { status, updatedAt: serverTimestamp() };
+    if (status === 'Assigned') updates.assignedAt = serverTimestamp();
+    if (status === 'Delivered') updates.deliveredAt = serverTimestamp();
     if (USE_FIRESTORE && db) {
       try {
         await updateDoc(doc(getOrdersCollection(), orderId), updates);
       } catch (err) {
         console.error('Failed to update order status:', err);
-        commit((items) => items.map((item) => (item.id === orderId ? { ...item, status } : item)));
+        commit((items) => items.map((item) => (item.id === orderId ? { ...item, ...updates } : item)));
       }
     } else {
-      commit((items) => items.map((item) => (item.id === orderId ? { ...item, status } : item)));
+      commit((items) => items.map((item) => (item.id === orderId ? { ...item, ...updates } : item)));
     }
     onNotice(`Order ${orderId} is now ${status.toLowerCase()}.`);
     const order = orders.find((item) => item.id === orderId);

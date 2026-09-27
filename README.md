@@ -184,6 +184,17 @@ There is no escrow and no pending-payout queue. Paystack collects money directly
 into the AquaLink account, so confirming delivery marks an order delivered and
 records that the seller payout is handled separately by operations.
 
+### Reliability scoring
+
+`src/lib/reliability.js` is a second opinion on seller performance, aimed at the
+operator question "how dependable is this seller, and how long do they usually
+take?". It sums completion, cancellation and on-time rates from real orders, and
+it estimates a delivery window as the **median of observed delivery windows**,
+expressed as a range and labelled an estimate. That estimate is not a promise, and
+it is not invented: where timing is unrecorded the panel says so plainly rather
+than substituting a plausible number. Timing is recorded when an order is marked
+Assigned and then Delivered, so a fresh workspace has no window to report.
+
 ### Google sign-in
 
 Set `VITE_GOOGLE_CLIENT_ID` to the client id of a **Web application** OAuth

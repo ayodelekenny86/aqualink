@@ -53,6 +53,7 @@ export function recordAssignment(orderId, { driver, seller }) {
     driverScore: driver?.score ?? order.driverScore ?? null,
     sellerName: seller?.candidate?.name ?? order.sellerName ?? '',
     sellerId: seller?.candidate?.id ?? order.sellerId ?? '',
+    assignedAt: order.assignedAt ?? new Date().toISOString(),
     assignmentReason: [
       driver ? `driver ${explain(driver)}` : 'no driver available',
       seller ? `seller ${explain(seller)}` : 'no seller with capacity',

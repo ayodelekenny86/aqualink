@@ -57,3 +57,27 @@ describe('Aqua AI — seller performance intent', () => {
     expect(answer).toMatch(/No seller has a completed order yet/);
   });
 });
+
+describe('Aqua AI — delivery time intent', () => {
+  test('reports the fastest and slowest observed window', () => {
+    const reliability = [
+      { sellerId: 'slr_a', slaMeasured: true, slaHours: 10, timedDeliveries: 3 },
+      { sellerId: 'slr_b', slaMeasured: true, slaHours: 30, timedDeliveries: 2 },
+    ];
+    const answer = getAiAnswer('how long do deliveries take', { orders: [], reliabilityScores: reliability });
+    expect(answer).toMatch(/slr_a/);
+    expect(answer).toMatch(/slr_b/);
+    expect(answer).toMatch(/not promises/);
+  });
+
+  test('says plainly when no timing has been recorded', () => {
+    const reliability = [{ sellerId: 'slr_a', slaMeasured: false, timedDeliveries: 0 }];
+    const answer = getAiAnswer('delivery time', { orders: [], reliabilityScores: reliability });
+    expect(answer).toMatch(/no delivery window can be estimated/);
+  });
+
+  test('says plainly when no seller has completed an order', () => {
+    const answer = getAiAnswer('how long do deliveries take', { orders: [], reliabilityScores: [] });
+    expect(answer).toMatch(/No seller has a completed order yet/);
+  });
+});

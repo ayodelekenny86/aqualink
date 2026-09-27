@@ -22,7 +22,7 @@ import { tierFor, computePoints, TIERS } from './useLoyalty';
 const greeting = { from: 'ai', text: 'I can explain your orders and what they cost. I read your real order data, so if I do not know something I will say so rather than guess.' };
 
 export const aiQuickActions = (role) => (role === 'ops'
-  ? ['Explain an order', 'Summarise revenue', 'List unpaid orders', 'Check revenue split', 'Score sellers']
+  ? ['Explain an order', 'Summarise revenue', 'List unpaid orders', 'Check revenue split', 'Score sellers', 'How long do deliveries take']
   : ['Explain my order', 'Check delivery price', 'Find my receipt', 'Request a refund', 'My loyalty tier']);
 
 const FALLBACK_ANSWER = 'I can explain your orders, their cost, and how the revenue split works. I cannot forecast demand or track drivers, because that data is not available to me. Try asking about an order or its price.';
@@ -52,7 +52,7 @@ function supportAnswer() {
  * Answer from real order data. Kept pure and exported so the behaviour can be
  * tested without rendering the panel.
  */
-export function getAiAnswer(question, { language = 'en', orders = [], split, sellerScores = [], buyerId = null } = {}) {
+export function getAiAnswer(question, { language = 'en', orders = [], split, sellerScores = [], reliabilityScores = [], buyerId = null } = {}) {
   const lower = String(question ?? '').toLowerCase();
   const latest = newestOrder(orders);
 
@@ -135,6 +135,22 @@ export function getAiAnswer(question, { language = 'en', orders = [], split, sel
         return flagged.length
           ? `${head} ${flagged.length} seller(s) are below the watch threshold: ${flagged.map((s) => `${s.sellerId} (${s.score})`).join(', ')}.`
           : `${head} No seller is below the watch threshold.`;
+      },
+    },
+    {
+      keywords: ['sla', 'how long', 'delivery time', 'dependable', 'dependability', 'reliability', 'how fast'],
+      answer: () => {
+        const ranked = Array.isArray(reliabilityScores) ? reliabilityScores : [];
+        if (!ranked.length) {
+          return 'No seller has a completed order yet, so there is no delivery time to estimate. Timing is recorded when an order is marked Assigned and then Delivered.';
+        }
+        const timed = ranked.filter((s) => s.slaMeasured);
+        if (!timed.length) {
+          return 'No seller has a timed delivery yet, so no delivery window can be estimated. The median of observed windows is used once timing exists, and it is always labelled as an estimate.';
+        }
+        const fastest = timed.reduce((a, b) => (a.slaHours < b.slaHours ? a : b));
+        const slowest = timed.reduce((a, b) => (a.slaHours > b.slaHours ? a : b));
+        return `Based on ${timed.length} seller(s) with timed deliveries: fastest observed window is ${fastest.sellerId} at about ${fastest.slaHours}h, slowest is ${slowest.sellerId} at about ${slowest.slaHours}h. These are medians of real delivery windows, not promises.`;
       },
     },
     {

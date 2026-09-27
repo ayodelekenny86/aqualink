@@ -320,6 +320,20 @@ test('shows AI business health signals in ops', async () => {
   expect(screen.getByText(/sellers at risk/i)).toBeInTheDocument();
 });
 
+test('shows an honest reliability panel with no timing recorded', async () => {
+  const user = userEvent.setup();
+  await createOpsAccount();
+  render(<App />);
+
+  await user.click(screen.getByRole('button', { name: /admin authorized operations access/i }));
+  await signInAdmin(user);
+  expect(screen.getByText(/how dependable is each seller/i)).toBeInTheDocument();
+  // No seller has a completed order in a fresh workspace, so the reliability
+  // panel says so rather than inventing a delivery window.
+  expect(screen.getByText(/no reliability score and no delivery window to estimate/i)).toBeInTheDocument();
+  expect(screen.getByText(/delivery timing is not recorded/i)).toBeInTheDocument();
+});
+
 test('shows the honest driver state for a buyer with no assignment', async () => {
   const user = userEvent.setup();
   render(<App />);
