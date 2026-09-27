@@ -1,3 +1,13 @@
+import { vi } from 'vitest';
+
+// Mock PWASetup and virtual:pwa-register/react before any imports
+vi.mock('./components/PWASetup', () => ({
+  PWASetup: () => null,
+  PWADetectOffline: () => null,
+  usePWAUpdate: () => ({ needRefresh: false, offlineReady: false, updateServiceWorker: vi.fn() }),
+  PWAUpdatePrompt: () => null,
+}));
+
 import { afterEach, beforeEach, expect, test } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';

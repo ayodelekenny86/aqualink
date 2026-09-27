@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useState, useEffect } from 'react';
 import './App.css';
 import { languages, translations } from './data/translations';
 import useAuth from './hooks/useAuth';
@@ -6,6 +6,7 @@ import useBooking from './hooks/useBooking';
 import useAquaAi, { aiQuickActions } from './hooks/useAquaAi';
 import useReports from './hooks/useReports';
 import useNotifications from './hooks/useNotifications';
+import { usePushNotifications } from './hooks/usePushNotifications';
 import { formatPhoneForDisplay, normalizePhone } from './lib/accounts';
 import { seedProducts } from './lib/collections';
 import { formatCedi } from './lib/money';
@@ -124,6 +125,15 @@ function App() {
   });
 
   const { downloadReport } = useReports({ region, orders, onNotice: showNotice });
+
+  const { requestPermission } = usePushNotifications();
+
+  // Request push notification permission when user is authenticated
+  useEffect(() => {
+    if (ready && (buyerAuthenticated || sellerAuthenticated || adminAuthenticated)) {
+      requestPermission();
+    }
+  }, [ready, buyerAuthenticated, sellerAuthenticated, adminAuthenticated, requestPermission]);
 
   const roleNotifications = forRole(role);
   const roleUnread = unreadCount(role);

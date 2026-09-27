@@ -21,3 +21,11 @@ vi.mock('../lib/firebase', () => ({
   messaging: null,
   firebaseConfig: {},
 }));
+
+// Mock PWASetup component to avoid virtual module issues in tests
+vi.mock('../components/PWASetup', () => ({
+  default: () => null,
+  usePWAUpdate: () => ({ needRefresh: false, offlineReady: false, updateServiceWorker: vi.fn() }),
+  PWAUpdatePrompt: () => null,
+  PWADetectOffline: () => null,
+}));

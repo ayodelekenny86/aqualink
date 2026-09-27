@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'robots.txt', 'Octocat.png'],
+      includeAssets: ['favicon.ico', 'robots.txt', 'Octocat.png', 'firebase-messaging-sw.js'],
       manifest: {
         name: 'AquaLink',
         short_name: 'AquaLink',
@@ -36,6 +36,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/api\.paystack\.co\/.*/i,
