@@ -59,25 +59,39 @@ describe('split validation', () => {
 
 describe('allocation', () => {
   test('splits a 100 cedi order per the default plan', () => {
+    // With no service charge configured, the buyer pays the order value itself
+    // and the three shares divide it exactly. The figures below are the rule:
+    // the advertised price is the price paid.
     const result = allocate(toMinor(100));
     expect(result.gross).toBe(10000);
-    expect(result.buyerPays).toBe(11000);
+    expect(result.buyerPays).toBe(10000);
     expect(result.sellerReceives).toBe(4500);
     expect(result.driverReceives).toBe(1500);
-    expect(result.buyerServiceCharge).toBe(1000);
+    expect(result.buyerServiceCharge).toBe(0);
     expect(result.platformCommission).toBe(4000);
-    expect(result.companyTake).toBe(5000);
+    expect(result.companyTake).toBe(4000);
   });
 
-  test('the company take is 40% commission plus the 10% buyer charge', () => {
+  test('the company take is the platform commission when no charge is set', () => {
     const result = allocate(toMinor(100));
-    expect(result.companyTake).toBe(result.platformCommission + result.buyerServiceCharge);
+    expect(result.companyTake).toBe(result.platformCommission);
   });
 
-  test('what the buyer pays equals the gross plus the service charge', () => {
+  test('a configured charge is the only money above the gross', () => {
+    // The default plan is asserted above; this keeps the arithmetic honest for
+    // an operator who does set a charge, so the field is not quietly broken.
+    const withFee = { buyerServiceCharge: 10, seller: 45, driver: 15, platformCommission: 40 };
+    for (const amount of [1, 99, 250, 980, 12345]) {
+      const result = allocate(toMinor(amount), withFee);
+      expect(result.buyerPays).toBe(result.gross + result.buyerServiceCharge);
+      expect(result.companyTake).toBe(result.platformCommission + result.buyerServiceCharge);
+    }
+  });
+
+  test('the default plan charges the buyer exactly the gross', () => {
     for (const amount of [1, 99, 250, 980, 12345]) {
       const result = allocate(toMinor(amount));
-      expect(result.buyerPays).toBe(result.gross + result.buyerServiceCharge);
+      expect(result.buyerPays).toBe(result.gross);
     }
   });
 
@@ -86,7 +100,6 @@ describe('allocation', () => {
       const result = allocate(toMinor(amount));
       const paid = result.sellerReceives + result.driverReceives + result.platformCommission;
       expect(paid).toBe(result.gross);
-      // The buyer's charge is the only money above the gross.
       expect(result.sellerReceives + result.driverReceives + result.companyTake).toBe(result.buyerPays);
     }
   });
@@ -113,19 +126,30 @@ describe('allocation', () => {
 });
 
 describe('round trips and take rate', () => {
-  test('recovers the gross from what the buyer was charged', () => {
-    expect(grossFromBuyerCharge(11000)).toBe(10000);
-    expect(grossFromBuyerCharge(27500)).toBe(25000);
+  test('recovers the gross from what the buyer was charged, with no fee applied', () => {
+    // With the default plan the buyer pays the gross, so recovery is the
+    // identity. The fee case below proves the helper still works when a charge
+    // is configured, so it is not silently broken.
+    expect(grossFromBuyerCharge(30000)).toBe(30000);
   });
 
-  test('the company take rate is reported against what the buyer pays', () => {
+  test('recovers the gross when a service charge is configured', () => {
+    const withFee = { buyerServiceCharge: 10, seller: 45, driver: 15, platformCommission: 40 };
+    expect(grossFromBuyerCharge(11000, withFee)).toBe(10000);
+    expect(grossFromBuyerCharge(27500, withFee)).toBe(25000);
+  });
+
+  test('the company take rate against what the buyer pays is 40% on the default plan', () => {
+    // The platform takes 40% of the order value, and the buyer pays the order
+    // value, so the effective take rate is 40%. It used to be 45.45% because a
+    // fee was charged on top of the discounted price.
+    expect(effectiveTakeRate()).toBeCloseTo(40, 6);
+  });
+
+  test('a fee plan still reports the take against the larger amount', () => {
     // 50 of every 110 the buyer hands over = 45.45%.
-    expect(effectiveTakeRate()).toBeCloseTo(45.4545, 3);
-  });
-
-  test('a zero-fee plan has a take rate equal to its commission', () => {
-    const noFee = { buyerServiceCharge: 0, seller: 45, driver: 15, platformCommission: 40 };
-    expect(effectiveTakeRate(noFee)).toBeCloseTo(40, 6);
+    const withFee = { buyerServiceCharge: 10, seller: 45, driver: 15, platformCommission: 40 };
+    expect(effectiveTakeRate(withFee)).toBeCloseTo(45.4545, 3);
   });
 });
 
@@ -159,12 +183,49 @@ describe('price formation', () => {
     expect(() => quotePrice({ listPrice: 600, surgePercent: -10 })).toThrow(RangeError);
   });
 
-  test('the admin default plan quotes 300 and charges 330', () => {
+  test('the business rule: the customer pays GH¢300, inclusive of the 50% discount', () => {
+    // This is the rule the whole pricing module exists to satisfy: a GH¢600 list
+    // price less 50% is GH¢300, and GH¢300 is what is actually taken from the
+    // buyer. It used to charge GH¢330 by adding a 10% service charge on top of
+    // the discounted price, so the advertised 50% was not the price paid.
     const quote = quotePrice(DEFAULT_PRICING);
     const money = allocate(quote.totalMinor, DEFAULT_SPLIT);
-    expect(formatCedi(quote.totalMinor)).toBe('GH₵300.00');
-    expect(formatCedi(money.buyerPays)).toBe('GH₵330.00');
-    expect(formatCedi(money.driverReceives)).toBe('GH₵45.00');
-    expect(formatCedi(money.companyTake)).toBe('GH₵150.00');
+
+    expect(formatCedi(quote.listMinor)).toBe('GH₵600.00');
+    expect(formatCedi(quote.discounted)).toBe('GH₵300.00');
+    expect(formatCedi(money.buyerServiceCharge)).toBe('GH₵0.00');
+    expect(money.buyerPays).toBe(30000);
+    expect(formatCedi(money.buyerPays)).toBe('GH₵300.00');
+  });
+
+  test('the shares divide the GH¢300 the customer paid, with nothing unaccounted for', () => {
+    // Previously the platform took 40% of GH¢300 plus a GH¢30 fee that was never
+    // part of any order value, so the breakdown described money that did not
+    // exist. The three shares must now sum to exactly what the buyer paid.
+    const { buyerPays, sellerReceives, driverReceives, platformCommission } = allocate(30000, DEFAULT_SPLIT);
+
+    expect(sellerReceives).toBe(13500);
+    expect(driverReceives).toBe(4500);
+    expect(platformCommission).toBe(12000);
+    expect(sellerReceives + driverReceives + platformCommission).toBe(buyerPays);
+  });
+
+  test('a configured service charge still works and is added on top', () => {
+    // The field is kept as a real lever, so this proves it is not broken: with a
+    // charge set, the buyer pays order value plus the fee.
+    const withFee = { buyerServiceCharge: 10, seller: 45, driver: 15, platformCommission: 40 };
+    const money = allocate(30000, withFee);
+
+    expect(money.buyerServiceCharge).toBe(3000);
+    expect(money.buyerPays).toBe(33000);
+    expect(money.companyTake).toBe(money.platformCommission + money.buyerServiceCharge);
+  });
+
+  test('the default plan has no service charge configured', () => {
+    // Guards the rule at its source. If someone re-adds a fee here, the customer
+    // stops paying GH¢300 and this fails before it reaches a customer.
+    expect(DEFAULT_SPLIT.buyerServiceCharge).toBe(0);
+    expect(DEFAULT_PRICING.listPrice).toBe(600);
+    expect(DEFAULT_PRICING.discountPercent).toBe(50);
   });
 });

@@ -30,6 +30,10 @@ export default function RevenueBreakdown({ amountCedi = 250, split = DEFAULT_SPL
   if (!breakdown) return null;
 
   const { gross, buyerPays, buyerServiceCharge, sellerReceives, driverReceives, companyTake } = breakdown;
+  // The company's share of what the buyer paid. With no service charge that is
+  // just the platform commission, but the sum is used so a configured charge is
+  // still reflected correctly.
+  const companyShare = split.platformCommission + split.buyerServiceCharge;
 
   return (
     <section className="revenue-breakdown panel" aria-label="Order revenue breakdown">
@@ -49,11 +53,16 @@ export default function RevenueBreakdown({ amountCedi = 250, split = DEFAULT_SPL
 
       <div className="revenue-rows">
         <Row label="Order value" amountMinor={gross} total={buyerPays} />
-        <Row label="Buyer service charge" amountMinor={buyerServiceCharge} share={split.buyerServiceCharge} total={buyerPays} tone="fee" />
+        {/* Only rendered when a charge is configured. The default plan charges the
+            discounted price inclusive, so a GH¢0.00 fee row would imply the buyer
+            was charged something on top of the advertised price. */}
+        {buyerServiceCharge > 0 && (
+          <Row label="Buyer service charge" amountMinor={buyerServiceCharge} share={split.buyerServiceCharge} total={buyerPays} tone="fee" />
+        )}
         <Row label="Total charged to you" amountMinor={buyerPays} />
         <Row label="Water seller receives" amountMinor={sellerReceives} share={split.seller} />
         <Row label="Driver receives" amountMinor={driverReceives} share={split.driver} />
-        <Row label="AquaLink keeps" amountMinor={companyTake} share={split.platformCommission + split.buyerServiceCharge} tone="company" />
+        <Row label="AquaLink keeps" amountMinor={companyTake} share={companyShare} tone="company" />
       </div>
 
       <small className="revenue-note">

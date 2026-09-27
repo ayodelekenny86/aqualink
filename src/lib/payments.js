@@ -174,8 +174,11 @@ export function saveReceipt(receipt) {
  * flag. A receipt is only ever built from `settled: true`.
  */
 export function buildReceipt({ order, payment, breakdown, issuedAt = new Date().toISOString() }) {
-  // The customer paid the order value plus the service charge. Deriving the
-  // total from the order value alone would quietly under-report what was taken.
+  // The total is whatever the server says was charged, never re-derived here.
+  // Re-deriving it is how a receipt once understated GH¢330.00 as GH¢300.00 and
+  // quietly dropped the fee line. With the default plan the two agree, because
+  // the customer pays the discounted price inclusive, but the receipt must still
+  // report the charged figure rather than recomputing one.
   const grossMinor = breakdown?.grossMinor ?? 0;
   const buyerServiceCharge = breakdown?.buyerServiceCharge ?? 0;
   const totalChargedMinor = breakdown?.buyerPays ?? breakdown?.chargedMinor ?? grossMinor + buyerServiceCharge;
@@ -189,7 +192,9 @@ export function buildReceipt({ order, payment, breakdown, issuedAt = new Date().
     accountName: order.email ?? '',
     currency: payment.currency ?? 'GHS',
     orderValue: formatCedi(grossMinor),
-    serviceCharge: formatCedi(buyerServiceCharge),
+    // Omitted when there is no charge, so a receipt does not itemise a
+    // GH₵0.00 fee the customer was never billed.
+    ...(buyerServiceCharge > 0 ? { serviceCharge: formatCedi(buyerServiceCharge) } : {}),
     totalCharged: formatCedi(totalChargedMinor),
     sellerShare: formatCedi(breakdown?.sellerReceives ?? 0),
     driverShare: formatCedi(breakdown?.driverReceives ?? 0),
@@ -219,7 +224,10 @@ export function receiptHtml(receipt) {
     ['Volume', receipt.volume],
     ['Paid to', receipt.accountName],
     ['Order value', receipt.orderValue],
-    ['Service charge', receipt.serviceCharge],
+    // Only present when a charge was actually applied, matching `buildReceipt`.
+    // Emitting the row unconditionally would print an empty or `undefined`
+    // service charge on a receipt for a plan that charges none.
+    ...(receipt.serviceCharge ? [['Service charge', receipt.serviceCharge]] : []),
     ['Total charged', receipt.totalCharged],
     ['Water seller share', receipt.sellerShare],
     ['Driver share', receipt.driverShare],

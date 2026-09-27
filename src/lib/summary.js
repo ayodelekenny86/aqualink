@@ -34,7 +34,6 @@ export function summarise(orders = []) {
     unpaidCount: unpaid.length,
     grossMinor: sum(rows, 'grossMinor'),
     chargedMinor: sum(paid, 'chargedMinor'),
-    serviceChargeMinor: sum(paid, 'buyerServiceCharge'),
     sellerReceivesMinor: sum(paid, 'sellerReceives'),
     driverReceivesMinor: sum(paid, 'driverReceives'),
     platformCommissionMinor: sum(paid, 'platformCommission'),

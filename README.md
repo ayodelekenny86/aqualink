@@ -144,19 +144,45 @@ workspace unlock. The approval itself comes from a signed-in operator through
 second decision on the same application is rejected rather than overwriting the
 first, so the audit trail keeps the original outcome.
 
+### Pricing: the customer pays GH₵300
+
+**The business rule: a customer pays GH₵300, inclusive of the 50% discount.** The
+list price is GH₵600, discounted by 50%, and GH₵300 is the amount actually taken.
+
+| | |
+| --- | --- |
+| List price | GH₵600.00 |
+| Discount (50%) | −GH₵300.00 |
+| **Customer pays** | **GH₵300.00** |
+| Water seller (45%) | GH₵135.00 |
+| Driver (15%) | GH₵45.00 |
+| AquaLink (40%) | GH₵120.00 |
+
+There is **no service charge on top**. The previous version added a 10% buyer
+service charge to the discounted price, so the customer paid GH₵330 while still
+being advertised 50% off — the headline price was not the price paid. It also made
+the revenue split describe money that did not exist: the platform took 40% of
+GH₵300 plus a further GH₵30 that was never part of any order value. The three
+shares now divide the GH₵300 exactly, with nothing unaccounted for.
+
+`buyerServiceCharge` is still a configurable field, set to `0` by default, because
+it is a real pricing lever an operator may want. `src/lib/money.test.js` and
+`functions/lib/payments.test.js` pin the GH₵300 figure, so raising it fails the
+test suite rather than quietly charging buyers more than the advertised price.
+
 ### Honest figures
 
 Money shown in the app is summed from real orders by `src/lib/summary.js`. The
 finance panels, the ops dashboard and the downloadable report all read from it,
 and an empty workspace says it has no data. Invented figures ("124 orders",
-"GH₵18,540 GMV", a 15% buyer fee when the configured charge is 10%) have been
-removed rather than kept as sample data, because a business cannot tell invented
-numbers from measured ones. The Aqua panel says it cannot forecast demand rather
-than inventing a forecast.
+"GH₵18,540 GMV", a 4.8★ seller rating, a "100% — certificates up to date" water
+quality score, a GH₵3,500/month subscription) have been removed rather than kept
+as sample data, because a business cannot tell invented numbers from measured ones.
+The Aqua panel says it cannot forecast demand rather than inventing a forecast.
 
-There is no escrow. Paystack collects money directly into the AquaLink account,
-so confirming delivery marks an order delivered and records that the seller
-payout is handled separately by operations.
+There is no escrow and no pending-payout queue. Paystack collects money directly
+into the AquaLink account, so confirming delivery marks an order delivered and
+records that the seller payout is handled separately by operations.
 
 ### Google sign-in
 

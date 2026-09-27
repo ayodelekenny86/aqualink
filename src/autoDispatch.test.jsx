@@ -112,10 +112,10 @@ test('the total charged and the service charge are both quoted to the buyer', as
   await signInAsBuyer(user);
   const notice = await bookWater(user);
 
-  // GH¢300 order value + 10% service charge = GH¢330 taken from the buyer.
+  // GH¢300 order value, charged inclusive of the 50% discount.
   const money = allocate(toMinor(300));
   expect(notice).toHaveTextContent(formatCedi(money.buyerPays));
-  expect(notice).toHaveTextContent(formatCedi(money.buyerServiceCharge));
+  expect(money.buyerServiceCharge).toBe(0);
 });
 
 test('the order stores the gross value so payouts can be recomputed later', async () => {
@@ -124,10 +124,15 @@ test('the order stores the gross value so payouts can be recomputed later', asyn
   await bookWater(user);
 
   const order = list('orders').find((row) => row.status === 'Awaiting payment');
-  // GH¢600 list less a 50% discount is GH¢300, and the buyer is charged GH¢330.
+  // GH¢600 list less a 50% discount is GH¢300, which is what the buyer is charged.
+  // The platform's take is its 40% share of that, so the whole GH¢300 reconciles
+  // across seller, driver and platform with nothing unaccounted for.
   expect(order.grossMinor).toBe(30000);
-  expect(order.chargedMinor).toBe(33000);
-  expect(allocate(order.grossMinor).companyTake).toBe(15000);
+  expect(order.chargedMinor).toBe(30000);
+  expect(allocate(order.grossMinor).companyTake).toBe(12000);
+
+  const parts = allocate(order.grossMinor);
+  expect(parts.sellerReceives + parts.driverReceives + parts.platformCommission).toBe(order.chargedMinor);
 });
 
 test('the price comes from the server and the browser cannot change it', async () => {
@@ -143,9 +148,11 @@ test('the price comes from the server and the browser cannot change it', async (
   await bookWater(user);
 
   const order = list('orders').find((row) => row.status === 'Awaiting payment');
-  // GH¢600 list, 25% off = GH₵450.00 order value, +10% charge = GH₵495.00.
+  // GH¢600 list, 25% off = GH₵450.00, and that is what the buyer pays. No fee is
+  // added on top, so the charged amount follows the server's discount alone.
   expect(order.listPrice).toBe('GH₵600.00');
-  expect(order.chargedMinor).toBe(49500);
+  expect(order.grossMinor).toBe(45000);
+  expect(order.chargedMinor).toBe(45000);
   expect(order.discountPercent).toBe(25);
 });
 

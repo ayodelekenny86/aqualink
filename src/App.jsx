@@ -348,7 +348,6 @@ function InstitutionView({ orders = [], showNotice }) {
             <div><dt>Orders</dt><dd>{summary.totalCount}</dd></div>
             <div><dt>Delivered</dt><dd>{summary.deliveredCount}</dd></div>
             <div><dt>Order value</dt><dd>{formatCedi(summary.grossMinor)}</dd></div>
-            <div><dt>Service charges paid</dt><dd>{formatCedi(summary.serviceChargeMinor)}</dd></div>
             <div className="highlight"><dt>Total paid</dt><dd>{formatCedi(summary.chargedMinor)}</dd></div>
           </dl>
         )}
@@ -411,7 +410,7 @@ function BuyerFinance({ orders, showNotice }) {
     return <FinanceEmpty title="Your money, explained." copy="Fees on every booking, once one is paid." />;
   }
   const lastPaid = orders.find((order) => order.status === 'Paid');
-  return <section className="finance-workspace"><div className="finance-heading"><div><span className="section-kicker">BUYER FINANCE</span><h2>Your money, explained.</h2><p>What you paid, and what AquaLink charged, across your paid orders.</p></div><button className="outline-button" type="button" onClick={() => showNotice(`${summary.paidCount} paid order(s), ${formatCedi(summary.chargedMinor)} total including fees.`)}>Summarise ↓</button></div><div className="finance-grid buyer-finance"><article><span>LAST PAID ORDER</span><strong>{formatCedi(lastPaid?.chargedMinor ?? 0)}</strong><small>{lastPaid?.code ?? '—'}</small></article><article><span>SERVICE CHARGES PAID</span><strong>{formatCedi(summary.serviceChargeMinor)}</strong><small>Across {summary.paidCount} paid order(s)</small></article><article><span>TOTAL PAID</span><strong>{formatCedi(summary.chargedMinor)}</strong><small>Order value plus fees</small></article><article><span>STILL TO PAY</span><strong>{formatCedi(summary.unpaidMinor)}</strong><small>{summary.unpaidCount} unpaid order(s)</small></article></div></section>;
+  return <section className="finance-workspace"><div className="finance-heading"><div><span className="section-kicker">BUYER FINANCE</span><h2>Your money, explained.</h2><p>What you paid, and what AquaLink charged, across your paid orders.</p></div><button className="outline-button" type="button" onClick={() => showNotice(`${summary.paidCount} paid order(s), ${formatCedi(summary.chargedMinor)} total.`)}>Summarise ↓</button></div><div className="finance-grid buyer-finance"><article><span>LAST PAID ORDER</span><strong>{formatCedi(lastPaid?.chargedMinor ?? 0)}</strong><small>{lastPaid?.code ?? '—'}</small></article><article><span>TOTAL PAID</span><strong>{formatCedi(summary.chargedMinor)}</strong><small>The full amount you were charged</small></article><article><span>STILL TO PAY</span><strong>{formatCedi(summary.unpaidMinor)}</strong><small>{summary.unpaidCount} unpaid order(s)</small></article></div></section>;
 }
 
 function SellerFinance({ orders, showNotice }) {

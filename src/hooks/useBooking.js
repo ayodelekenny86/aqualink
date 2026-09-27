@@ -142,7 +142,7 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
       ? `${driver.candidate.name} (${driver.candidate.base.split(',')[0]}) is assigned`
       : 'a driver is being assigned';
     const surgeNote = (serverOrder.surgeMinor ?? 0) > 0 ? ` Surge ${formatCedi(serverOrder.surgeMinor)} applied.` : '';
-    onNotice(`Booking confirmed. Your reference is ${reference}. You will be charged ${formatCedi(serverOrder.chargedMinor)} including ${formatCedi(serverOrder.buyerServiceCharge)} service charge.${surgeNote} ${who}.`);
+    onNotice(`Booking confirmed. Your reference is ${reference}. You will be charged ${formatCedi(serverOrder.chargedMinor)}.${surgeNote} ${who}.`);
     // Dispatchers need to see every new order, since assignment is automatic.
     notify?.({ role: 'ops', title: `New order ${reference} · ${location}`, body: `${volume} · ${formatCedi(serverOrder.chargedMinor)} · awaiting payment · auto-assigned to ${who}.`, orderId: reference, kind: 'job' });
   }, [booking, commit, onNotice, notify, email, buyerPhone]);

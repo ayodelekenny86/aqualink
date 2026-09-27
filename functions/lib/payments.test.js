@@ -21,7 +21,9 @@ import {
 
 const ORDER = {
   id: 'AQ-1048-2',
-  chargedMinor: 33000, // GH¢330.00
+  // GH¢300.00: the discounted price, inclusive. The settlement checks are
+  // amount-agnostic, so the fixture uses the real default order value.
+  chargedMinor: 30000,
   paystackReference: 'aq10482-9f2c1b7a4e6d8c0b1a2c3d4e5f60718',
   status: 'Confirmed',
 };
@@ -90,7 +92,7 @@ describe('settlement decision', () => {
 
   test('refuses a payment smaller than the order', () => {
     // The attack this blocks: create a GH¢1.00 transaction, then present it as
-    // payment for a GH¢330.00 order.
+    // payment for a GH¢300.00 order.
     const result = checkSettlement({ transaction: { ...SUCCESS, amount: 100 }, order: ORDER });
     expect(result.settled).toBe(false);
     expect(result.reason).toBe('amount_mismatch');
@@ -104,7 +106,7 @@ describe('settlement decision', () => {
   });
 
   test('refuses a non-integer amount rather than rounding it into agreement', () => {
-    const result = checkSettlement({ transaction: { ...SUCCESS, amount: 33000.4 }, order: ORDER });
+    const result = checkSettlement({ transaction: { ...SUCCESS, amount: 30000.4 }, order: ORDER });
     expect(result.settled).toBe(false);
     expect(result.reason).toBe('amount_mismatch');
   });
@@ -200,16 +202,31 @@ describe('MSISDN normalisation', () => {
 });
 
 describe('server-side pricing', () => {
-  test('produces the documented default quote', () => {
-    // GH¢600 list, 50% off = GH¢300, plus 10% service charge = GH¢330.
+  test('produces the documented default quote: the customer pays GH¢300', () => {
+    // The business rule, on the server that actually does the charging: a
+    // GH¢600 list price less the 50% discount is GH¢300, and GH¢300 is what is
+    // taken. There is no service charge on top, because charging a fee after
+    // advertising 50% off means the advertised price is not the price paid.
     const priced = priceOrder({});
+    expect(priced.listMinor).toBe(60000);
+    expect(priced.discountMinor).toBe(30000);
     expect(priced.grossMinor).toBe(30000);
-    expect(priced.chargedMinor).toBe(33000);
+    expect(priced.buyerServiceCharge).toBe(0);
+    expect(priced.chargedMinor).toBe(30000);
     expect(priced.sellerReceives).toBe(13500);
     expect(priced.driverReceives).toBe(4500);
     expect(priced.platformCommission).toBe(12000);
-    // Platform 40% of 30000 = 12000, plus the 10% service charge of 3000.
-    expect(priced.companyTake).toBe(15000);
+    expect(priced.companyTake).toBe(12000);
+  });
+
+  test('the customer pays the discounted price whatever the order value', () => {
+    // Guards the rule beyond the default list price, so a price change cannot
+    // reintroduce a fee that makes the charged amount exceed the quote.
+    for (const listPrice of [200, 450, 600, 1200, 5000]) {
+      const priced = priceOrder({ pricing: { ...DEFAULT_PRICING, listPrice } });
+      const quote = quotePrice({ ...DEFAULT_PRICING, listPrice });
+      expect(priced.chargedMinor).toBe(quote.discounted);
+    }
   });
 
   test('allocates every pesewa, with no residue', () => {
@@ -220,10 +237,16 @@ describe('server-side pricing', () => {
     }
   });
 
-  test('the parts plus the service charge equal what the buyer pays', () => {
+  test('the shares plus any service charge equal what the buyer pays', () => {
+    // Still true with a fee configured, so the reconciliation property is
+    // checked on both the default and a charged plan.
     const parts = allocate(30000, DEFAULT_SPLIT);
     expect(parts.sellerReceives + parts.driverReceives + parts.platformCommission + parts.buyerServiceCharge)
       .toBe(parts.buyerPays);
+
+    const withFee = allocate(30000, { ...DEFAULT_SPLIT, buyerServiceCharge: 10 });
+    expect(withFee.sellerReceives + withFee.driverReceives + withFee.platformCommission + withFee.buyerServiceCharge)
+      .toBe(withFee.buyerPays);
   });
 
   test('refuses a split that does not total 100%', () => {

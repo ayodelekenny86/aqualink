@@ -37,6 +37,7 @@ export default function PaymentPanel({ order, onPaid, showNotice }) {
 
   const isPaid = order?.status === 'Paid' || Boolean(receipt);
   const chargedMinor = order?.chargedMinor ?? 0;
+  const serviceChargeMinor = order?.buyerServiceCharge ?? 0;
 
   // Handle the return leg of the redirect. Keyed on the reference so a repeat
   // render does not re-query Paystack for the same transaction.
@@ -109,7 +110,12 @@ export default function PaymentPanel({ order, onPaid, showNotice }) {
 
       <dl className="payment-summary">
         <div><dt>Order value</dt><dd>{formatCedi(order.grossMinor ?? 0)}</dd></div>
-        <div><dt>Service charge</dt><dd>{formatCedi(order.buyerServiceCharge ?? 0)}</dd></div>
+        {/* Only shown when a charge is actually configured. The default plan has
+            none, because the customer pays the discounted price inclusive, and a
+            GH¢0.00 line under "Order value" reads like a fee they were charged. */}
+        {serviceChargeMinor > 0 && (
+          <div><dt>Service charge</dt><dd>{formatCedi(serviceChargeMinor)}</dd></div>
+        )}
         <div className="total"><dt>You pay</dt><dd>{formatCedi(chargedMinor)}</dd></div>
       </dl>
 

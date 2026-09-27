@@ -64,7 +64,7 @@ export function getAiAnswer(question, { language = 'en', orders = [], split } = 
       keywords: ['price', 'cost', 'how much', 'charge'],
       answer: () => {
         if (!latest) return 'You have no orders yet, so there is no price to quote. The amount you will be charged is calculated on the server when you book, and shown before you pay.';
-        return `Your most recent order, ${latest.code}, was ${formatCedi(latest.grossMinor ?? 0)} for the water plus a ${formatCedi(latest.buyerServiceCharge ?? 0)} service charge, ${formatCedi(latest.chargedMinor ?? 0)} in total. That order is currently ${latest.status}.`;
+        return `Your most recent order, ${latest.code}, was ${formatCedi(latest.chargedMinor ?? latest.grossMinor ?? 0)} in total. That order is currently ${latest.status}.`;
       },
     },
     {

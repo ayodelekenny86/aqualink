@@ -45,16 +45,27 @@ export function formatCedi(minor) {
 /**
  * The default commercial plan.
  *
- * The buyer sees a 50% discount off list price, so a GH¢600 list price is sold
- * at GH¢300. A 10% service charge is added on top of that, making GH¢330 the
- * amount taken from the buyer, and the platform keeps 40% of the discounted
- * price. The remaining shares divide the discounted price and must sum to 100.
+ * The business rule this file exists to satisfy: **the customer pays GH¢300,
+ * inclusive of the 50% discount.** A GH¢600 list price discounted by 50% is
+ * GH¢300, and that is the amount actually taken from the buyer.
  *
- * `platformCommission + buyerServiceCharge` is the company's total take, which
- * is the number that matters for sustainability.
+ * `buyerServiceCharge` is therefore 0. It used to be 10%, which was added on top
+ * of the discounted price and made the customer pay GH¢330 — the discount was
+ * advertised as 50% off and then a fee was charged on the discounted figure, so
+ * the headline price was not the price. Adding the fee also meant the shares no
+ * longer described where the money came from: the platform took 40% of GH¢300
+ * plus a further GH¢30 that was never part of any order value.
+ *
+ * With the charge at 0 the arithmetic is exact and reconciles: of the GH¢300
+ * taken, the seller receives GH¢135, the driver GH¢45, and the platform GH¢120,
+ * which sums back to GH¢300 with nothing unaccounted for.
+ *
+ * The field is kept because it is a real pricing lever an operator can set, not
+ * because it is used by default. `money.test.js` pins the GH¢300 contract, so
+ * raising it will fail the suite rather than quietly charging buyers more.
  */
 export const DEFAULT_SPLIT = {
-  buyerServiceCharge: 10,
+  buyerServiceCharge: 0,
   seller: 45,
   driver: 15,
   platformCommission: 40,

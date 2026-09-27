@@ -5,6 +5,7 @@ import {
   fetchQuote,
   initialisePayment,
   listReceipts,
+  receiptHtml,
   referenceFromLocation,
   saveReceipt,
   verifyPayment,
@@ -25,8 +26,8 @@ const ORDER = {
   location: 'East Legon, Accra',
   volumeLitres: 5000,
   grossMinor: 30000,
-  chargedMinor: 33000,
-  buyerServiceCharge: 3000,
+  chargedMinor: 30000,
+  buyerServiceCharge: 0,
   sellerReceives: 13500,
   driverReceives: 4500,
   platformCommission: 12000,
@@ -35,8 +36,8 @@ const ORDER = {
 const BREAKDOWN = {
   grossMinor: 30000,
   // What the customer actually paid: order value plus the service charge.
-  buyerPays: 33000,
-  buyerServiceCharge: 3000,
+  buyerPays: 30000,
+  buyerServiceCharge: 0,
   sellerReceives: 13500,
   driverReceives: 4500,
   platformCommission: 12000,
@@ -64,7 +65,7 @@ describe('starting a payment', () => {
     fetchMock.mockResolvedValue(jsonResponse({
       reference: 'aq1a2b3c-abcdef0123456789',
       authorizationUrl: 'https://checkout.paystack.com/abc',
-      amountMinor: 33000,
+      amountMinor: 30000,
       currency: 'GHS',
       status: 'pending',
     }));
@@ -164,9 +165,9 @@ describe('confirming a payment', () => {
 
 describe('quoting', () => {
   test('takes the price from the server rather than computing it', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ quote: { grossMinor: 30000, chargedMinor: 33000 } }));
+    fetchMock.mockResolvedValue(jsonResponse({ quote: { grossMinor: 30000, chargedMinor: 30000 } }));
     const result = await fetchQuote({ volumeLitres: 5000 });
-    expect(result.quote.chargedMinor).toBe(33000);
+    expect(result.quote.chargedMinor).toBe(30000);
     expect(String(fetchMock.mock.calls[0][0])).toContain('volume=5000');
   });
 });
@@ -195,25 +196,38 @@ describe('receipts', () => {
       breakdown: BREAKDOWN,
     });
 
-    expect(receipt.totalCharged).toBe('GH₵330.00');
+    expect(receipt.totalCharged).toBe('GH₵300.00');
     expect(receipt.sellerShare).toBe('GH₵135.00');
     expect(receipt.driverShare).toBe('GH₵45.00');
     expect(receipt.platformShare).toBe('GH₵120.00');
     expect(receipt.status).toBe('settled');
   });
 
-  test('never shows an order value as the total, so the fee is not dropped', () => {
+  test('never shows an order value as the total when a fee is configured', () => {
     // Regression: the receipt once rendered `grossMinor` as the total, which
     // understated GH¢330.00 as GH₵300.00 and made the fee vanish from the
-    // customer's copy of the record.
+    // customer's copy of the record. The default plan charges no fee so the two
+    // figures coincide, which would hide that bug again, so the case is built
+    // with a configured charge where they genuinely differ.
+    const withFee = { ...BREAKDOWN, grossMinor: 30000, buyerServiceCharge: 3000, buyerPays: 33000 };
     const receipt = buildReceipt({
       order: ORDER,
       payment: { reference: 'r1' },
-      breakdown: { ...BREAKDOWN, buyerPays: undefined },
+      breakdown: { ...withFee, buyerPays: undefined },
     });
-    expect(receipt.totalCharged).toBe('GH₵330.00');
+
     expect(receipt.orderValue).toBe('GH₵300.00');
     expect(receipt.serviceCharge).toBe('GH₵30.00');
+    expect(receipt.totalCharged).toBe('GH₵330.00');
+  });
+
+  test('omits the service charge line when no charge applies', () => {
+    // The default plan. A GH₵0.00 fee line on a customer's receipt implies they
+    // were billed a fee, so the field is left out entirely.
+    const receipt = buildReceipt({ order: ORDER, payment: { reference: 'r1' }, breakdown: BREAKDOWN });
+    expect(receipt.serviceCharge).toBeUndefined();
+    expect(receipt.totalCharged).toBe('GH₵300.00');
+    expect(receipt.orderValue).toBe('GH₵300.00');
   });
 
   test('carries no simulated marker, because there is no simulated receipt', () => {
@@ -232,9 +246,29 @@ describe('receipts', () => {
     expect(rows[0].totalCharged).toBe('GH₵400.00');
   });
 
+  test('the printed receipt omits the service charge when none applies', () => {
+    // The default plan charges no fee, so the downloaded document must not carry
+    // a blank or "undefined" service charge line implying the customer paid one.
+    const receipt = buildReceipt({ order: ORDER, payment: { reference: 'r1' }, breakdown: BREAKDOWN });
+    const html = receiptHtml(receipt);
+
+    expect(html).not.toMatch(/Service charge/);
+    expect(html).not.toMatch(/undefined/);
+    expect(html).toMatch(/GH₵300\.00/);
+  });
+
+  test('the printed receipt itemises a service charge when one is configured', () => {
+    const withFee = { ...BREAKDOWN, grossMinor: 30000, buyerServiceCharge: 3000, buyerPays: 33000 };
+    const receipt = buildReceipt({ order: ORDER, payment: { reference: 'r1' }, breakdown: withFee });
+    const html = receiptHtml(receipt);
+
+    expect(html).toMatch(/Service charge/);
+    expect(html).toMatch(/GH₵30\.00/);
+    expect(html).toMatch(/GH₵330\.00/);
+  });
+
   test('survives corrupt storage instead of crashing the panel', () => {
-    localStorage.setItem('aqualink.v1.payments.receipts', '{"not":"an array"}');
-    expect(listReceipts()).toEqual([]);
+    localStorage.setItem('aqualink.v1.payments.receipts', '{"not":"an array"}');    expect(listReceipts()).toEqual([]);
   });
 });
 

@@ -14,8 +14,19 @@
 
 export const MINOR_UNITS_PER_MAJOR = 100;
 
+/**
+ * The revenue split, mirroring `src/lib/money.js`.
+ *
+ * `buyerServiceCharge` is 0 so the customer pays exactly the discounted price:
+ * a GH¢600 list price less 50% is GH¢300, and GH¢300 is what is taken. It used
+ * to be 10%, which was charged on top of the discount and made the customer pay
+ * GH¢330 while still advertising 50% off. The shares below then divide that
+ * GH¢300 exactly: seller GH¢135, driver GH¢45, platform GH¢120.
+ *
+ * `money.test.js` and `payments.test.js` pin that figure, so this cannot drift.
+ */
 export const DEFAULT_SPLIT = {
-  buyerServiceCharge: 10,
+  buyerServiceCharge: 0,
   seller: 45,
   driver: 15,
   platformCommission: 40,
