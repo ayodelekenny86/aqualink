@@ -17,6 +17,7 @@ import { list } from './lib/collections';
 import { allocate, formatCedi, toMinor } from './lib/money';
 import { installFakeApi, teardownFakeApi } from './testServer';
 import { DEFAULT_PRICING, DEFAULT_SPLIT } from './lib/money';
+import { writeValue } from './lib/storage';
 
 /**
  * Auto-dispatch coverage.
@@ -30,10 +31,27 @@ import { DEFAULT_PRICING, DEFAULT_SPLIT } from './lib/money';
  * that prices with the real server module.
  */
 
+function clearAccounts() {
+  // Directly clear the accounts storage key
+  try {
+    writeValue('accounts.list', []);
+  } catch {
+    // ignore
+  }
+}
+
 beforeEach(() => {
   clearAll();
   localStorage.clear();
+  clearAccounts();
   installFakeApi();
+});
+
+afterEach(() => {
+  teardownFakeApi();
+  clearAll();
+  localStorage.clear();
+  clearAccounts();
 });
 
 afterEach(() => {
@@ -48,8 +66,9 @@ async function signInAsBuyer(user) {
   // No account is seeded any more, so the test creates its own through the real
   // sign-up path before signing in. That keeps the flow honest: if sign-up
   // breaks, these tests break too.
+  const testPhone = '0544007799';
   await user.click(screen.getByRole('button', { name: /create an account/i }));
-  await user.type(screen.getByRole('textbox', { name: /new buyer phone/i }), '0544007788');
+  await user.type(screen.getByRole('textbox', { name: /new buyer phone/i }), testPhone);
   await user.click(screen.getByRole('button', { name: /^create account/i }));
 
   // Registration hashes a password with 210k PBKDF2 iterations, so it is slow
@@ -61,7 +80,7 @@ async function signInAsBuyer(user) {
 
   await user.click(screen.getByRole('button', { name: /back to sign in/i }));
 
-  await user.type(screen.getByRole('textbox', { name: /buyer phone number/i }), '0544007788');
+  await user.type(screen.getByRole('textbox', { name: /buyer phone number/i }), testPhone);
   await user.click(screen.getByRole('button', { name: /send otp/i }));
 
   const code = (await screen.findByTestId('otp-code')).textContent;

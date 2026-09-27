@@ -108,5 +108,11 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/setupTests.js'],
     exclude: ['**/node_modules/**', '**/dist/**', '.kilo/**', '**/.kilo/**', 'functions/**'],
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        singleFork: true,
+      },
+    },
   },
 })

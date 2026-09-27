@@ -14,6 +14,8 @@ import userEvent from '@testing-library/user-event';
 import App from './App';
 import { clearAll } from './lib/storage';
 import { installFakeApi, reviewSellerApplication, STUB_OPS_CREDENTIALS, teardownFakeApi } from './testServer';
+import { listAccounts, deleteAccount } from './lib/accounts';
+import { readValue, writeValue } from './lib/storage';
 
 /**
  * The app mints its own one-time codes, so tests cannot hardcode a value.
@@ -23,15 +25,27 @@ import { installFakeApi, reviewSellerApplication, STUB_OPS_CREDENTIALS, teardown
  * Bookings are created server-side so the server owns the price, so each test
  * installs a stub server.
  */
+function clearAccounts() {
+  // Directly clear the accounts storage key
+  try {
+    writeValue('accounts.list', []);
+  } catch {
+    // ignore
+  }
+}
+
 beforeEach(() => {
   clearAll();
   localStorage.clear();
+  clearAccounts();
   installFakeApi();
 });
 
 afterEach(() => {
   teardownFakeApi();
   clearAll();
+  localStorage.clear();
+  clearAccounts();
 });
 /** Waits for the account registry to finish generating before interacting. */
 async function waitForRegistry() {

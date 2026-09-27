@@ -29,3 +29,16 @@ vi.mock('../components/PWASetup', () => ({
   PWAUpdatePrompt: () => null,
   PWADetectOffline: () => null,
 }));
+
+// Mock push notifications hook to avoid FCM sync during tests
+vi.mock('../hooks/usePushNotifications', () => ({
+  usePushNotifications: () => ({
+    token: null,
+    permission: 'default',
+    error: null,
+    requestPermission: vi.fn().mockResolvedValue(false),
+    revokeToken: vi.fn(),
+    syncTokenToServer: vi.fn(),
+  }),
+  useFCMTokenSync: vi.fn(),
+}));
