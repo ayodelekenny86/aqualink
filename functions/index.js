@@ -140,6 +140,260 @@ function callbackUrl() {
 
 /* ------------------------------------------------------------------ pricing */
 
+/* ------------------------------------------------------------- ops identity */
+
+/**
+ * Authenticate an operations login and issue a session token.
+ *
+ * This is the piece that makes the admin side enforceable. Previously the ops
+ * console checked a password against `localStorage`, which meant the server could
+ * not tell an operator from an anonymous caller, so anything that changed money
+ * or approved a seller either could not be protected or was left wide open.
+ */
+export const apiOpsLogin = onRequest({ secrets: [OPS_SESSION_SECRET] }, async (req, res) => {
+  applyCors(req, res);
+  if (req.method === 'OPTIONS') return res.status(204).send('');
+  if (req.method !== 'POST') return fail(res, 405, 'method_not_allowed', 'Use POST.');
+
+  const secret = OPS_SESSION_SECRET.value();
+  if (!secret) {
+    logger.error('OPS_SESSION_SECRET is not set; refusing to issue session tokens.');
+    return fail(res, 503, 'auth_unconfigured', 'Operations sign-in is not configured on this deployment.');
+  }
+
+  try {
+    const body = await readJson(req);
+    const email = String(body.email ?? '').trim().toLowerCase();
+    const password = String(body.password ?? '');
+
+    if (!email || !password) {
+      return fail(res, 400, 'missing_credentials', 'An email address and password are required.');
+    }
+
+    const snapshot = await db.collection(COLLECTIONS.ops)
+      .where('email', '==', email)
+      .where('role', '==', 'ops')
+      .limit(1)
+      .get();
+
+    // One message for "no such operator" and "wrong password" alike, so this
+    // cannot be used to enumerate which addresses have admin accounts.
+    const invalid = () => fail(res, 401, 'invalid_credentials', 'Those sign-in details are not correct.');
+
+    if (snapshot.empty) {
+      // Still spend the time hashing, so a missing account and a wrong password
+      // take about the same wall-clock time and cannot be told apart.
+      hashPassword(password);
+      return invalid();
+    }
+
+    const operator = snapshot.docs[0].data();
+    if (!verifyPassword(password, operator.salt, operator.passwordHash)) return invalid();
+
+    await snapshot.docs[0].ref.update({ lastLoginAt: FieldValue.serverTimestamp() });
+    logger.info('ops signed in', { email });
+
+    return res.status(200).json({
+      token: signOpsToken({ email, role: 'ops', secret }),
+      email,
+      expiresInSeconds: 60 * 60 * 8,
+    });
+  } catch (error) {
+    logger.error('ops login failed', error);
+    return fail(res, 500, 'login_failed', 'Could not sign in.');
+  }
+});
+
+/**
+ * Require a valid ops session.
+ *
+ * Every protected endpoint calls this and returns 401 on anything other than a
+ * good token, so a missing deployment secret rejects everyone rather than
+ * everyone.
+ */
+function requireOps(req, res) {
+  const secret = OPS_SESSION_SECRET.value();
+  if (!secret) {
+    fail(res, 503, 'auth_unconfigured', 'Operations access is not configured on this deployment.');
+    return null;
+  }
+  const result = verifyOpsToken(bearerToken(req), secret, { requiredRole: 'ops' });
+  if (!result.valid) {
+    fail(res, 401, 'not_authorised', 'Sign in as an operator to do that.');
+    return null;
+  }
+  return result.payload;
+}
+
+/* ------------------------------------------------------------------ pricing */
+
+/**
+ * Update pricing. Operator-only.
+ *
+ * The admin console is not the reason this is protected: it is because this
+ * endpoint decides what every customer is charged. The browser's copy of the
+ * price is display-only, so this is the single point where a price can change.
+ */
+export const apiUpdatePricing = onRequest({ secrets: [OPS_SESSION_SECRET] }, async (req, res) => {
+  applyCors(req, res);
+  if (req.method === 'OPTIONS') return res.status(204).send('');
+  if (req.method !== 'POST') return fail(res, 405, 'method_not_allowed', 'Use POST.');
+
+  const operator = requireOps(req, res);
+  if (!operator) return undefined;
+
+  try {
+    const body = await readJson(req);
+    const current = await readPricingConfig();
+
+    // Partial updates are allowed, so the console can change the discount
+    // without resending the list price. Unspecified fields keep their value.
+    const pricing = {
+      ...current.pricing,
+      ...(body.pricing ?? {}),
+    };
+    const split = body.split ? { ...current.split, ...body.split } : current.split;
+
+    const check = validatePricingInput(pricing, split);
+    if (!check.valid) {
+      return fail(res, 400, 'invalid_pricing', check.problems.join(' '));
+    }
+
+    await db.collection(COLLECTIONS.config).doc('pricing').set({
+      pricing: {
+        listPrice: Number(pricing.listPrice),
+        discountPercent: Number(pricing.discountPercent),
+        surgePercent: Number(pricing.surgePercent),
+        surgeReason: String(pricing.surgeReason ?? '').slice(0, 140),
+      },
+      split: Object.fromEntries(Object.entries(split).map(([key, value]) => [key, Number(value)])),
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: operator.sub,
+    }, { merge: true });
+
+    logger.info('pricing updated', { by: operator.sub, listPrice: pricing.listPrice });
+    return res.status(200).json({ pricing, split, updatedBy: operator.sub });
+  } catch (error) {
+    logger.error('update pricing failed', error);
+    return fail(res, 500, 'pricing_update_failed', 'Could not save the pricing change.');
+  }
+});
+
+/* -------------------------------------------------------- seller onboarding */
+
+export const apiApplySeller = onRequest(async (req, res) => {
+  applyCors(req, res);
+  if (req.method === 'OPTIONS') return res.status(204).send('');
+  if (req.method !== 'POST') return fail(res, 405, 'method_not_allowed', 'Use POST.');
+
+  try {
+    const body = await readJson(req);
+    const phone = String(body.phone ?? '').trim();
+    const business = String(body.business ?? '').trim();
+    const vehicle = String(body.vehicle ?? '').trim();
+    const capacity = String(body.capacity ?? '').trim();
+
+    if (!/^\+?233?\d{9,12}$/.test(phone.replace(/[\s-]/g, ''))) {
+      return fail(res, 400, 'invalid_phone', 'A valid Ghanaian phone number is required.');
+    }
+    if (business.length < 2) return fail(res, 400, 'invalid_business', 'A business or trading name is required.');
+    if (vehicle.length < 3) return fail(res, 400, 'invalid_vehicle', 'A vehicle registration is required.');
+
+    const normalisedPhone = phone.replace(/[\s-]/g, '');
+    const id = createHash('sha256').update(normalisedPhone).digest('hex').slice(0, 24);
+
+    const existing = await db.collection('sellers').doc(id).get();
+    if (existing.exists && existing.get('status') === 'approved') {
+      return res.status(200).json({ applicationId: id, status: 'approved' });
+    }
+
+    await db.collection('sellers').doc(id).set({
+      id,
+      phone: normalisedPhone,
+      business,
+      vehicle,
+      capacity,
+      status: 'pending',
+      // No self-issued approval code. The old flow minted `SEL-XXXXXXXX` in the
+      // browser and displayed it, so anyone who loaded the app could approve
+      // themselves; approval now has to come from a signed-in operator.
+      appliedAt: existing.exists ? existing.get('appliedAt') : FieldValue.serverTimestamp(),
+      reviewedAt: null,
+      reviewedBy: null,
+    }, { merge: true });
+
+    return res.status(201).json({ applicationId: id, status: 'pending' });
+  } catch (error) {
+    logger.error('seller application failed', error);
+    return fail(res, 500, 'apply_failed', 'Could not submit the application.');
+  }
+});
+
+export const apiReviewSeller = onRequest({ secrets: [OPS_SESSION_SECRET] }, async (req, res) => {
+  applyCors(req, res);
+  if (req.method === 'OPTIONS') return res.status(204).send('');
+  if (req.method !== 'POST') return fail(res, 405, 'method_not_allowed', 'Use POST.');
+
+  const operator = requireOps(req, res);
+  if (!operator) return undefined;
+
+  try {
+    const body = await readJson(req);
+    const id = String(body.applicationId ?? '').trim();
+    const decision = body.decision === 'approve' ? 'approved' : body.decision === 'reject' ? 'rejected' : null;
+
+    if (!id) return fail(res, 400, 'invalid_application', 'An application id is required.');
+    if (!decision) return fail(res, 400, 'invalid_decision', 'Decision must be approve or reject.');
+
+    const ref = db.collection('sellers').doc(id);
+    const snapshot = await ref.get();
+    if (!snapshot.exists) return fail(res, 404, 'application_not_found', 'That application does not exist.');
+
+    // A second decision would silently overwrite the first, so the audit trail
+    // would show only the latest. Reject it instead.
+    if (snapshot.get('status') !== 'pending') {
+      return fail(res, 409, 'already_reviewed', `That application was already ${snapshot.get('status')}.`);
+    }
+
+    await ref.update({
+      status: decision,
+      reviewNote: String(body.note ?? '').slice(0, 280),
+      reviewedAt: FieldValue.serverTimestamp(),
+      reviewedBy: operator.sub,
+    });
+
+    logger.info('seller application reviewed', { id, decision, by: operator.sub });
+    return res.status(200).json({ applicationId: id, status: decision });
+  } catch (error) {
+    logger.error('seller review failed', error);
+    return fail(res, 500, 'review_failed', 'Could not record the decision.');
+  }
+});
+
+export const apiSellerStatus = onRequest(async (req, res) => {
+  applyCors(req, res);
+  if (req.method === 'OPTIONS') return res.status(204).send('');
+  if (req.method !== 'GET') return fail(res, 405, 'method_not_allowed', 'Use GET.');
+
+  try {
+    const phone = String(req.query.phone ?? '').replace(/[\s-]/g, '').trim();
+    if (!/^\+?233?\d{9,12}$/.test(phone)) {
+      return fail(res, 400, 'invalid_phone', 'A valid Ghanaian phone number is required.');
+    }
+    const id = createHash('sha256').update(phone).digest('hex').slice(0, 24);
+    const snapshot = await db.collection('sellers').doc(id).get();
+
+    // An unknown number is 'pending' rather than 404, so this endpoint does not
+    // reveal which phone numbers have applied.
+    return res.status(200).json({ status: snapshot.exists ? snapshot.get('status') : 'pending' });
+  } catch (error) {
+    logger.error('seller status failed', error);
+    return fail(res, 500, 'status_failed', 'Could not read the application status.');
+  }
+});
+
+/* ------------------------------------------------------------------ pricing */
+
 export const apiPricing = onRequest(async (req, res) => {
   applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).send('');
