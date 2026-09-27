@@ -350,7 +350,7 @@ test('institution finance and the ops tower report real figures or none at all',
   render(<App />);
 
   await user.click(screen.getByRole('button', { name: /institution plan your supply/i }));
-  expect(screen.getByText(/institution finance/i)).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: /plan the month with confidence/i })).toBeInTheDocument();
   expect(screen.getByText(/no paid orders yet/i)).toBeInTheDocument();
   // The old dashboard showed a GH₵3,500 plan and GH₵4,820 in escrow; neither
   // came from an order and there is no escrow.
