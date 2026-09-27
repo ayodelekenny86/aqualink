@@ -15,6 +15,9 @@ import ContactButtons from './components/ContactButtons';
 import useAdminPricing from './hooks/useAdminPricing';
 import GoogleSignInButton from './components/GoogleSignInButton';
 import { PWASetup, PWADetectOffline } from './components/PWASetup';
+import SellerDashboard from './components/SellerDashboard';
+import InstitutionDashboard from './components/InstitutionDashboard';
+import DriverTrackingView from './components/DriverTrackingView';
 
 // Admin-only and overlay surfaces load on demand. A buyer who never opens the
 // admin console never downloads it, which keeps the initial bundle small.
@@ -200,12 +203,33 @@ function App() {
             />
           </Suspense>
         )}
-        {ready && role === 'seller' && (sellerAuthenticated ? <SellerView available={available} setAvailable={setAvailable} showNotice={showNotice} orders={orders} updateOrderStatus={(id, status) => updateOrderStatus(id, status, notify)} issueDeliveryCode={issueDeliveryCode} sellerProfile={sellerProfile} setSellerProfile={setSellerProfile} /> : <SellerAccessGate sellerProfile={sellerProfile} setSellerProfile={setSellerProfile} onApply={applyForSellerApproval} onRefresh={refreshSellerApproval} applicationId={sellerApplicationId} onSignIn={completeSellerApproval} />)}
-        {role === 'seller' && <SellerFinance orders={orders} showNotice={showNotice} />}
-        {role === 'seller' && <LiveAgentCard role="seller" showNotice={showNotice} />}
-        {role === 'institution' && <InstitutionView orders={orders} showNotice={showNotice} />}
-        {role === 'institution' && <InstitutionFinance orders={orders} showNotice={showNotice} />}
-        {role === 'institution' && <InstitutionAgentCard showNotice={showNotice} />}
+        {ready && role === 'seller' && (sellerAuthenticated ? (
+          <SellerDashboard
+            available={available}
+            setAvailable={setAvailable}
+            showNotice={showNotice}
+            orders={orders}
+            updateOrderStatus={(id, status) => updateOrderStatus(id, status, notify)}
+            issueDeliveryCode={issueDeliveryCode}
+            sellerProfile={sellerProfile}
+            setSellerProfile={setSellerProfile}
+          />
+        ) : (
+          <SellerAccessGate
+            sellerProfile={sellerProfile}
+            setSellerProfile={setSellerProfile}
+            onApply={applyForSellerApproval}
+            onRefresh={refreshSellerApproval}
+            applicationId={sellerApplicationId}
+            onSignIn={completeSellerApproval}
+          />
+        ))}
+        {role === 'ops' && adminAuthenticated && (
+          <DriverTrackingView orders={orders} showNotice={showNotice} />
+        )}
+        {role === 'institution' && (
+          <InstitutionDashboard orders={orders} showNotice={showNotice} />
+        )}
         {ready && role === 'ops' && (adminAuthenticated ? <Suspense fallback={null}><OpsView orders={orders} downloadReport={downloadReport} opsToken={opsToken} showNotice={showNotice} /></Suspense> : <AdminAccessGate onSignIn={signInWithPassword} error={signInError} onGoogle={signInWithGoogleIdentity} showNotice={showNotice} />)}
         {ready && role === 'ops' && adminAuthenticated && <ReportActions downloadReport={downloadReport} />}
         {ready && role === 'ops' && adminAuthenticated && <OperationalRiskPanel orders={orders} />}

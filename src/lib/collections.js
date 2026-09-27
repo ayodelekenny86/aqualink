@@ -21,6 +21,9 @@ const COLLECTIONS = {
   otpCodes: 'db.otpCodes',
   drivers: 'db.drivers',
   sellers: 'db.sellers',
+  institutionSchedules: 'db.institution_schedules',
+  qualityRecords: 'db.quality_records',
+  institutionBudget: 'db.institution_budget',
 };
 
 export const COLLECTION_NAMES = Object.keys(COLLECTIONS);

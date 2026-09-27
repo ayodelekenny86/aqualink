@@ -361,9 +361,10 @@ test('seller finance shows an honest empty state, not an invented payout', async
   const user = userEvent.setup();
   render(<App />);
 
-  await user.click(screen.getByRole('button', { name: /seller app manage your fleet/i }));
-  expect(screen.getByRole('heading', { name: /know what you take home/i })).toBeInTheDocument();
-  expect(screen.getByText(/no paid orders yet/i)).toBeInTheDocument();
+  await approveSeller(user);
+  expect(screen.getByRole('heading', { name: /ready for the next job/i })).toBeInTheDocument();
+  expect(screen.getByText(/no active jobs/i)).toBeInTheDocument();
+  expect(screen.getByText(/no completed jobs yet/i)).toBeInTheDocument();
   expect(screen.queryByText('GH₵6,904.40')).not.toBeInTheDocument();
   expect(screen.queryByText(/20% seller fee/i)).not.toBeInTheDocument();
 });
@@ -421,8 +422,8 @@ test('institution finance and the ops tower report real figures or none at all',
   render(<App />);
 
   await user.click(screen.getByRole('button', { name: /institution plan your supply/i }));
-  expect(screen.getByRole('heading', { name: /plan the month with confidence/i })).toBeInTheDocument();
-  expect(screen.getByText(/no paid orders yet/i)).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: /your supply, as delivered/i })).toBeInTheDocument();
+  expect(screen.getByText(/no upcoming scheduled deliveries/i)).toBeInTheDocument();
   // The old dashboard showed a GH₵3,500 plan and GH₵4,820 in escrow; neither
   // came from an order and there is no escrow.
   expect(screen.queryByText('GH₵3,500')).not.toBeInTheDocument();
