@@ -101,33 +101,39 @@ function App() {
         {!ready && <section className="access-gate panel"><span className="access-lock">⌁</span><p className="eyebrow">Preparing secure workspace</p><h1>Setting up your accounts.</h1><p>AquaLink is generating the local account registry and its credentials on this device. This takes a moment and needs no network access.</p></section>}
         {ready && role === 'buyer' && (buyerAuthenticated ? <><BuyerView booking={booking} updateBooking={updateBooking} requestDelivery={requestDelivery} orders={orders} showNotice={showNotice} authStep={authStep} email={email} setEmail={setEmail} emailCode={emailCode} sendOtp={sendOtp} confirmEmailCode={confirmEmailCode} confirmDelivery={confirmDelivery} requestRefund={requestRefund} savedAddresses={savedAddresses} repeatBooking={repeatBooking} setSavedAddresses={setSavedAddresses} t={t} driverUpdate={driverUpdate} refreshDriverUpdate={refreshDriverUpdate} /><BuyerFinance showNotice={showNotice} /></> : <BuyerAccessGate onSignedIn={() => {}} startSignIn={startPhoneSignIn} confirmCode={confirmPhoneCode} generatedCode={phoneCode} identifier={phoneIdentifier} error={signInError} demo={demoCredentials} onRegister={(value) => registerAccount({ identifier: value, role: 'buyer', displayName: 'Buyer' })} accountExists={accountExists} />)}
         {notificationsOpen && (
-          <NotificationsPanel
-            notifications={roleNotifications}
-            unreadCount={roleUnread}
-            onMarkAllRead={() => markAllRead(role)}
-            onMarkRead={markRead}
-            onClose={() => setNotificationsOpen(false)}
-            onOrderClick={setDetailOrderId}
-            supportPhone={SUPPORT_PHONE}
-          />
+          <Suspense fallback={null}>
+            <NotificationsPanel
+              notifications={roleNotifications}
+              unreadCount={roleUnread}
+              onMarkAllRead={() => markAllRead(role)}
+              onMarkRead={markRead}
+              onClose={() => setNotificationsOpen(false)}
+              onOrderClick={setDetailOrderId}
+              supportPhone={SUPPORT_PHONE}
+            />
+          </Suspense>
         )}
         {detailOrder && (
-          <OrderDetailModal
-            order={detailOrder}
-            onClose={() => setDetailOrderId(null)}
-            onShowNotice={showNotice}
-            buyerPhone={detailOrder.buyerPhone}
-            onContactBuyer
-          />
+          <Suspense fallback={null}>
+            <OrderDetailModal
+              order={detailOrder}
+              onClose={() => setDetailOrderId(null)}
+              onShowNotice={showNotice}
+              buyerPhone={detailOrder.buyerPhone}
+              onContactBuyer
+            />
+          </Suspense>
         )}
         {ready && role === 'buyer' && buyerAuthenticated && (
-          <PaymentPanel
-            order={orders.find((order) => order.status === 'Confirmed') ?? orders[0]}
-            pricing={pricing}
-            split={split}
-            onPaid={(orderId) => { updateOrderStatus(orderId, 'Paid', notify); refreshDriverUpdate(); }}
-            showNotice={showNotice}
-          />
+          <Suspense fallback={<div className="panel lazy-fallback" aria-hidden="true" />}>
+            <PaymentPanel
+              order={orders.find((order) => order.status === 'Confirmed') ?? orders[0]}
+              pricing={pricing}
+              split={split}
+              onPaid={(orderId) => { updateOrderStatus(orderId, 'Paid', notify); refreshDriverUpdate(); }}
+              showNotice={showNotice}
+            />
+          </Suspense>
         )}
         {ready && role === 'seller' && (sellerAuthenticated ? <SellerView available={available} setAvailable={setAvailable} showNotice={showNotice} orders={orders} updateOrderStatus={(id, status) => updateOrderStatus(id, status, notify)} issueDeliveryCode={issueDeliveryCode} sellerProfile={sellerProfile} setSellerProfile={setSellerProfile} /> : <SellerAccessGate sellerProfile={sellerProfile} setSellerProfile={setSellerProfile} onApproved={completeSellerApproval} issueCode={issueSellerCode} currentCode={sellerCode} />)}
         {role === 'seller' && <SellerFinance showNotice={showNotice} />}
@@ -138,7 +144,7 @@ function App() {
         {ready && role === 'ops' && adminAuthenticated && <ReportActions downloadReport={downloadReport} />}
         {ready && role === 'ops' && adminAuthenticated && <OperationalRiskPanel />}
         {ready && role === 'ops' && adminAuthenticated && <RevenueFinance showNotice={showNotice} />}
-        {ready && role === 'ops' && adminAuthenticated && <AdminPricingConsole onNotice={showNotice} onPricingChange={(nextPricing, nextSplit) => publish(nextPricing, nextSplit)} />}
+        {ready && role === 'ops' && adminAuthenticated && <Suspense fallback={null}><AdminPricingConsole onNotice={showNotice} onPricingChange={(nextPricing, nextSplit) => publish(nextPricing, nextSplit)} /></Suspense>}
         </main>
     </div>
   );
