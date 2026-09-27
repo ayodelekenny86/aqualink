@@ -1,10 +1,11 @@
 import { useCallback, useState } from 'react';
 import { generateBookingCode, generateConfirmationCode } from '../lib/secureCode';
-import { persistedState } from '../lib/storage';
+import { list, replaceAll } from '../lib/collections';
 
 export const initialOrders = [
-  { id: 'AQ-1048-2', location: 'East Legon, Accra', volume: '2,000 gal', status: 'Delivered', payment: 'Released', date: 'Today, 09:42', price: 'GH₵250', confirmCode: '' },
-  { id: 'AQ-1032-7', location: 'Cantonments, Accra', volume: '1,000 gal', status: 'Delivered', payment: 'Released', date: 'Jun 18, 14:20', price: 'GH₵250', confirmCode: '' },
+  { id: 'AQ-1048-2', code: 'AQ-1048-2', location: 'East Legon, Accra', volume: '2,000 gal', status: 'Delivered', payment: 'Released', date: 'Today, 09:42', price: 'GH₵250', confirmCode: '', driverName: 'Kojo Mensah', buyerName: 'Buyer', buyerPhone: '0544001122' },
+  { id: 'AQ-1032-7', code: 'AQ-1032-7', location: 'Cantonments, Accra', volume: '1,000 gal', status: 'Delivered', payment: 'Released', date: 'Jun 18, 14:20', price: 'GH₵250', confirmCode: '', driverName: 'Ama Boateng', buyerName: 'Buyer', buyerPhone: '0544001122' },
+  { id: 'AQ-1051-3', code: 'AQ-1051-3', location: 'Airport Residential, Accra', volume: '5,000 gal', status: 'Placed', payment: 'Held in escrow', date: 'Just now', price: 'GH₵980', confirmCode: '', driverName: '', buyerName: 'Buyer', buyerPhone: '0544001122' },
 ];
 
 const initialBooking = { location: '', volume: '2,000 gallons', window: 'As soon as possible', payment: 'Mobile money' };
@@ -19,11 +20,25 @@ const initialSavedAddresses = ['Home · East Legon, Accra', 'Office · Cantonmen
  * gets a checksummed `AQ-####-X` reference, and releasing escrow requires the
  * delivery confirmation code that the seller side generates when handing over.
  */
-export function useBooking({ email, onNotice }) {
-  const [orders, setOrders] = useState(persistedState('orders', initialOrders));
+export function useBooking({ email, onNotice, notify }) {
+  // Orders live in the shared `orders` collection so the buyer, seller and driver
+  // workspaces all read one list rather than three divergent copies.
+  const [orders, setOrders] = useState(() => {
+    const stored = list('orders');
+    return stored.length ? stored : replaceAll('orders', initialOrders);
+  });
   const [booking, setBooking] = useState(initialBooking);
   const [savedAddresses, setSavedAddresses] = useState(initialSavedAddresses);
   const [driverUpdate, setDriverUpdate] = useState('Driver Kojo · assigned seller · ETA 18 min');
+
+  /** Write-through: update React state and persist so other roles see the change. */
+  const commit = useCallback((updater) => {
+    setOrders((items) => {
+      const next = updater(items);
+      replaceAll('orders', next);
+      return next;
+    });
+  }, []);
 
   const updateBooking = useCallback((event) => {
     const { name, value } = event.target;
@@ -40,9 +55,10 @@ export function useBooking({ email, onNotice }) {
     // The app issues the reference itself, continuing from the highest in use.
     const reference = generateBookingCode(orders.map((order) => order.id));
     setBooking((current) => ({ ...current, location: '' }));
-    setOrders((items) => [
+    commit((items) => [
       {
         id: reference,
+        code: reference,
         location,
         volume: volume.replace(' gallons', ' gal'),
         status: 'Confirmed',
@@ -50,11 +66,16 @@ export function useBooking({ email, onNotice }) {
         date: 'Just now',
         price: 'GH₵250',
         confirmCode: '',
+        driverName: '',
+        buyerName: email ? `Buyer ${email}` : 'Buyer',
+        buyerPhone: '0544001122',
       },
       ...items,
     ]);
     onNotice(`Booking confirmed. Your reference is ${reference}. Payment is held in escrow until delivery.`);
-  }, [booking, orders, onNotice]);
+    // Drivers are the ones who can act on this, so tell them a job opened up.
+    notify?.({ role: 'driver', title: `New job available · ${location}`, body: `${volume} · tap to accept.`, kind: 'job' });
+  }, [booking, orders, onNotice, commit, notify]);
 
   const repeatBooking = useCallback((address) => {
     setBooking((current) => ({ ...current, location: address.replace(/^.* · /, '') }));
@@ -67,9 +88,46 @@ export function useBooking({ email, onNotice }) {
   }, [onNotice]);
 
   const updateOrderStatus = useCallback((orderId, status) => {
-    setOrders((items) => items.map((item) => (item.id === orderId ? { ...item, status } : item)));
+    commit((items) => items.map((item) => (item.id === orderId ? { ...item, status } : item)));
     onNotice(`Order ${orderId} is now ${status.toLowerCase()}.`);
-  }, [onNotice]);
+  }, [onNotice, commit]);
+
+  /** Driver claims an unclaimed job. */
+  const acceptOrder = useCallback((orderId, driverName = 'Kojo Mensah', notify) => {
+    commit((items) => items.map((item) => (item.id === orderId ? { ...item, driverName, status: 'Accepted' } : item)));
+    onNotice(`Job ${orderId} accepted. Head to the pickup point.`);
+    const order = orders.find((item) => item.id === orderId);
+    notify?.({
+      role: 'buyer',
+      title: `${driverName} accepted ${orderId}`,
+      body: order?.location ? `Heading to your delivery at ${order.location}.` : 'Your driver is on the way.',
+      orderId,
+      kind: 'status',
+    });
+  }, [onNotice, commit, orders]);
+
+  /** Driver advances a claimed job through the handover steps. */
+  const advanceOrder = useCallback((orderId, status) => {
+    commit((items) => items.map((item) => (item.id === orderId ? { ...item, status } : item)));
+    onNotice(`${orderId} updated to ${status.toLowerCase()}. The buyer has been notified.`);
+  }, [onNotice, commit]);
+
+  /**
+   * Driver closes a delivery. Escrow only releases when the buyer quotes the
+   * code the seller issued at handover, so a wrong or empty code is rejected.
+   */
+  const completeDelivery = useCallback((orderId, code) => {
+    const order = orders.find((item) => item.id === orderId);
+    if (!order) return { ok: false, reason: 'unknown-order' };
+    if (!order.confirmCode) return { ok: false, reason: 'not-handed-over' };
+    if (String(code ?? '').trim().toUpperCase() !== order.confirmCode.toUpperCase()) {
+      onNotice('That delivery code does not match. Ask the buyer to confirm their code.');
+      return { ok: false, reason: 'mismatch' };
+    }
+    commit((items) => items.map((item) => (item.id === orderId ? { ...item, status: 'Delivered', payment: 'Released', confirmCode: '' } : item)));
+    onNotice(`Delivery completed for ${orderId}. Escrow released.`);
+    return { ok: true };
+  }, [orders, onNotice, commit]);
 
   /**
    * Seller-side handover: issues the delivery confirmation code the buyer must
@@ -77,10 +135,10 @@ export function useBooking({ email, onNotice }) {
    */
   const issueDeliveryCode = useCallback((orderId) => {
     const code = generateConfirmationCode('delivery');
-    setOrders((items) => items.map((item) => (item.id === orderId ? { ...item, confirmCode: code } : item)));
+    commit((items) => items.map((item) => (item.id === orderId ? { ...item, confirmCode: code } : item)));
     onNotice(`Delivery code ${code} issued for ${orderId}. Share it with the buyer at handover.`);
     return code;
-  }, [onNotice]);
+  }, [onNotice, commit]);
 
   /** Buyer-side: escrow only releases when the issued code matches. */
   const confirmDelivery = useCallback((orderId, code) => {
@@ -91,10 +149,10 @@ export function useBooking({ email, onNotice }) {
       onNotice('That delivery code does not match. Ask the driver for the code.');
       return { ok: false, reason: 'mismatch' };
     }
-    setOrders((items) => items.map((item) => (item.id === orderId ? { ...item, payment: 'Released', confirmCode: '' } : item)));
+    commit((items) => items.map((item) => (item.id === orderId ? { ...item, payment: 'Released', confirmCode: '' } : item)));
     onNotice('Delivery confirmed. Escrow funds released to the seller.');
     return { ok: true };
-  }, [orders, onNotice]);
+  }, [orders, onNotice, commit]);
 
   const requestRefund = useCallback((orderId) => {
     onNotice(`Refund request opened for ${orderId}. Ops will review it and email ${email} with the decision.`);
@@ -111,6 +169,9 @@ export function useBooking({ email, onNotice }) {
     driverUpdate,
     refreshDriverUpdate,
     updateOrderStatus,
+    acceptOrder,
+    advanceOrder,
+    completeDelivery,
     issueDeliveryCode,
     confirmDelivery,
     requestRefund,

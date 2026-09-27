@@ -12,10 +12,12 @@ import {
   createAccount,
   findAccount,
   formatPhoneForDisplay,
+  listAccounts,
   seedDemoAccounts,
   validateIdentifier,
 } from '../lib/accounts';
 import { persistedState, readValue, writeValue } from '../lib/storage';
+import { syncUsers } from '../lib/collections';
 
 const initialSellerProfile = { business: '', phone: '', vehicle: '', capacity: '2,000 gallons', document: 'ID document not uploaded' };
 
@@ -68,7 +70,10 @@ export function useAuth() {
         if (!cancelled && seeded) setDemoCredentials(seeded);
       })
       .finally(() => {
-        if (!cancelled) setReady(true);
+        if (!cancelled) {
+          syncUsers(listAccounts());
+          setReady(true);
+        }
       });
     return () => {
       cancelled = true;
@@ -87,6 +92,7 @@ export function useAuth() {
   const buyerAuthenticated = signedInAs('buyer');
   const adminAuthenticated = signedInAs('ops');
   const sellerAuthenticated = signedInAs('seller') && sellerApproved;
+  const driverAuthenticated = signedInAs('driver');
 
   const startSession = useCallback((account) => {
     setSession({
@@ -204,6 +210,7 @@ export function useAuth() {
     try {
       const password = generatePassword({ length: 16 });
       const account = await createAccount({ identifier, role: accountRole, displayName, password });
+      syncUsers(listAccounts());
       showNotice(`Account created for ${account.identifier}. Copy your generated password now.`);
       return { ok: true, account, password };
     } catch (error) {
@@ -356,6 +363,7 @@ export function useAuth() {
     buyerAuthenticated,
     adminAuthenticated,
     sellerAuthenticated,
+    driverAuthenticated,
     startPhoneSignIn,
     confirmPhoneCode,
     signInWithPassword,

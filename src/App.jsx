@@ -5,14 +5,24 @@ import useAuth from './hooks/useAuth';
 import useBooking from './hooks/useBooking';
 import useAquaAi, { aiQuickActions } from './hooks/useAquaAi';
 import useReports from './hooks/useReports';
+import useNotifications from './hooks/useNotifications';
 import { formatPhoneForDisplay, normalizePhone } from './lib/accounts';
+import { seedProducts } from './lib/collections';
+import DriverView, { DriverAccessGate } from './components/DriverView';
+import NotificationsPanel from './components/NotificationsPanel';
+import OrderDetailModal from './components/OrderDetailModal';
 
 const roles = [
   ['buyer', 'Buyer app', 'Book reliable water'],
+  ['driver', 'Driver app', 'Deliver and get paid'],
   ['seller', 'Seller app', 'Manage your fleet'],
   ['institution', 'Institution', 'Plan your supply'],
   ['ops', 'Admin', 'Authorized operations access'],
 ];
+
+const ROLE_ICONS = { buyer: '⌂', driver: '⇢', seller: '↗', institution: '▦', ops: '◈' };
+
+const SUPPORT_PHONE = '0545009046';
 
 const finance = {
   buyer: { transaction: 'GH₵250', fee: 'GH₵37.50', feeRate: '15%', savings: 'GH₵50.00', wallet: 'GH₵24.50' },
@@ -23,12 +33,15 @@ const finance = {
 function App() {
   const [language, setLanguage] = useState('en');
   const [region, setRegion] = useState('Accra');
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [detailOrderId, setDetailOrderId] = useState(null);
   const t = translations[language] ?? translations.en;
+  seedProducts();
 
   const {
     ready, role, selectRole, notice, showNotice, dismissNotice,
     session, signOut, accountExists,
-    buyerAuthenticated, adminAuthenticated, sellerAuthenticated,
+    buyerAuthenticated, adminAuthenticated, sellerAuthenticated, driverAuthenticated,
     startPhoneSignIn, confirmPhoneCode, signInWithPassword, registerAccount,
     phoneCode, phoneIdentifier, signInError, demoCredentials,
     authStep, email, setEmail, emailCode, sendOtp, confirmEmailCode,
@@ -37,10 +50,14 @@ function App() {
   } = useAuth();
 
   const {
+    forRole, unreadCount, notify, markRead, markAllRead,
+  } = useNotifications();
+
+  const {
     orders, booking, updateBooking, requestDelivery, repeatBooking,
     savedAddresses, setSavedAddresses, driverUpdate, refreshDriverUpdate,
-    updateOrderStatus, issueDeliveryCode, confirmDelivery, requestRefund,
-  } = useBooking({ email, onNotice: showNotice });
+    updateOrderStatus, acceptOrder, advanceOrder, completeDelivery, issueDeliveryCode, confirmDelivery, requestRefund,
+  } = useBooking({ email, onNotice: showNotice, notify });
 
   const { aiOpen, toggleAi, closeAi, aiInput, setAiInput, aiMessages, askAi } = useAquaAi({
     language,
@@ -48,6 +65,23 @@ function App() {
   });
 
   const { downloadReport } = useReports({ region, onNotice: showNotice });
+
+  const roleNotifications = forRole(role);
+  const roleUnread = unreadCount(role);
+  const detailOrder = orders.find((order) => order.id === detailOrderId) ?? null;
+
+  /** Every status change fans out a notification to the roles that care. */
+  const advanceWithNotice = (orderId, status) => {
+    advanceOrder(orderId, status);
+    const order = orders.find((item) => item.id === orderId);
+    notify({
+      role: 'buyer',
+      title: `${orderId} is now ${status.toLowerCase()}`,
+      body: order?.location ? `Delivery to ${order.location}.` : '',
+      orderId,
+      kind: 'status',
+    });
+  };
 
   return (
     <div className="app-shell">
@@ -57,7 +91,7 @@ function App() {
         <div className="role-list">
           {roles.map(([key, label, description]) => (
             <button className={`role-button ${role === key ? 'active' : ''}`} key={key} type="button" onClick={() => selectRole(key)}>
-              <span className={`role-icon ${key}`} aria-hidden="true">{key === 'buyer' ? '⌂' : key === 'seller' ? '↗' : key === 'institution' ? '▦' : '◈'}</span>
+              <span className={`role-icon ${key}`} aria-hidden="true">{ROLE_ICONS[key]}</span>
               <span><b>{label}</b><small>{description}</small></span>
             </button>
           ))}
@@ -66,11 +100,42 @@ function App() {
       </aside>
 
       <main className="main-content" id="main">
-        <header className="topbar"><div className="breadcrumb"><span>AquaLink</span><i>/</i><strong>{t[role]}</strong><select aria-label="Operating region" value={region} onChange={(event) => { setRegion(event.target.value); showNotice(`Workspace switched to ${event.target.value}.`); }}><option>Accra</option><option>Kumasi</option><option>Takoradi</option><option>Tema</option><option>Lagos</option><option>Abidjan</option></select></div><div className="topbar-actions"><label className="language-picker"><span>文</span><select aria-label="Language" value={language} onChange={(event) => setLanguage(event.target.value)}>{languages.map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label><button className={`ai-trigger ${aiOpen ? 'active' : ''}`} type="button" onClick={toggleAi}><span>✦</span> Aqua AI</button><button className="icon-button" type="button" aria-label="Notifications" onClick={() => showNotice('You have 2 new delivery updates.')}><span>♧</span><em>2</em></button><button className="profile mobile-profile" type="button"><span className="avatar">AK</span></button></div></header>
+        <header className="topbar"><div className="breadcrumb"><span>AquaLink</span><i>/</i><strong>{t[role]}</strong><select aria-label="Operating region" value={region} onChange={(event) => { setRegion(event.target.value); showNotice(`Workspace switched to ${event.target.value}.`); }}><option>Accra</option><option>Kumasi</option><option>Takoradi</option><option>Tema</option><option>Lagos</option><option>Abidjan</option></select></div><div className="topbar-actions"><label className="language-picker"><span>文</span><select aria-label="Language" value={language} onChange={(event) => setLanguage(event.target.value)}>{languages.map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label><button className={`ai-trigger ${aiOpen ? 'active' : ''}`} type="button" onClick={toggleAi}><span>✦</span> Aqua AI</button><button className="icon-button" type="button" aria-label="Notifications" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen(!notificationsOpen)}><span>♧</span>{roleUnread > 0 && <em>{roleUnread}</em>}</button><button className="profile mobile-profile" type="button"><span className="avatar">AK</span></button></div></header>
         {notice && <div className="notice" role="status"><span>✓</span>{notice}<button type="button" aria-label="Dismiss notification" onClick={dismissNotice}>×</button></div>}
         {aiOpen && <AiPanel role={role} input={aiInput} setInput={setAiInput} messages={aiMessages} askAi={askAi} close={closeAi} />}
         {!ready && <section className="access-gate panel"><span className="access-lock">⌁</span><p className="eyebrow">Preparing secure workspace</p><h1>Setting up your accounts.</h1><p>AquaLink is generating the local account registry and its credentials on this device. This takes a moment and needs no network access.</p></section>}
         {ready && role === 'buyer' && (buyerAuthenticated ? <><BuyerView booking={booking} updateBooking={updateBooking} requestDelivery={requestDelivery} orders={orders} showNotice={showNotice} authStep={authStep} email={email} setEmail={setEmail} emailCode={emailCode} sendOtp={sendOtp} confirmEmailCode={confirmEmailCode} confirmDelivery={confirmDelivery} requestRefund={requestRefund} savedAddresses={savedAddresses} repeatBooking={repeatBooking} setSavedAddresses={setSavedAddresses} t={t} driverUpdate={driverUpdate} refreshDriverUpdate={refreshDriverUpdate} /><BuyerFinance showNotice={showNotice} /></> : <BuyerAccessGate onSignedIn={() => {}} startSignIn={startPhoneSignIn} confirmCode={confirmPhoneCode} generatedCode={phoneCode} identifier={phoneIdentifier} error={signInError} demo={demoCredentials} onRegister={(value) => registerAccount({ identifier: value, role: 'buyer', displayName: 'Buyer' })} accountExists={accountExists} />)}
+        {notificationsOpen && (
+          <NotificationsPanel
+            notifications={roleNotifications}
+            unreadCount={roleUnread}
+            onMarkAllRead={() => markAllRead(role)}
+            onMarkRead={markRead}
+            onClose={() => setNotificationsOpen(false)}
+            onOrderClick={setDetailOrderId}
+            supportPhone={SUPPORT_PHONE}
+          />
+        )}
+        {detailOrder && (
+          <OrderDetailModal
+            order={detailOrder}
+            onClose={() => setDetailOrderId(null)}
+            onShowNotice={showNotice}
+            buyerPhone={detailOrder.buyerPhone}
+            onContactBuyer
+          />
+        )}
+        {ready && role === 'driver' && (driverAuthenticated
+          ? <DriverView orders={orders} onAccept={(id) => acceptOrder(id, 'Kojo Mensah', notify)} onAdvance={advanceWithNotice} onComplete={completeDelivery} driver={{ region, name: session?.displayName ?? 'Driver' }} showNotice={showNotice} />
+          : <DriverAccessGate
+              onStartSignIn={startPhoneSignIn}
+              onConfirmCode={confirmPhoneCode}
+              onRegister={(value) => registerAccount({ identifier: value, role: 'driver', displayName: 'Driver' })}
+              identifier={phoneIdentifier}
+              generatedCode={phoneCode}
+              error={signInError}
+              accountExists={accountExists}
+            />)}
         {ready && role === 'seller' && (sellerAuthenticated ? <SellerView available={available} setAvailable={setAvailable} showNotice={showNotice} orders={orders} updateOrderStatus={updateOrderStatus} issueDeliveryCode={issueDeliveryCode} sellerProfile={sellerProfile} setSellerProfile={setSellerProfile} /> : <SellerAccessGate sellerProfile={sellerProfile} setSellerProfile={setSellerProfile} onApproved={completeSellerApproval} issueCode={issueSellerCode} currentCode={sellerCode} />)}
         {role === 'seller' && <SellerFinance showNotice={showNotice} />}
         {role === 'seller' && <LiveAgentCard role="seller" showNotice={showNotice} />}

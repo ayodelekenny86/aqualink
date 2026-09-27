@@ -19,5 +19,8 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/setupTests.js'],
+    // Agent Manager keeps a copy of the app under .kilo/worktrees. Without this
+    // exclude, vitest discovers and runs that duplicate suite as well.
+    exclude: ['**/node_modules/**', '**/dist/**', '.kilo/**', '**/.kilo/**'],
   },
 })

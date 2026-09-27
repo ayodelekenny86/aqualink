@@ -135,7 +135,7 @@ describe('account store', () => {
   });
 
   test('every seeded role is a known role', () => {
-    expect(ACCOUNT_ROLES).toEqual(['buyer', 'seller', 'institution', 'ops']);
+    expect(ACCOUNT_ROLES).toEqual(['buyer', 'driver', 'seller', 'institution', 'ops']);
   });
 });
 

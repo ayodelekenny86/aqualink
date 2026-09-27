@@ -120,8 +120,8 @@ test('issues a checksummed booking reference for each new order', async () => {
 
   const notice = await screen.findByRole('status');
   expect(notice).toHaveTextContent(/your reference is AQ-\d{4}-[0-9A-Z]/i);
-  // The seeded orders are AQ-1048 / AQ-1032, so the next reference continues past them.
-  expect(notice).toHaveTextContent(/AQ-1049-/i);
+  // The seeded orders top out at AQ-1051, so the next reference continues past it.
+  expect(notice).toHaveTextContent(/AQ-1052-/i);
 });
 
 test('lets a seller submit onboarding details', async () => {

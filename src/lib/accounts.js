@@ -22,7 +22,7 @@ import {
 import { readValue, writeValue } from './storage';
 
 const ACCOUNTS_KEY = 'accounts.list';
-export const ACCOUNT_ROLES = ['buyer', 'seller', 'institution', 'ops'];
+export const ACCOUNT_ROLES = ['buyer', 'driver', 'seller', 'institution', 'ops'];
 export const MAX_FAILED_ATTEMPTS = 5;
 export const LOCKOUT_MS = 5 * 60 * 1000;
 
