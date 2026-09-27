@@ -26,6 +26,7 @@ import { defineSecret, defineString } from 'firebase-functions/params';
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
 import { DEFAULT_PRICING, DEFAULT_SPLIT, checkSettlement, newReference, priceOrder, verifyPaystackSignature } from './lib/index.js';
+import { bearerToken, signOpsToken, validatePricingInput, verifyOpsToken } from './lib/session.js';
 
 setGlobalOptions({ region: 'europe-west1', maxInstances: 10 });
 
@@ -36,6 +37,7 @@ const PAYSTACK_SECRET_KEY = defineSecret('PAYSTACK_SECRET_KEY');
 const OPS_BOOTSTRAP_TOKEN = defineSecret('OPS_BOOTSTRAP_TOKEN');
 const OPS_ADMIN_EMAIL = defineString('OPS_ADMIN_EMAIL', { default: '' });
 const OPS_ADMIN_PASSWORD = defineSecret('OPS_ADMIN_PASSWORD');
+const OPS_SESSION_SECRET = defineSecret('OPS_SESSION_SECRET');
 const ALLOWED_ORIGINS = defineString('ALLOWED_ORIGINS', { default: '' });
 
 const CURRENCY = 'GHS';
