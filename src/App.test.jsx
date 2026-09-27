@@ -320,16 +320,23 @@ test('shows AI business health signals in ops', async () => {
   expect(screen.getByText(/sellers at risk/i)).toBeInTheDocument();
 });
 
-test('refreshes a buyer live driver update', async () => {
+test('shows the honest driver state for a buyer with no assignment', async () => {
   const user = userEvent.setup();
   render(<App />);
 
   await verifyBuyer(user);
 
-  expect(screen.getByText(/driver kojo · assigned seller/i)).toBeInTheDocument();
+  // The card used to invent a "Driver Kojo · ETA 18 min" for every buyer. A
+  // buyer with no assigned driver now sees that plainly instead.
+  expect(screen.getByText(/no driver is assigned to your orders yet/i)).toBeInTheDocument();
+  expect(screen.queryByText(/driver kojo/i)).not.toBeInTheDocument();
+
   await user.click(screen.getByRole('button', { name: /refresh position/i }));
 
-  expect(screen.getByText(/driver kojo · en route from east legon/i)).toBeInTheDocument();
+  // Refreshing simply reports the seller app pushed an update; it does not
+  // invent a name or ETA.
+  expect(screen.getByText(/live delivery update received from the seller app/i)).toBeInTheDocument();
+  expect(screen.queryByText(/driver kojo/i)).not.toBeInTheDocument();
 });
 
 test('buyer finance shows real aggregates and an honest empty state', async () => {

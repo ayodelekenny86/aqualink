@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { generateBookingCode, generateConfirmationCode } from '../lib/secureCode';
 import { list, replaceAll } from '../lib/collections';
 import { assignDriver, assignSeller } from '../lib/dispatch';
@@ -49,9 +49,22 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
   });
   const [booking, setBooking] = useState(initialBooking);
   const [savedAddresses, setSavedAddresses] = useState(initialSavedAddresses);
-  const [driverUpdate, setDriverUpdate] = useState('Driver Kojo · assigned seller · ETA 18 min');
   const [loading, setLoading] = useState(USE_FIRESTORE);
   const [error, setError] = useState(null);
+
+  // The buyer's live driver update is derived from the most recent order that
+  // actually has a driver assigned, rather than being a fixed "Driver Kojo ·
+  // ETA 18 min" string. A buyer with no assigned driver sees that plainly
+  // instead of a name nobody has met.
+  const driverUpdate = useMemo(() => {
+    const mine = orders
+      .filter(o => (email && (o.buyerEmail === email || o.email === email)) || (buyerPhone && o.buyerPhone === buyerPhone))
+      .sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
+    const active = mine.find(o => o.driverName && ['Assigned', 'En Route'].includes(o.status));
+    if (!active) return 'No driver is assigned to your orders yet. One will appear here once a seller accepts.';
+    const base = `${active.driverName} · ${active.status.toLowerCase()}`;
+    return active.driverBase ? `${base} from ${active.driverBase.split(',')[0]}` : base;
+  }, [orders, email, buyerPhone]);
 
   const commit = useCallback((updater) => {
     const next = updater(orders);
@@ -184,7 +197,8 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
   }, [onNotice]);
 
   const refreshDriverUpdate = useCallback(() => {
-    setDriverUpdate('Driver Kojo · En Route from East Legon · ETA 12 min');
+    // The live card re-reads the order list, so refreshing here simply reports
+    // that the seller app pushed a new update. There is no invented ETA.
     onNotice('Live delivery update received from the seller app.');
   }, [onNotice]);
 
