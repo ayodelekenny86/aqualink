@@ -1,6 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { formatCedi } from '../lib/money';
 import useInstitutionDashboard from '../hooks/useInstitutionDashboard';
+import useDemandForecast from '../hooks/useDemandForecast';
+import usePredictiveAnalytics from '../hooks/usePredictiveAnalytics';
+import useDynamicPricing from '../hooks/useDynamicPricing';
+import useSmartNotifications from '../hooks/useSmartNotifications';
+import useWaterQuality from '../hooks/useWaterQuality';
 
 function ScheduleCard({ schedule, onToggle, onDelete, onEdit }) {
   const freqLabels = {
@@ -110,28 +115,18 @@ export function InstitutionDashboard({ orders, showNotice }) {
     refreshing,
   } = useInstitutionDashboard({ orders, onNotice: showNotice });
 
+  // Smart features
+  const { forecast, summary: forecastSummary, trend, anomalies, peakHours, loading: forecastLoading, refresh: refreshForecast } = useDemandForecast({ orders, region: 'ACCRA' });
+  const { churnAnalysis, ltvPredictions, segments, anomalies: predAnomalies, revenueForecast, summary: analyticsSummary, loading: analyticsLoading, refresh: refreshAnalytics } = usePredictiveAnalytics({ orders, customers: [], driverPositions: {} });
+  const { pricing, customerProfile, loading: pricingLoading, refresh: refreshPricing, getPriceForVolume, getPriceExplanation, summary: pricingSummary } = useDynamicPricing({ orders, driverPositions: {}, customerId: null, region: 'ACCRA' });
+  const { notifications, preferences, unreadCount, sendNotification, checkTriggers } = useSmartNotifications({ user: { identifier: 'institution', role: 'institution' }, orders, driverPositions: {}, schedules, budget, qualityRecords, onNotice: showNotice });
+  const { records: waterRecords, compliance, trends, forecasts, certificates, sourceRisks, alerts, summary: qualitySummary, loading: qualityLoading, addQualityRecord: addWaterQualityRecord, getSourceSummary, refresh: refreshWaterQuality } = useWaterQuality({ qualityRecords, sources: [...new Set(qualityRecords.map(r => r.source))], onNotice: showNotice });
+
   const [activeTab, setActiveTab] = useState('overview');
+  const [smartTab, setSmartTab] = useState('forecast');
   const [showScheduleForm, setShowScheduleForm] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(null);
   const [showQualityForm, setShowQualityForm] = useState(false);
-
-  const scheduleForm = useState({
-    name: '',
-    frequency: 'weekly',
-    day: 'Monday',
-    volume: '2,000 gallons',
-    active: true,
-    nextDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-  })[0];
-
-  const handleScheduleSubmit = (event) => {
-    event.preventDefault();
-    const schedule = editingSchedule || scheduleForm;
-    upsertSchedule({ ...schedule, ...scheduleForm, nextDelivery: scheduleForm.nextDelivery });
-    setShowScheduleForm(false);
-    setEditingSchedule(null);
-    scheduleForm.name = '';
-  };
 
   return (
     <>
@@ -163,6 +158,7 @@ export function InstitutionDashboard({ orders, showNotice }) {
         <button className={activeTab === 'quality' ? 'active' : ''} onClick={() => setActiveTab('quality')}>Quality</button>
         <button className={activeTab === 'budget' ? 'active' : ''} onClick={() => setActiveTab('budget')}>Budget</button>
         <button className={activeTab === 'analytics' ? 'active' : ''} onClick={() => setActiveTab('analytics')}>Analytics</button>
+        <button className={activeTab === 'smart' ? 'active' : ''} onClick={() => setActiveTab('smart')}>Smart Hub</button>
       </div>
 
       {activeTab === 'overview' && (
@@ -471,6 +467,315 @@ export function InstitutionDashboard({ orders, showNotice }) {
               Export Quality Records
             </button>
           </div>
+        </section>
+      )}
+
+      {activeTab === 'smart' && (
+        <section className="panel">
+          <div className="panel-toolbar">
+            <div className="panel-title">
+              <span className="section-kicker">SMART HUB</span>
+              <h2>AI-Powered Insights & Automation</h2>
+            </div>
+          </div>
+
+          <div className="smart-tabs">
+            <button className={smartTab === 'forecast' ? 'active' : ''} onClick={() => setSmartTab('forecast')}>Demand Forecast</button>
+            <button className={smartTab === 'analytics' ? 'active' : ''} onClick={() => setSmartTab('analytics')}>Predictive Analytics</button>
+            <button className={smartTab === 'pricing' ? 'active' : ''} onClick={() => setSmartTab('pricing')}>Dynamic Pricing</button>
+            <button className={smartTab === 'waterquality' ? 'active' : ''} onClick={() => setSmartTab('waterquality')}>Water Quality</button>
+            <button className={smartTab === 'notifications' ? 'active' : ''} onClick={() => setSmartTab('notifications')}>Smart Alerts</button>
+          </div>
+
+          {smartTab === 'forecast' && (
+            <div className="smart-panel">
+              {forecastLoading ? <p>Loading forecast…</p> : forecast?.error ? (
+                <div className="empty-feed">{forecast.error} ({forecast.ordersCount} orders)</div>
+              ) : forecast && forecast.length > 0 ? (
+                <>
+                  <div className="forecast-summary">
+                    <article className="forecast-card">
+                      <span>Next 7 Days</span>
+                      <strong>{forecastSummary?.next7DaysOrders || 0} orders</strong>
+                    </article>
+                    <article className="forecast-card">
+                      <span>Next 30 Days</span>
+                      <strong>{forecastSummary?.next30DaysOrders || 0} orders</strong>
+                    </article>
+                    <article className="forecast-card">
+                      <span>Avg Daily</span>
+                      <strong>{forecastSummary?.avgDailyOrders || 0}</strong>
+                    </article>
+                    <article className="forecast-card">
+                      <span>Trend</span>
+                      <strong>{trend}</strong>
+                    </article>
+                    <article className="forecast-card warning">
+                      <span>Anomalies</span>
+                      <strong>{anomalies?.length || 0}</strong>
+                    </article>
+                  </div>
+                  <div className="forecast-chart">
+                    {forecast.slice(0, 14).map((day, i) => (
+                      <div key={day.date} className="forecast-day" title={day.date}>
+                        <div className="forecast-bar" style={{ height: `${Math.max(5, (day.predictedOrders / (forecastSummary?.avgDailyOrders || 1)) * 100)}%` }} />
+                        <span className="forecast-label">{day.dayOfWeek.slice(0,3)}</span>
+                        <span className="forecast-value">{day.predictedOrders}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {anomalies?.length > 0 && (
+                    <>
+                      <div className="panel-divider" />
+                      <h4>⚠ Detected Anomalies</h4>
+                      <div className="anomaly-list">
+                        {anomalies.slice(0, 5).map((a, i) => (
+                          <div key={i} className="anomaly-item">
+                            <span>{a.date}</span>
+                            <span>{a.actualOrders} vs expected {a.expectedRange}</span>
+                            <span className={`severity ${a.severity}`}>{a.severity}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <p className="empty-feed">Need at least 10 orders for forecasting. Place more orders to unlock AI predictions.</p>
+              )}
+            </div>
+          )}
+
+          {smartTab === 'analytics' && (
+            <div className="smart-panel">
+              {analyticsLoading ? <p>Loading analytics…</p> : (
+                <>
+                  <div className="analytics-summary">
+                    <article className="analytics-card">
+                      <span>Total Customers</span>
+                      <strong>{analyticsSummary.totalCustomers}</strong>
+                    </article>
+                    <article className="analytics-card warning">
+                      <span>At Risk</span>
+                      <strong>{analyticsSummary.atRiskCustomers}</strong>
+                    </article>
+                    <article className="analytics-card highlight">
+                      <span>VIP Customers</span>
+                      <strong>{analyticsSummary.vipCustomers}</strong>
+                    </article>
+                    <article className="analytics-card">
+                      <span>Predicted LTV</span>
+                      <strong>{formatCedi(analyticsSummary.totalPredictedLTV * 100)}</strong>
+                    </article>
+                    <article className="analytics-card critical">
+                      <span>Critical Anomalies</span>
+                      <strong>{analyticsSummary.criticalAnomalies}</strong>
+                    </article>
+                    <article className="analytics-card">
+                      <span>30-Day Revenue Forecast</span>
+                      <strong>{formatCedi((analyticsSummary.revenueForecast30d || 0) * 100)}</strong>
+                    </article>
+                  </div>
+                  <div className="panel-divider" />
+                  <h4>Customer Segments</h4>
+                  <div className="segment-list">
+                    {Object.entries(segments).map(([segment, count]) => (
+                      <div key={segment} className="segment-item">
+                        <span className="segment-name">{segment.replace('_', ' ').toUpperCase()}</span>
+                        <span className="segment-count">{count} customers</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="panel-divider" />
+                  <h4>Recent Anomalies</h4>
+                  <div className="anomaly-list">
+                    {predAnomalies?.slice(0, 5).map((a, i) => (
+                      <div key={i} className="anomaly-item">
+                        <span>{a.type}</span>
+                        <span>{a.description}</span>
+                        <span className={`severity ${a.severity}`}>{a.severity}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {smartTab === 'pricing' && (
+            <div className="smart-panel">
+              {pricingLoading ? <p>Loading pricing…</p> : (
+                <>
+                  <div className="pricing-summary">
+                    <article className="pricing-card">
+                      <span>Avg Multiplier</span>
+                      <strong>{pricingSummary.avgMultiplier}x</strong>
+                    </article>
+                    <article className={pricingSummary.surgeActive ? 'pricing-card warning' : 'pricing-card'}>
+                      <span>Surge Active</span>
+                      <strong>{pricingSummary.surgeActive ? 'YES' : 'NO'}</strong>
+                    </article>
+                    <article className={pricingSummary.discountActive ? 'pricing-card highlight' : 'pricing-card'}>
+                      <span>Discount Active</span>
+                      <strong>{pricingSummary.discountActive ? 'YES' : 'NO'}</strong>
+                    </article>
+                  </div>
+                  <div className="panel-divider" />
+                  <h4>Current Prices by Volume</h4>
+                  <div className="pricing-table">
+                    <div className="pricing-header">
+                      <span>Volume</span>
+                      <span>Base Price</span>
+                      <span>Current Price</span>
+                      <span>Multiplier</span>
+                      <span>Explanation</span>
+                    </div>
+                    {Object.entries(pricing).map(([volume, price]) => (
+                      <div key={volume} className="pricing-row">
+                        <span>{volume}</span>
+                        <span>{formatCedi((price.basePrice || 0) * 100)}</span>
+                        <span className={price.multiplier > 1.1 ? 'surge' : price.multiplier < 0.95 ? 'discount' : ''}>
+                          {formatCedi((price.finalPrice || 0) * 100)}
+                        </span>
+                        <span>{price.multiplier.toFixed(2)}x</span>
+                        <span className="pricing-explanation">{getPriceExplanation(volume)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {smartTab === 'waterquality' && (
+            <div className="smart-panel">
+              {qualityLoading ? <p>Loading water quality data…</p> : (
+                <>
+                  <div className="quality-summary">
+                    <article className="quality-stat-card">
+                      <span>Sources Monitored</span>
+                      <strong>{qualitySummary.sourcesMonitored}</strong>
+                    </article>
+                    <article className="quality-stat-card">
+                      <span>Tests This Period</span>
+                      <strong>{qualitySummary.totalTests}</strong>
+                    </article>
+                    <article className="quality-stat-card">
+                      <span>Pass Rate</span>
+                      <strong>{qualitySummary.passingRate}%</strong>
+                    </article>
+                    <article className="quality-stat-card">
+                      <span>Avg Score</span>
+                      <strong>{qualitySummary.avgScore}/100</strong>
+                    </article>
+                    <article className="quality-stat-card warning">
+                      <span>Critical Alerts</span>
+                      <strong>{qualitySummary.criticalAlerts}</strong>
+                    </article>
+                    <article className="quality-stat-card warning">
+                      <span>High Risk Sources</span>
+                      <strong>{qualitySummary.highRiskSources}</strong>
+                    </article>
+                  </div>
+                  <div className="panel-divider" />
+                  <h4>Source Compliance</h4>
+                  <div className="compliance-grid">
+                    {Object.entries(compliance).map(([source, comp]) => (
+                      <article key={source} className="compliance-card panel">
+                        <div className="compliance-header">
+                          <strong>{source}</strong>
+                          <span className={`status ${comp.classification === 'excellent' ? 'status-delivered' : comp.classification === 'good' ? 'status-online' : comp.classification === 'fair' ? 'status-awaiting' : 'status-cancelled'}`}>
+                            {comp.classification.toUpperCase()} ({comp.score}/100)
+                          </span>
+                        </div>
+                        <div className="compliance-params">
+                          {Object.entries(comp.parameters).map(([param, data]) => (
+                            <div key={param} className={`param-item ${data.status}`}>
+                              <span>{param.toUpperCase()}</span>
+                              <strong>{data.value} {data.standard?.unit || ''}</strong>
+                              <span className={`param-status ${data.status}`}>{data.status}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                  {certificates.length > 0 && (
+                    <>
+                      <div className="panel-divider" />
+                      <h4>Compliance Certificates</h4>
+                      <div className="certificate-list">
+                        {certificates.map((cert, i) => (
+                          <div key={i} className="certificate-item">
+                            <span><strong>{cert.source}</strong> - {cert.classification.toUpperCase()} (Score: {cert.averageScore})</span>
+                            <span>Tests: {cert.testsPerformed} | Period: {cert.period.start} to {cert.period.end}</span>
+                            <button className="text-button" onClick={() => showNotice(`Certificate ${cert.certificateId} downloaded`)}>Download</button>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {alerts.length > 0 && (
+                    <>
+                      <div className="panel-divider" />
+                      <h4>Active Alerts</h4>
+                      <div className="alert-list">
+                        {alerts.slice(0, 5).map((a, i) => (
+                          <div key={i} className={`alert-item ${a.severity}`}>
+                            <span>{a.source}: {a.type.replace('_', ' ')}</span>
+                            <span className={`severity ${a.severity}`}>{a.severity}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {smartTab === 'notifications' && (
+            <div className="smart-panel">
+              <div className="notification-stats">
+                <article className="stat-card">
+                  <span>Unread</span>
+                  <strong>{unreadCount}</strong>
+                </article>
+                <article className="stat-card">
+                  <span>Push Enabled</span>
+                  <strong>{preferences.pushEnabled ? 'ON' : 'OFF'}</strong>
+                </article>
+                <article className="stat-card">
+                  <span>Quiet Hours</span>
+                  <strong>{preferences.quietHoursEnabled ? 'ON' : 'OFF'}</strong>
+                </article>
+              </div>
+              <div className="panel-divider" />
+              <h4>Recent Notifications</h4>
+              <div className="notification-list">
+                {notifications.slice(0, 10).map(n => (
+                  <div key={n.id} className={`notification-item ${n.readAt ? 'read' : 'unread'}`}>
+                    <div className="notification-content">
+                      <strong>{n.title}</strong>
+                      <span>{n.body}</span>
+                      <small>{new Date(n.createdAt).toLocaleString()}</small>
+                    </div>
+                    {!n.readAt && <button className="text-button" onClick={() => {}}>Mark Read</button>}
+                  </div>
+                ))}
+              </div>
+              <div className="panel-divider" />
+              <h4>Preferences</h4>
+              <div className="preference-grid">
+                {Object.entries(preferences).filter(([k]) => k !== 'quietHoursStart' && k !== 'quietHoursEnd').map(([key, value]) => (
+                  <label key={key} className="preference-item">
+                    <input type="checkbox" checked={value} onChange={e => {}} />
+                    <span>{key.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase())}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       )}
     </>

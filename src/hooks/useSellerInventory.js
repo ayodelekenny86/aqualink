@@ -305,9 +305,10 @@ export function useSellerInventory({ sellerProfile, orders, driverPositions, for
     }).reverse();
     
     return last30Days.map(date => {
-      const dayOrders = orders.filter(o => 
-        new Date(o.createdAt).toISOString().split('T')[0] === date
-      );
+      const dayOrders = orders.filter(o => {
+        const createdAt = new Date(o.createdAt);
+        return !isNaN(createdAt.getTime()) && createdAt.toISOString().split('T')[0] === date
+      });
       const totalVolume = dayOrders.reduce((s, o) => s + parseFloat(o.volume?.replace(/[^0-9.]/g, '') || '0'), 0);
       return { date, volume: totalVolume, orders: dayOrders.length };
     });

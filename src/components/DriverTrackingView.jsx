@@ -1,6 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { formatCedi } from '../lib/money';
 import useDriverTracking from '../hooks/useDriverTracking';
+import useLoadBalancing from '../hooks/useLoadBalancing';
+import useSmartAssignment from '../hooks/useSmartAssignment';
+import usePredictiveAnalytics from '../hooks/usePredictiveAnalytics';
+import useSmartNotifications from '../hooks/useSmartNotifications';
 
 function DriverMarker({ driver, onClick }) {
   const statusColors = {
@@ -270,8 +274,15 @@ export function DriverTrackingView({ orders, onNotice }) {
     setDriverStatus,
   } = useDriverTracking({ orders, onNotice });
 
+  // Smart features
+  const { zoneLoads, driverWorkloads, rebalancingSuggestions, autoRebalanceEnabled, setAutoRebalanceEnabled, surgeMode, activateSurge, fleetSummary, refreshLoads, applyRebalancing, lastRebalance } = useLoadBalancing({ orders, driverPositions, onNotice });
+  const { assignments, optimizationQueue, autoAssignEnabled, setAutoAssignEnabled, fleetStats: assignmentFleetStats, assignOrder, autoAssignAll, optimizeRoutes, applyOptimization, lastOptimization } = useSmartAssignment({ orders, driverPositions, onNotice, updateOrderStatus: (id, status, cb) => cb() });
+  const { churnAnalysis, ltvPredictions, segments, anomalies, revenueForecast, summary: analyticsSummary, loading: analyticsLoading, refresh: refreshAnalytics } = usePredictiveAnalytics({ orders, customers: [], driverPositions });
+  const { notifications, preferences, unreadCount, sendNotification, checkTriggers } = useSmartNotifications({ user: { identifier: 'ops', role: 'ops' }, orders, driverPositions, schedules: [], budget: null, qualityRecords: [], onNotice });
+
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [viewMode, setViewMode] = useState('map'); // 'map' | 'list'
+  const [smartTab, setSmartTab] = useState('loadbalance');
 
   const activeDrivers = getActiveDrivers();
   const allDrivers = useMemo(() => Object.values(driverPositions), [driverPositions]);
@@ -332,6 +343,13 @@ export function DriverTrackingView({ orders, onNotice }) {
           >
             List
           </button>
+          <button
+            className={viewMode === 'smart' ? 'primary-button' : 'outline-button'}
+            type="button"
+            onClick={() => setViewMode('smart')}
+          >
+            Smart Hub
+          </button>
         </div>
       </div>
 
@@ -387,6 +405,238 @@ export function DriverTrackingView({ orders, onNotice }) {
             )}
           </section>
         </>
+      )}
+
+      {viewMode === 'smart' && (
+        <section className="panel">
+          <div className="panel-toolbar">
+            <div className="panel-title">
+              <span className="section-kicker">SMART HUB</span>
+              <h2>AI-Powered Fleet Intelligence</h2>
+            </div>
+          </div>
+
+          <div className="smart-tabs">
+            <button className={smartTab === 'loadbalance' ? 'active' : ''} onClick={() => setSmartTab('loadbalance')}>Load Balancing</button>
+            <button className={smartTab === 'assignment' ? 'active' : ''} onClick={() => setSmartTab('assignment')}>Auto-Assignment</button>
+            <button className={smartTab === 'analytics' ? 'active' : ''} onClick={() => setSmartTab('analytics')}>Predictive Analytics</button>
+            <button className={smartTab === 'notifications' ? 'active' : ''} onClick={() => setSmartTab('notifications')}>Smart Alerts</button>
+          </div>
+
+          {smartTab === 'loadbalance' && (
+            <div className="smart-panel">
+              <div className="loadbalance-summary">
+                <article className="stat-card">
+                  <span>Online Drivers</span>
+                  <strong>{fleetSummary.onlineDrivers}</strong>
+                </article>
+                <article className="stat-card">
+                  <span>On Job</span>
+                  <strong>{fleetSummary.onJobDrivers}</strong>
+                </article>
+                <article className="stat-card">
+                  <span>Pending Orders</span>
+                  <strong>{fleetSummary.totalPendingOrders}</strong>
+                </article>
+                <article className="stat-card">
+                  <span>Avg Utilization</span>
+                  <strong>{fleetSummary.avgZoneUtilization}%</strong>
+                </article>
+                <article className={fleetSummary.surgeActive ? 'stat-card warning' : 'stat-card'}>
+                  <span>Surge Mode</span>
+                  <strong>{fleetSummary.surgeActive ? 'ACTIVE' : 'OFF'}</strong>
+                </article>
+                <article className="stat-card">
+                  <span>Last Rebalance</span>
+                  <strong>{lastRebalance ? new Date(lastRebalance).toLocaleTimeString() : 'Never'}</strong>
+                </article>
+              </div>
+              <div className="loadbalance-controls">
+                <label className="toggle-label">
+                  <input type="checkbox" checked={autoRebalanceEnabled} onChange={e => setAutoRebalanceEnabled(e.target.checked)} />
+                  <span>Auto Rebalance</span>
+                </label>
+                <label className="toggle-label">
+                  <input type="checkbox" checked={surgeMode} onChange={e => activateSurge(e.target.checked)} />
+                  <span>Surge Pricing</span>
+                </label>
+                <button className="outline-button" onClick={refreshLoads}>Refresh Zones</button>
+              </div>
+              <div className="panel-divider" />
+              <h4>Zone Load</h4>
+              <div className="zone-grid">
+                {zoneLoads.map(zone => (
+                  <article key={zone.zoneId} className="zone-card panel">
+                    <div className="zone-header">
+                      <strong>{zone.zoneName}</strong>
+                      <span className={`pressure ${zone.pressure}`}>{zone.pressure.toUpperCase()}</span>
+                    </div>
+                    <div className="zone-stats">
+                      <div><span>Pending:</span> <strong>{zone.pendingOrders}</strong></div>
+                      <div><span>Active:</span> <strong>{zone.activeOrders}</strong></div>
+                      <div><span>Drivers:</span> <strong>{zone.availableDrivers} avail / {zone.busyDrivers} busy</strong></div>
+                      <div><span>Utilization:</span> <strong>{zone.utilization.toFixed(0)}%</strong></div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+              {rebalancingSuggestions.length > 0 && (
+                <>
+                  <div className="panel-divider" />
+                  <h4>Rebalancing Suggestions</h4>
+                  <div className="suggestion-list">
+                    {rebalancingSuggestions.map((s, i) => (
+                      <div key={i} className="suggestion-item">
+                        <span className="suggestion-type">{s.type}</span>
+                        <span>{s.reason}</span>
+                        <button className="text-button" onClick={() => applyRebalancing(s)}>Apply</button>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {smartTab === 'assignment' && (
+            <div className="smart-panel">
+              <div className="assignment-stats">
+                <article className="stat-card">
+                  <span>Pending Assignment</span>
+                  <strong>{assignmentFleetStats.unassignedOrders}</strong>
+                </article>
+                <article className="stat-card">
+                  <span>Available Drivers</span>
+                  <strong>{assignmentFleetStats.availableDrivers}</strong>
+                </article>
+                <article className="stat-card">
+                  <span>Auto-Assign</span>
+                  <strong>{autoAssignEnabled ? 'ON' : 'OFF'}</strong>
+                </article>
+                <article className="stat-card">
+                  <span>Pending Optimizations</span>
+                  <strong>{assignmentFleetStats.pendingOptimizations}</strong>
+                </article>
+              </div>
+              <div className="assignment-controls">
+                <label className="toggle-label">
+                  <input type="checkbox" checked={autoAssignEnabled} onChange={e => setAutoAssignEnabled(e.target.checked)} />
+                  <span>Enable Auto-Assignment</span>
+                </label>
+                <button className="primary-button" onClick={autoAssignAll} disabled={assignmentFleetStats.unassignedOrders === 0 || assignmentFleetStats.availableDrivers === 0}>
+                  Assign All Now
+                </button>
+                <button className="outline-button" onClick={optimizeRoutes} disabled={assignmentFleetStats.pendingOptimizations === 0}>
+                  Optimize Routes
+                </button>
+              </div>
+              {optimizationQueue.length > 0 && (
+                <>
+                  <div className="panel-divider" />
+                  <h4>Route Optimizations</h4>
+                  <div className="optimization-list">
+                    {optimizationQueue.map((opt, i) => (
+                      <div key={i} className="optimization-item">
+                        <span>Driver {opt.driverId}</span>
+                        <span>{opt.optimizedOrders.length} stops optimized</span>
+                        <button className="text-button" onClick={() => applyOptimization(opt.id)}>Apply</button>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {smartTab === 'analytics' && (
+            <div className="smart-panel">
+              {analyticsLoading ? <p>Loading analytics…</p> : (
+                <>
+                  <div className="analytics-summary">
+                    <article className="analytics-card">
+                      <span>Total Customers</span>
+                      <strong>{analyticsSummary.totalCustomers}</strong>
+                    </article>
+                    <article className="analytics-card warning">
+                      <span>At Risk</span>
+                      <strong>{analyticsSummary.atRiskCustomers}</strong>
+                    </article>
+                    <article className="analytics-card highlight">
+                      <span>VIP Customers</span>
+                      <strong>{analyticsSummary.vipCustomers}</strong>
+                    </article>
+                    <article className="analytics-card">
+                      <span>Predicted LTV</span>
+                      <strong>{formatCedi(analyticsSummary.totalPredictedLTV * 100)}</strong>
+                    </article>
+                    <article className="analytics-card critical">
+                      <span>Critical Anomalies</span>
+                      <strong>{analyticsSummary.criticalAnomalies}</strong>
+                    </article>
+                    <article className="analytics-card">
+                      <span>30-Day Revenue Forecast</span>
+                      <strong>{formatCedi((analyticsSummary.revenueForecast30d || 0) * 100)}</strong>
+                    </article>
+                  </div>
+                  <div className="panel-divider" />
+                  <h4>Driver Anomalies</h4>
+                  <div className="anomaly-list">
+                    {anomalies?.slice(0, 5).map((a, i) => (
+                      <div key={i} className="anomaly-item">
+                        <span>{a.type}</span>
+                        <span>{a.description}</span>
+                        <span className={`severity ${a.severity}`}>{a.severity}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {smartTab === 'notifications' && (
+            <div className="smart-panel">
+              <div className="notification-stats">
+                <article className="stat-card">
+                  <span>Unread</span>
+                  <strong>{unreadCount}</strong>
+                </article>
+                <article className="stat-card">
+                  <span>Push Enabled</span>
+                  <strong>{preferences.pushEnabled ? 'ON' : 'OFF'}</strong>
+                </article>
+                <article className="stat-card">
+                  <span>Quiet Hours</span>
+                  <strong>{preferences.quietHoursEnabled ? 'ON' : 'OFF'}</strong>
+                </article>
+              </div>
+              <div className="panel-divider" />
+              <h4>Recent Notifications</h4>
+              <div className="notification-list">
+                {notifications.slice(0, 10).map(n => (
+                  <div key={n.id} className={`notification-item ${n.readAt ? 'read' : 'unread'}`}>
+                    <div className="notification-content">
+                      <strong>{n.title}</strong>
+                      <span>{n.body}</span>
+                      <small>{new Date(n.createdAt).toLocaleString()}</small>
+                    </div>
+                    {!n.readAt && <button className="text-button" onClick={() => {}}>Mark Read</button>}
+                  </div>
+                ))}
+              </div>
+              <div className="panel-divider" />
+              <h4>Preferences</h4>
+              <div className="preference-grid">
+                {Object.entries(preferences).filter(([k]) => k !== 'quietHoursStart' && k !== 'quietHoursEnd').map(([key, value]) => (
+                  <label key={key} className="preference-item">
+                    <input type="checkbox" checked={value} onChange={e => {}} />
+                    <span>{key.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase())}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
       )}
     </>
   );
