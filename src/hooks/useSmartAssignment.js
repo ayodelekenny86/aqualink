@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { list, insert, update, findBy } from '../lib/collections';
-import { formatCedi } from '../lib/money';
 
 /**
  * Smart driver auto-assignment with route optimization.
@@ -16,17 +14,18 @@ import { formatCedi } from '../lib/money';
  */
 
 const ASSIGNMENT_WEIGHTS = {
-  distance: 0.35,
-  capacity: 0.20,
+  distance: 0.30,
+  capacity: 0.18,
   rating: 0.15,
-  workload: 0.15,
+  workload: 0.18,
   availability: 0.10,
-  reliability: 0.05,
+  reliability: 0.09,
 };
 
 const MAX_DRIVER_DISTANCE_KM = 25;
 const MAX_ACTIVE_JOBS_PER_DRIVER = 3;
 const REASSIGNMENT_THRESHOLD_MINUTES = 15;
+const MAX_JOBS_BEFORE_REBALANCE = 4;
 
 const LOCATION_COORDS = {
   'east legon': { lat: 5.6254, lng: -0.1721 },
@@ -70,7 +69,7 @@ function getCoords(location) {
 function estimateTravelTime(origin, destination) {
   const coords1 = getCoords(origin);
   const coords2 = getCoords(destination);
-  if (!coords1 || !coords2) return { distance: 0, duration: 0, traffic: 'unknown' };
+  if (!coords1 || !coords2) return { distance: 999, duration: 999, traffic: 'unknown' };
   
   const distance = haversineDistance(coords1, coords2);
   const baseSpeed = 30; // km/h average urban
@@ -152,6 +151,7 @@ function scoreDriver(driver, order, allOrders, driverPositions) {
   const orderLoc = order.location || 'central';
   const travel = estimateTravelTime(driverLoc, orderLoc);
   
+  // Unknown locations are penalized, not rewarded
   if (travel.distance > MAX_DRIVER_DISTANCE_KM) return -Infinity;
   
   const activeJobs = allOrders.filter(o => o.driverId === driver.id && 
@@ -159,25 +159,28 @@ function scoreDriver(driver, order, allOrders, driverPositions) {
   
   const capacityMatch = driver.capacityGallons >= parseFloat(order.volume?.replace(/[^0-9.]/g, '') || '0') ? 1 : 0.5;
   const distanceScore = Math.max(0, 1 - travel.distance / MAX_DRIVER_DISTANCE_KM);
-  const workloadScore = Math.max(0, 1 - activeJobs / MAX_ACTIVE_JOBS_PER_DRIVER);
+  const workloadScore = Math.max(0, 1 - activeJobs / MAX_JOBS_BEFORE_REBALANCE);
   const ratingScore = (driver.rating || 4.5) / 5;
   const availabilityScore = driver.status === 'online' ? 1 : 0;
   const reliabilityScore = (driver.completedJobs || 0) / Math.max(1, (driver.completedJobs || 0) + (driver.cancelledJobs || 0));
+  
+  // Fair distribution: penalize drivers already carrying more work
+  const fairScore = Math.max(0, 1 - activeJobs / MAX_JOBS_BEFORE_REBALANCE);
   
   return (
     distanceScore * ASSIGNMENT_WEIGHTS.distance +
     capacityMatch * ASSIGNMENT_WEIGHTS.capacity +
     ratingScore * ASSIGNMENT_WEIGHTS.rating +
-    workloadScore * ASSIGNMENT_WEIGHTS.workload +
+    fairScore * ASSIGNMENT_WEIGHTS.workload +
     availabilityScore * ASSIGNMENT_WEIGHTS.availability +
     reliabilityScore * ASSIGNMENT_WEIGHTS.reliability
   ) * 100;
 }
 
-function optimizeMultiStopRoute(driverId, orders, driverLocations) {
+function optimizeMultiStopRoute(driverId, orders, driverPositions) {
   if (orders.length <= 1) return orders;
   
-  const driverLoc = driverLocations[driverId]?.location || 'central';
+  const driverLoc = driverPositions[driverId]?.location || driver.base?.split(',')[0] || 'central';
   const locations = [driverLoc, ...orders.map(o => o.location)];
   const uniqueLocations = [...new Set(locations)];
   const distanceMatrix = buildDistanceMatrix(uniqueLocations);
@@ -188,7 +191,7 @@ function optimizeMultiStopRoute(driverId, orders, driverLocations) {
   return optimizedIndices.map(idx => orders[idx - 1]);
 }
 
-export function useSmartAssignment({ orders, driverPositions, driverLocations, onNotice, updateOrderStatus }) {
+export function useSmartAssignment({ orders, driverPositions, onNotice, updateOrderStatus }) {
   const [assignments, setAssignments] = useState([]);
   const [optimizationQueue, setOptimizationQueue] = useState([]);
   const [autoAssignEnabled, setAutoAssignEnabled] = useState(true);
@@ -210,7 +213,7 @@ export function useSmartAssignment({ orders, driverPositions, driverLocations, o
     if (!order || !driver) return false;
 
     const travel = estimateTravelTime(
-      driverLocations[driverId]?.location || driver.base?.split(',')[0] || 'central',
+      driverPositions[driverId]?.location || driver.base?.split(',')[0] || 'central',
       order.location
     );
 
@@ -224,7 +227,7 @@ export function useSmartAssignment({ orders, driverPositions, driverLocations, o
       assignedAt: new Date().toISOString(),
       estimatedPickup: travel.duration,
       status: 'assigned',
-      score: scoreDriver(driver, order, orders, driverLocations),
+      score: scoreDriver(driver, order, orders, driverPositions),
     };
     
     setAssignments(prev => [...prev, assignment]);
@@ -241,7 +244,7 @@ export function useSmartAssignment({ orders, driverPositions, driverLocations, o
     
     for (const order of pending) {
       const scoredDrivers = availableDrivers
-        .map(d => ({ driver: d, score: scoreDriver(d, order, orders, driverLocations) }))
+        .map(d => ({ driver: d, score: scoreDriver(d, order, orders, driverPositions) }))
         .filter(d => d.score > 0)
         .sort((a, b) => b.score - a.score);
       
@@ -263,9 +266,10 @@ export function useSmartAssignment({ orders, driverPositions, driverLocations, o
 
     Object.entries(driverGroups).forEach(([driverId, driverOrders]) => {
       if (driverOrders.length > 1) {
-        const optimized = optimizeMultiStopRoute(driverId, driverOrders, driverLocations);
+        const optimized = optimizeMultiStopRoute(driverId, driverOrders, driverPositions);
         if (JSON.stringify(optimized.map(o => o.id)) !== JSON.stringify(driverOrders.map(o => o.id))) {
           setOptimizationQueue(prev => [...prev, {
+            id: `opt_${Date.now()}_${driverId}`,
             driverId,
             originalOrder: driverOrders[0].id,
             optimizedOrders: optimized.map(o => o.id),
@@ -283,17 +287,18 @@ export function useSmartAssignment({ orders, driverPositions, driverLocations, o
     const opt = optimizationQueue.find(o => o.id === optimizationId);
     if (!opt) return;
     
+    // Apply the optimized order sequence to the driver's order queue
     opt.optimizedOrders.forEach((orderId, index) => {
       const order = orders.find(o => o.id === orderId);
       if (order) {
-        updateOrderStatus(orderId, order.status, () => {});
+        updateOrderStatus(orderId, order.status, { routeSequence: index });
       }
     });
     
     setOptimizationQueue(prev => prev.map(o => 
       o.id === optimizationId ? { ...o, status: 'applied', appliedAt: new Date().toISOString() } : o
     ));
-    onNotice(`Route optimized for driver ${opt.driverId}`);
+    onNotice(`Route optimized for driver ${opt.driverId} — ${opt.optimizedOrders.length} stops resequenced`);
   }, [optimizationQueue, orders, updateOrderStatus, onNotice]);
 
   const reassignStalledOrders = useCallback(() => {
@@ -358,7 +363,7 @@ export function useSmartAssignment({ orders, driverPositions, driverLocations, o
     reassignStalledOrders,
     lastOptimization,
     estimateTravelTime,
-    scoreDriver: (driver, order) => scoreDriver(driver, order, orders, driverLocations),
+    scoreDriver: (driver, order) => scoreDriver(driver, order, orders, driverPositions),
   };
 }
 
