@@ -13,6 +13,7 @@ import { summarise } from './lib/summary';
 import ContactButtons from './components/ContactButtons';
 import useAdminPricing from './hooks/useAdminPricing';
 import GoogleSignInButton from './components/GoogleSignInButton';
+import { PWASetup, PWADetectOffline } from './components/PWASetup';
 
 // Admin-only and overlay surfaces load on demand. A buyer who never opens the
 // admin console never downloads it, which keeps the initial bundle small.
@@ -146,6 +147,8 @@ function App() {
 
       <main className="main-content" id="main">
         <header className="topbar"><div className="breadcrumb"><span>AquaLink</span><i>/</i><strong>{t[role]}</strong><select aria-label="Operating region" value={region} onChange={(event) => { setRegion(event.target.value); showNotice(`Workspace switched to ${event.target.value}.`); }}><option>Accra</option><option>Kumasi</option><option>Takoradi</option><option>Tema</option><option>Lagos</option><option>Abidjan</option></select></div><div className="topbar-actions"><label className="language-picker"><span>文</span><select aria-label="Language" value={language} onChange={(event) => setLanguage(event.target.value)}>{languages.map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label><button className={`ai-trigger ${aiOpen ? 'active' : ''}`} type="button" onClick={toggleAi}><span>✦</span> Aqua AI</button><button className="icon-button" type="button" aria-label="Notifications" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen(!notificationsOpen)}><span>♧</span>{roleUnread > 0 && <em>{roleUnread}</em>}</button><button className="profile mobile-profile" type="button"><span className="avatar">AK</span></button></div></header>
+        <PWASetup />
+        <PWADetectOffline onOfflineChange={(offline) => showNotice(offline ? 'You are offline. Changes will sync when reconnected.' : 'Back online. Syncing...')} />
         {notice && <div className="notice" role="status"><span>✓</span>{notice}<button type="button" aria-label="Dismiss notification" onClick={dismissNotice}>×</button></div>}
         {aiOpen && <AiPanel role={role} input={aiInput} setInput={setAiInput} messages={aiMessages} askAi={askAi} close={closeAi} />}
         {!ready && <section className="access-gate panel"><span className="access-lock">⌁</span><p className="eyebrow">Preparing secure workspace</p><h1>Setting up your accounts.</h1><p>AquaLink is generating the local account registry and its credentials on this device. This takes a moment and needs no network access.</p></section>}

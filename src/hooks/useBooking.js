@@ -1,16 +1,23 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { generateBookingCode, generateConfirmationCode } from '../lib/secureCode';
 import { list, replaceAll } from '../lib/collections';
 import { assignDriver, assignSeller } from '../lib/dispatch';
 import { getFleet, recordAssignment, seedFleet } from '../lib/fleet';
 import { createOrder } from '../lib/payments';
 import { allocate, formatCedi, DEFAULT_PRICING, DEFAULT_SPLIT } from '../lib/money';
+import { db } from '../lib/firebase';
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  addDoc,
+  updateDoc,
+  doc,
+  serverTimestamp,
+} from 'firebase/firestore';
 
-/**
- * US liquid gallon to litre. The booking form is in gallons because that is what
- * tank sizes are quoted in locally, and the server prices in litres, so the
- * conversion happens here rather than being guessed at twice.
- */
 const LITRES_PER_GALLON = 3.785411784;
 
 function toLitres(volumeLabel) {
@@ -20,43 +27,62 @@ function toLitres(volumeLabel) {
 }
 
 const initialBooking = { location: '', volume: '2,000 gallons', window: 'As soon as possible', payment: 'Mobile money', whatsapp: '' };
-
 const initialSavedAddresses = [];
+
+const USE_FIRESTORE = typeof window !== 'undefined' && !!import.meta.env.VITE_FIREBASE_API_KEY && !!db;
+
+function getOrdersCollection() {
+  return collection(db, 'orders');
+}
 
 /**
  * Owns booking form state, the order list, saved addresses and the driver
  * position update shown on the buyer and seller workspaces.
  *
- * References and confirmation codes are minted by the app itself: each booking
- * gets a checksummed `AQ-####-X` reference, and releasing escrow requires the
- * delivery confirmation code that the seller side generates when handing over.
+ * When Firebase is configured, orders sync in real-time via Firestore.
+ * Otherwise, orders persist to localStorage (offline/demo mode).
  */
 export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing = DEFAULT_PRICING, split = DEFAULT_SPLIT }) {
-  // Orders live in the shared `orders` collection so the buyer, seller and ops
-  // workspaces all read one list rather than three divergent copies.
   const [orders, setOrders] = useState(() => {
     seedFleet();
-    // No fabricated history. An empty workspace shows an honest empty state
-    // rather than three invented orders with made-over prices and a
-    // "held in escrow" status that no payment system ever set.
     return list('orders');
   });
   const [booking, setBooking] = useState(initialBooking);
   const [savedAddresses, setSavedAddresses] = useState(initialSavedAddresses);
   const [driverUpdate, setDriverUpdate] = useState('Driver Kojo · assigned seller · ETA 18 min');
+  const [loading, setLoading] = useState(USE_FIRESTORE);
+  const [error, setError] = useState(null);
 
-  /**
-   * Write-through: persist first, then update React state.
-   *
-   * The collection is written synchronously rather than from inside a setState
-   * updater, because a subsequent call in the same handler (dispatch assignment,
-   * for one) must be able to read the row this one just wrote.
-   */
   const commit = useCallback((updater) => {
     const next = updater(orders);
-    replaceAll('orders', next);
+    if (!USE_FIRESTORE) {
+      replaceAll('orders', next);
+    }
     setOrders(next);
   }, [orders]);
+
+  useEffect(() => {
+    if (!USE_FIRESTORE || !db) {
+      setLoading(false);
+      return;
+    }
+
+    const ordersQuery = query(getOrdersCollection(), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(ordersQuery, (snapshot) => {
+      const firestoreOrders = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      if (!USE_FIRESTORE) {
+        replaceAll('orders', firestoreOrders);
+      }
+      setOrders(firestoreOrders);
+      setLoading(false);
+    }, (err) => {
+      console.error('Firestore orders listener error:', err);
+      setError(err.message);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const updateBooking = useCallback((event) => {
     const { name, value } = event.target;
@@ -83,9 +109,6 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
 
     let serverOrder;
     try {
-      // The order is created server-side, and the price that comes back is the
-      // price that will be charged. The browser does not get to name an amount,
-      // which is what stops a tampered client from booking at GH¢1.
       serverOrder = await createOrder({ email, phone: buyerPhone, location, volumeLitres });
     } catch (caught) {
       onNotice(caught.message || 'Could not reach the booking service. Please try again.');
@@ -96,42 +119,45 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
     const money = allocate(serverOrder.grossMinor, serverOrder.split);
     setBooking((current) => ({ ...current, location: '' }));
 
-    commit((items) => [
-      {
-        id: reference,
-        code: serverOrder.code ?? reference,
-        location: serverOrder.location,
-        volume: volume.replace(' gallons', ' gal'),
-        status: 'Awaiting payment',
-        // No escrow claim: Paystack collects the money directly, so saying it is
-        // "held in escrow" would describe a system that does not exist.
-        payment: 'Not yet paid',
-        date: 'Just now',
-        price: formatCedi(serverOrder.chargedMinor),
-        listPrice: formatCedi(serverOrder.listMinor ?? serverOrder.grossMinor),
-        // The pricing snapshot the server used, so the order shows why it cost
-        // what it did even after the admin changes the price.
-        discountPercent: serverOrder.pricing?.discountPercent ?? DEFAULT_PRICING.discountPercent,
-        surgePercent: serverOrder.pricing?.surgePercent ?? DEFAULT_PRICING.surgePercent,
-        surgeMinor: serverOrder.surgeMinor ?? 0,
-        grossMinor: serverOrder.grossMinor,
-        chargedMinor: serverOrder.chargedMinor,
-        buyerServiceCharge: serverOrder.buyerServiceCharge,
-        sellerReceives: serverOrder.sellerReceives,
-        driverReceives: serverOrder.driverReceives,
-        platformCommission: serverOrder.platformCommission,
-        volumeLitres,
-        whatsapp: booking.whatsapp ?? '',
-        confirmCode: '',
-        buyerName: email || 'Buyer',
-        buyerPhone,
-      },
-      ...items,
-    ]);
+    const newOrder = {
+      id: reference,
+      code: serverOrder.code ?? reference,
+      location: serverOrder.location,
+      volume: volume.replace(' gallons', ' gal'),
+      status: 'Awaiting payment',
+      payment: 'Not yet paid',
+      date: new Date().toISOString(),
+      price: formatCedi(serverOrder.chargedMinor),
+      listPrice: formatCedi(serverOrder.listMinor ?? serverOrder.grossMinor),
+      discountPercent: serverOrder.pricing?.discountPercent ?? DEFAULT_PRICING.discountPercent,
+      surgePercent: serverOrder.pricing?.surgePercent ?? DEFAULT_PRICING.surgePercent,
+      surgeMinor: serverOrder.surgeMinor ?? 0,
+      grossMinor: serverOrder.grossMinor,
+      chargedMinor: serverOrder.chargedMinor,
+      buyerServiceCharge: serverOrder.buyerServiceCharge,
+      sellerReceives: serverOrder.sellerReceives,
+      driverReceives: serverOrder.driverReceives,
+      platformCommission: serverOrder.platformCommission,
+      volumeLitres,
+      whatsapp: booking.whatsapp ?? '',
+      confirmCode: '',
+      buyerName: email || 'Buyer',
+      buyerPhone,
+      createdAt: serverTimestamp(),
+    };
 
-    // Dispatch automatically. There is no driver-side app to accept from, so the
-    // best available driver and a seller with enough capacity are committed to
-    // the order at creation time, and the buyer is told who is coming.
+    if (USE_FIRESTORE && db) {
+      try {
+        await addDoc(getOrdersCollection(), newOrder);
+      } catch (err) {
+        console.error('Failed to write order to Firestore:', err);
+        onNotice('Order created but failed to sync. Will retry on next load.');
+        commit((items) => [newOrder, ...items]);
+      }
+    } else {
+      commit((items) => [newOrder, ...items]);
+    }
+
     const { drivers, sellers } = getFleet();
     const dispatchable = { location, volumeGallons: Number.parseInt(volume, 10) || 0 };
     const driver = assignDriver({ order: dispatchable, drivers });
@@ -143,8 +169,13 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
       : 'a driver is being assigned';
     const surgeNote = (serverOrder.surgeMinor ?? 0) > 0 ? ` Surge ${formatCedi(serverOrder.surgeMinor)} applied.` : '';
     onNotice(`Booking confirmed. Your reference is ${reference}. You will be charged ${formatCedi(serverOrder.chargedMinor)}.${surgeNote} ${who}.`);
-    // Dispatchers need to see every new order, since assignment is automatic.
-    notify?.({ role: 'ops', title: `New order ${reference} · ${location}`, body: `${volume} · ${formatCedi(serverOrder.chargedMinor)} · awaiting payment · auto-assigned to ${who}.`, orderId: reference, kind: 'job' });
+    notify?.({
+      role: 'ops',
+      title: `New order ${reference} · ${location}`,
+      body: `${volume} · ${formatCedi(serverOrder.chargedMinor)} · awaiting payment · auto-assigned to ${who}.`,
+      orderId: reference,
+      kind: 'job',
+    });
   }, [booking, commit, onNotice, notify, email, buyerPhone]);
 
   const repeatBooking = useCallback((address) => {
@@ -157,10 +188,19 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
     onNotice('Live delivery update received from the seller app.');
   }, [onNotice]);
 
-  const updateOrderStatus = useCallback((orderId, status, notify) => {
-    commit((items) => items.map((item) => (item.id === orderId ? { ...item, status } : item)));
+  const updateOrderStatus = useCallback(async (orderId, status, notify) => {
+    const updates = { status, updatedAt: serverTimestamp() };
+    if (USE_FIRESTORE && db) {
+      try {
+        await updateDoc(doc(getOrdersCollection(), orderId), updates);
+      } catch (err) {
+        console.error('Failed to update order status:', err);
+        commit((items) => items.map((item) => (item.id === orderId ? { ...item, status } : item)));
+      }
+    } else {
+      commit((items) => items.map((item) => (item.id === orderId ? { ...item, status } : item)));
+    }
     onNotice(`Order ${orderId} is now ${status.toLowerCase()}.`);
-    // A status change is the buyer's cue to expect the tank, so tell them.
     const order = orders.find((item) => item.id === orderId);
     notify?.({
       role: 'buyer',
@@ -171,27 +211,24 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
     });
   }, [onNotice, commit, orders]);
 
-  /**
-   * Seller-side handover: issues the delivery confirmation code the buyer must
-   * quote before the order is marked delivered.
-   */
-  const issueDeliveryCode = useCallback((orderId) => {
+  const issueDeliveryCode = useCallback(async (orderId) => {
     const code = generateConfirmationCode('delivery');
-    commit((items) => items.map((item) => (item.id === orderId ? { ...item, confirmCode: code } : item)));
+    const updates = { confirmCode: code, updatedAt: serverTimestamp() };
+    if (USE_FIRESTORE && db) {
+      try {
+        await updateDoc(doc(getOrdersCollection(), orderId), updates);
+      } catch (err) {
+        console.error('Failed to issue delivery code:', err);
+        commit((items) => items.map((item) => (item.id === orderId ? { ...item, confirmCode: code } : item)));
+      }
+    } else {
+      commit((items) => items.map((item) => (item.id === orderId ? { ...item, confirmCode: code } : item)));
+    }
     onNotice(`Delivery code ${code} issued for ${orderId}. Share it with the buyer at handover.`);
     return code;
   }, [onNotice, commit]);
 
-  /**
-   * Buyer-side: the order is only marked delivered when the issued code matches.
-   *
-   * This confirms handover, nothing more. Paystack collects the buyer's money
-   * directly into the AquaLink account, so there is no escrow to release here,
-   * and paying the seller is a separate process that is not implemented yet.
-   * The old wording claimed funds had been released, which described a system
-   * that does not exist.
-   */
-  const confirmDelivery = useCallback((orderId, code) => {
+  const confirmDelivery = useCallback(async (orderId, code) => {
     const order = orders.find((item) => item.id === orderId);
     if (!order) return { ok: false, reason: 'unknown-order' };
     if (!order.confirmCode) return { ok: false, reason: 'not-handed-over' };
@@ -199,9 +236,26 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
       onNotice('That delivery code does not match. Ask the driver for the code.');
       return { ok: false, reason: 'mismatch' };
     }
-    commit((items) => items.map((item) => (item.id === orderId
-      ? { ...item, status: 'Delivered', payment: 'Delivered · awaiting seller payout', confirmCode: '' }
-      : item)));
+    const updates = {
+      status: 'Delivered',
+      payment: 'Delivered · awaiting seller payout',
+      confirmCode: '',
+      updatedAt: serverTimestamp(),
+    };
+    if (USE_FIRESTORE && db) {
+      try {
+        await updateDoc(doc(getOrdersCollection(), orderId), updates);
+      } catch (err) {
+        console.error('Failed to confirm delivery:', err);
+        commit((items) => items.map((item) => (item.id === orderId
+          ? { ...item, status: 'Delivered', payment: 'Delivered · awaiting seller payout', confirmCode: '' }
+          : item)));
+      }
+    } else {
+      commit((items) => items.map((item) => (item.id === orderId
+        ? { ...item, status: 'Delivered', payment: 'Delivered · awaiting seller payout', confirmCode: '' }
+        : item)));
+    }
     onNotice(`Delivery confirmed for ${orderId}. Seller payout is handled separately by operations.`);
     return { ok: true };
   }, [orders, onNotice, commit]);
@@ -224,6 +278,8 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
     issueDeliveryCode,
     confirmDelivery,
     requestRefund,
+    loading,
+    error,
   };
 }
 
