@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { list } from '../lib/collections';
-import { formatCedi } from '../lib/money';
+import { formatCedi, toMinor, quotePrice, DEFAULT_PRICING } from '../lib/money';
 
 /**
  * Dynamic Pricing Engine
@@ -16,11 +16,16 @@ import { formatCedi } from '../lib/money';
  * - Revenue optimization with constraints
  */
 
+const SERVER_LIST_PRICE = 600;
+const SERVER_DISCOUNT_PERCENT = 50;
+const SERVER_BASE_PRICE_MINOR = toMinor(Math.round((toMinor(SERVER_LIST_PRICE) * (100 - SERVER_DISCOUNT_PERCENT)) / 100));
+const SERVER_BASE_PRICE_MAJOR = SERVER_BASE_PRICE_MINOR / 100;
+
 const BASE_PRICES = {
-  '1,000 gallons': 250,
-  '2,000 gallons': 450,
-  '5,000 gallons': 980,
-  '10,000 gallons': 1800,
+  '1,000 gallons': SERVER_BASE_PRICE_MAJOR,
+  '2,000 gallons': SERVER_BASE_PRICE_MAJOR,
+  '5,000 gallons': SERVER_BASE_PRICE_MAJOR,
+  '10,000 gallons': SERVER_BASE_PRICE_MAJOR,
 };
 
 const PRICE_BOUNDS = {
@@ -35,6 +40,27 @@ const ELASTICITY_ESTIMATES = {
   '5,000 gallons': -0.8,
   '10,000 gallons': -0.6,
 };
+
+function erf(x) {
+  const a1 =  0.254829592;
+  const a2 = -0.284496736;
+  const a3 =  1.421413741;
+  const a4 = -1.453152027;
+  const a5 =  1.061405429;
+  const p  =  0.3275911;
+
+  const sign = x < 0 ? -1 : 1;
+  x = Math.abs(x);
+
+  const t = 1.0 / (1.0 + p * x);
+  const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+
+  return sign * y;
+}
+
+function normalCDF(z) {
+  return 0.5 * (1 + erf(z / Math.sqrt(2)));
+}
 
 function calculateDemandSignal(orders, region, volume, hoursBack = 24) {
   const cutoff = Date.now() - hoursBack * 60 * 60 * 1000;
@@ -95,8 +121,8 @@ function calculateOptimalPrice(basePrice, demandSignal, supplySignal, customerPr
   const supplyRatio = supplySignal.ratio;
   if (supplyRatio < 0.3) multiplier *= 1.25;
   else if (supplyRatio < 0.5) multiplier *= 1.1;
-  else if (supplyRatio > 3.0) multiplier *= 0.95;
   else if (supplyRatio > 5.0) multiplier *= 0.9;
+  else if (supplyRatio > 3.0) multiplier *= 0.95;
   
   if (isInstitution) multiplier *= 0.88;
   if (isRepeatCustomer && orderCount >= 5) multiplier *= 0.93;
@@ -115,7 +141,8 @@ function calculateOptimalPrice(basePrice, demandSignal, supplySignal, customerPr
     multiplier *= 1.05;
   }
   
-  const boundedMultiplier = Math.max(PRICE_BOUNDS.minMultiplier, Math.min(PRICE_BOUNDS.maxMultiplier, multiplier));
+  const maxAllowed = PRICE_BOUNDS.surgeMaxMultiplier;
+  const boundedMultiplier = Math.max(PRICE_BOUNDS.minMultiplier, Math.min(maxAllowed, multiplier));
   const finalPrice = Math.round(basePrice * boundedMultiplier);
   
   const revenueAtBase = basePrice * demandSignal.baselineRate * 24;
@@ -145,9 +172,10 @@ function runPriceExperiment(orders, variantA, variantB, volume, region) {
   const volumeOrders = orders.filter(o => o.volume === volume && (!region || o.region === region));
   if (volumeOrders.length < 50) return null;
   
-  const midPoint = volumeOrders.length / 2;
-  const groupA = volumeOrders.slice(0, midPoint);
-  const groupB = volumeOrders.slice(midPoint);
+  const shuffled = [...volumeOrders].sort(() => Math.random() - 0.5);
+  const midPoint = Math.floor(shuffled.length / 2);
+  const groupA = shuffled.slice(0, midPoint);
+  const groupB = shuffled.slice(midPoint);
   
   const revenueA = groupA.reduce((s, o) => s + (o.chargedMinor || 0), 0) / 100;
   const revenueB = groupB.reduce((s, o) => s + (o.chargedMinor || 0), 0) / 100;
@@ -164,7 +192,7 @@ function runPriceExperiment(orders, variantA, variantB, volume, region) {
   );
   
   const tStat = pooledStd > 0 ? (avgPriceA - avgPriceB) / (pooledStd * Math.sqrt(1/ordersA + 1/ordersB)) : 0;
-  const pValue = 2 * (1 - 0.5 * (1 + Math.erf(Math.abs(tStat) / Math.sqrt(2))));
+  const pValue = 2 * (1 - normalCDF(Math.abs(tStat)));
   
   return {
     variantA: { name: variantA.name, price: variantA.price, revenue: revenueA, orders: ordersA, avgPrice: avgPriceA },
@@ -173,10 +201,11 @@ function runPriceExperiment(orders, variantA, variantB, volume, region) {
     pValue: Math.round(pValue * 10000) / 10000,
     significant: pValue < 0.05,
     lift: revenueA > 0 ? Math.round(((revenueB - revenueA) / revenueA) * 100) : 0,
+    note: 'Retrospective analysis: orders randomly split post-hoc; not a prospective A/B test.',
   };
 }
 
-export function useDynamicPricing({ orders, driverPositions, customerId, region }) {
+export function useDynamicPricing({ orders, driverPositions, customerId, region, customers = [] }) {
   const [pricing, setPricing] = useState({});
   const [experiments, setExperiments] = useState([]);
   const [priceHistory, setPriceHistory] = useState([]);
@@ -184,15 +213,16 @@ export function useDynamicPricing({ orders, driverPositions, customerId, region 
 
   const customer = useMemo(() => {
     if (!customerId) return null;
-    // Would fetch from customers list
+    const found = customers.find(c => c.id === customerId || c.identifier === customerId);
+    if (found) return found;
     return { identifier: customerId };
-  }, [customerId]);
+  }, [customerId, customers]);
 
   const customerProfile = useMemo(() => {
     if (!customer) return {};
-    const customerOrders = orders.filter(o => o.customerId === customer.identifier);
+    const customerOrders = orders.filter(o => o.customerId === customer.identifier || o.customerId === customer.id);
     return {
-      isInstitution: customer.role === 'institution',
+      isInstitution: customer.role === 'institution' || customer.type === 'institution',
       isRepeatCustomer: customerOrders.length > 1,
       orderCount: customerOrders.length,
       totalSpent: customerOrders.reduce((s, o) => s + (o.chargedMinor || 0), 0) / 100,

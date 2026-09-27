@@ -124,6 +124,91 @@ function segmentCustomer(rfm, churnRisk, ltv) {
   return 'regular';
 }
 
+/**
+ * Build a customer list from orders when no explicit `customers` array is
+ * supplied. Aggregates each order's customer info (customerId, customerName,
+ * customerPhone) into per-customer stats so the RFM/churn/LTV algorithms can
+ * still run on the derived data.
+ */
+function deriveCustomersFromOrders(orders) {
+  const map = {};
+  orders.forEach(o => {
+    const id = o.customerId || o.customer?.id;
+    if (!id) return;
+    if (!map[id]) {
+      map[id] = {
+        identifier: id,
+        name: o.customerName || o.customer?.name || null,
+        phone: o.customerPhone || o.customer?.phone || null,
+      };
+    }
+  });
+  return Object.values(map);
+}
+
+/**
+ * Simple seasonal (day-of-week) decomposition of daily revenue.
+ * Returns average revenue per day of week plus the overall daily mean so
+ * callers can see which days over/under-perform.
+ */
+function seasonalDecomposition(orders) {
+  const byDay = {};
+  orders.forEach(o => {
+    const day = new Date(o.createdAt).getDay(); // 0=Sun..6=Sat
+    const label = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day];
+    if (!byDay[label]) byDay[label] = { total: 0, count: 0 };
+    byDay[label].total += o.chargedMinor || 0;
+    byDay[label].count += 1;
+  });
+
+  const dayOrder = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const averages = dayOrder.map(d => {
+    const entry = byDay[d] || { total: 0, count: 0 };
+    return {
+      day: d,
+      avgRevenue: entry.count ? Math.round(entry.total / entry.count / 100) : 0,
+      orderCount: entry.count,
+    };
+  });
+
+  const allTotals = averages.map(a => a.avgRevenue).filter(v => v > 0);
+  const overallMean = allTotals.length
+    ? allTotals.reduce((a, b) => a + b, 0) / allTotals.length
+    : 0;
+
+  const seasonalIndex = averages.map(a => ({
+    day: a.day,
+    index: overallMean > 0 ? Math.round((a.avgRevenue / overallMean) * 100) / 100 : 1,
+  }));
+
+  return { averages, seasonalIndex, overallMean: Math.round(overallMean) };
+}
+
+/**
+ * Early-warning alerts: flag customers whose recency is degrading — i.e. they
+ * have ordered before but are now going quiet, crossing the churn window
+ * threshold or showing increasing gaps between orders.
+ */
+function earlyWarningAlerts(churnAnalysis, referenceDate = new Date()) {
+  return churnAnalysis
+    .filter(c => c.rfm && c.level !== 'unknown')
+    .filter(c => c.rfm.recency > CHURN_WINDOW_DAYS * 0.5)
+    .map(c => {
+      const r = c.rfm;
+      const daysToChurn = Math.max(0, CHURN_WINDOW_DAYS - r.recency);
+      return {
+        customerId: c.customerId,
+        level: r.recency > CHURN_WINDOW_DAYS ? 'critical' : 'warning',
+        recency: r.recency,
+        daysToChurn,
+        description: r.recency > CHURN_WINDOW_DAYS
+          ? `No order in ${r.recency} days — at risk of churn`
+          : `Last order ${r.recency} days ago — recency degrading`,
+      };
+    })
+    .sort((a, b) => a.recency - b.recency);
+}
+
 function detectOrderAnomalies(orders) {
   if (orders.length < 20) return [];
   
@@ -267,6 +352,29 @@ function detectDriverAnomalies(orders, driverPositions) {
     }
   });
   
+  // Use live driverPositions to flag drivers whose tracked position is stale
+  // or who have active orders but no recent telemetry.
+  const positions = driverPositions || {};
+  Object.entries(positions).forEach(([driverId, pos]) => {
+    if (!pos) return;
+    const lastSeen = pos.updatedAt || pos.timestamp || pos.lastSeen;
+    const ageMs = lastSeen ? new Date().getTime() - new Date(lastSeen).getTime() : null;
+    const hasActiveOrders = (driverOrders[driverId] || []).some(
+      o => o.status !== 'Delivered' && o.status !== 'Cancelled'
+    );
+    if (hasActiveOrders && (ageMs === null || ageMs > 30 * 60 * 1000)) {
+      anomalies.push({
+        type: 'stale_driver_position',
+        driverId,
+        severity: 'warning',
+        timestamp: lastSeen || null,
+        description: ageMs === null
+          ? 'Driver has active orders but no position telemetry'
+          : `Position stale by ${Math.round(ageMs / 60000)} minutes`,
+      });
+    }
+  });
+  
   return anomalies;
 }
 
@@ -276,31 +384,33 @@ function monteCarloRevenueForecast(orders, days = 30, simulations = 500) {
     const day = new Date(o.createdAt).toISOString().split('T')[0];
     dailyRevenue[day] = (dailyRevenue[day] || 0) + (o.chargedMinor || 0);
   });
-  
+
   const values = Object.values(dailyRevenue);
   if (values.length < 14) return null;
-  
-  const mean = values.reduce((a, b) => a + b, 0) / values.length;
-  const std = Math.sqrt(values.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / values.length);
-  
+
+  // Bootstrap sample with replacement from the actual historical daily values.
+  // Each simulation path draws `days` independent daily revenues from the
+  // empirical distribution, preserving the real shape (skew, outliers) instead
+  // of replacing it with uniform noise around a mean.
   const results = [];
   for (let i = 0; i < simulations; i++) {
     let total = 0;
     for (let d = 0; d < days; d++) {
-      const daily = Math.max(0, mean + (Math.random() - 0.5) * std * 2);
-      total += daily;
+      const idx = Math.floor(Math.random() * values.length);
+      total += values[idx];
     }
     results.push(total);
   }
-  
+
   results.sort((a, b) => a - b);
+  const pct = (p) => results[Math.min(simulations - 1, Math.floor(simulations * p))];
   return {
     mean: Math.round(results.reduce((a, b) => a + b, 0) / simulations / 100),
     median: Math.round(results[Math.floor(simulations / 2)] / 100),
-    p10: Math.round(results[Math.floor(simulations * 0.1)] / 100),
-    p90: Math.round(results[Math.floor(simulations * 0.9)] / 100),
-    p5: Math.round(results[Math.floor(simulations * 0.05)] / 100),
-    p95: Math.round(results[Math.floor(simulations * 0.95)] / 100),
+    p10: Math.round(pct(0.10) / 100),
+    p90: Math.round(pct(0.90) / 100),
+    p5: Math.round(pct(0.05) / 100),
+    p95: Math.round(pct(0.95) / 100),
     currency: 'GHS',
   };
 }
@@ -311,20 +421,29 @@ export function usePredictiveAnalytics({ orders, customers, driverPositions }) {
   const [segments, setSegments] = useState({});
   const [anomalies, setAnomalies] = useState([]);
   const [revenueForecast, setRevenueForecast] = useState(null);
+  const [seasonalTrend, setSeasonalTrend] = useState(null);
+  const [earlyWarnings, setEarlyWarnings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
 
   const runAnalysis = useCallback(() => {
-    if (!orders?.length || !customers?.length) {
+    // Derive the customer list from orders when the caller passes an empty
+    // `customers` array (the common case). Each order carries customerId,
+    // customerName and customerPhone so we can rebuild per-customer stats.
+    const effectiveCustomers = (customers && customers.length)
+      ? customers
+      : deriveCustomersFromOrders(orders || []);
+
+    if (!orders?.length || !effectiveCustomers?.length) {
       setLoading(false);
       return;
     }
     
-    const allRFM = customers
+    const allRFM = effectiveCustomers
       .map(c => calculateRFM(orders, c.identifier))
       .filter(Boolean);
     
-    const churn = customers.map(c => {
+    const churn = effectiveCustomers.map(c => {
       const rfm = calculateRFM(orders, c.identifier);
       const risk = calculateChurnRisk(rfm, allRFM);
       const ltv = predictLTV(rfm, allRFM);
@@ -340,17 +459,23 @@ export function usePredictiveAnalytics({ orders, customers, driverPositions }) {
     
     const orderAnomalies = detectOrderAnomalies(orders);
     const paymentAnomalies = detectPaymentAnomalies(orders);
+    // Pass driverPositions into the anomaly detector so driver-level anomalies
+    // can be correlated against live/tracked driver positions.
     const driverAnomalies = detectDriverAnomalies(orders, driverPositions || {});
     const allAnomalies = [...orderAnomalies, ...paymentAnomalies, ...driverAnomalies]
       .sort((a, b) => (b.zScore || 0) - (a.zScore || 0));
     
     const forecast = monteCarloRevenueForecast(orders, 30);
+    const seasonal = seasonalDecomposition(orders);
+    const warnings = earlyWarningAlerts(churn);
     
     setChurnAnalysis(churn);
     setLtvPredictions(ltvMap);
     setSegments(segmentCounts);
     setAnomalies(allAnomalies);
     setRevenueForecast(forecast);
+    setSeasonalTrend(seasonal);
+    setEarlyWarnings(warnings);
     setLastUpdated(new Date().toISOString());
     setLoading(false);
   }, [orders, customers, driverPositions]);
@@ -363,12 +488,13 @@ export function usePredictiveAnalytics({ orders, customers, driverPositions }) {
 
   const summary = useMemo(() => {
     const atRisk = churnAnalysis.filter(c => c.level === 'critical' || c.level === 'high').length;
-    const vip = Object.keys(segments).filter(s => s === 'vip').length;
+    // Count actual customers flagged as VIP, not the number of segment keys.
+    const vip = churnAnalysis.filter(c => c.segment === 'vip').length;
     const totalLTV = Object.values(ltvPredictions).reduce((s, l) => s + (l.predicted || 0), 0);
     const criticalAnomalies = anomalies.filter(a => a.severity === 'critical').length;
     
     return {
-      totalCustomers: customers?.length || 0,
+      totalCustomers: churnAnalysis.length,
       atRiskCustomers: atRisk,
       vipCustomers: vip,
       totalPredictedLTV: totalLTV,
@@ -393,6 +519,8 @@ export function usePredictiveAnalytics({ orders, customers, driverPositions }) {
     segments,
     anomalies,
     revenueForecast,
+    seasonalTrend,
+    earlyWarnings,
     summary,
     loading,
     lastUpdated,
