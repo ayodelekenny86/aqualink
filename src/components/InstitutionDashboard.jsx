@@ -108,6 +108,7 @@ export function InstitutionDashboard({ orders, showNotice }) {
     upcomingDeliveries,
     qualityRecords,
     addQualityRecord,
+    deleteQualityRecord,
     budget,
     updateBudget,
     analytics,
@@ -127,6 +128,35 @@ export function InstitutionDashboard({ orders, showNotice }) {
   const [showScheduleForm, setShowScheduleForm] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(null);
   const [showQualityForm, setShowQualityForm] = useState(false);
+  const [scheduleForm, setScheduleForm] = useState({
+    name: '',
+    frequency: 'weekly',
+    day: 'Monday',
+    volume: '2,000 gallons',
+    nextDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    active: true,
+  });
+
+  function handleScheduleSubmit(event) {
+    event.preventDefault();
+    const form = new FormData(event.target);
+    const next = {
+      name: form.get('name'),
+      frequency: form.get('frequency'),
+      day: form.get('day'),
+      volume: form.get('volume'),
+      nextDelivery: form.get('nextDelivery'),
+      active: form.get('active') === 'on',
+    };
+    upsertSchedule(editingSchedule ? { ...editingSchedule, ...next } : next);
+    setShowScheduleForm(false);
+    setEditingSchedule(null);
+    setScheduleForm({
+      name: '', frequency: 'weekly', day: 'Monday', volume: '2,000 gallons',
+      nextDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      active: true,
+    });
+  }
 
   return (
     <>
@@ -250,15 +280,15 @@ export function InstitutionDashboard({ orders, showNotice }) {
             <form className="schedule-form panel" onSubmit={handleScheduleSubmit}>
               <h3>{editingSchedule ? 'Edit Schedule' : 'New Delivery Schedule'}</h3>
               <div className="form-row">
-                <label>Name<input name="name" value={scheduleForm.name} onChange={(e) => scheduleForm.name = e.target.value} placeholder="e.g. Main campus" required /></label>
-                <label>Frequency<select name="frequency" value={scheduleForm.frequency} onChange={(e) => scheduleForm.frequency = e.target.value}>
+                <label>Name<input name="name" value={scheduleForm.name} onChange={(e) => setScheduleForm({ ...scheduleForm, name: e.target.value })} placeholder="e.g. Main campus" required /></label>
+                <label>Frequency<select name="frequency" value={scheduleForm.frequency} onChange={(e) => setScheduleForm({ ...scheduleForm, frequency: e.target.value })}>
                   <option value="weekly">Weekly</option>
                   <option value="biweekly">Every 2 weeks</option>
                   <option value="monthly">Monthly</option>
                 </select></label>
               </div>
               <div className="form-row">
-                <label>Day<select name="day" value={scheduleForm.day} onChange={(e) => scheduleForm.day = e.target.value}>
+                <label>Day<select name="day" value={scheduleForm.day} onChange={(e) => setScheduleForm({ ...scheduleForm, day: e.target.value })}>
                   <option value="Monday">Monday</option>
                   <option value="Tuesday">Tuesday</option>
                   <option value="Wednesday">Wednesday</option>
@@ -267,7 +297,7 @@ export function InstitutionDashboard({ orders, showNotice }) {
                   <option value="Saturday">Saturday</option>
                   <option value="Sunday">Sunday</option>
                 </select></label>
-                <label>Volume<select name="volume" value={scheduleForm.volume} onChange={(e) => scheduleForm.volume = e.target.value}>
+                <label>Volume<select name="volume" value={scheduleForm.volume} onChange={(e) => setScheduleForm({ ...scheduleForm, volume: e.target.value })}>
                   <option>1,000 gallons</option>
                   <option>2,000 gallons</option>
                   <option>5,000 gallons</option>
@@ -275,8 +305,8 @@ export function InstitutionDashboard({ orders, showNotice }) {
                 </select></label>
               </div>
               <div className="form-row">
-                <label>Next delivery<input type="date" name="nextDelivery" value={scheduleForm.nextDelivery} onChange={(e) => scheduleForm.nextDelivery = e.target.value} required /></label>
-                <label className="checkbox-label"><input type="checkbox" name="active" checked={scheduleForm.active} onChange={(e) => scheduleForm.active = e.target.checked} /> Active</label>
+                <label>Next delivery<input type="date" name="nextDelivery" value={scheduleForm.nextDelivery} onChange={(e) => setScheduleForm({ ...scheduleForm, nextDelivery: e.target.value })} required /></label>
+                <label className="checkbox-label"><input type="checkbox" name="active" checked={scheduleForm.active} onChange={(e) => setScheduleForm({ ...scheduleForm, active: e.target.checked })} /> Active</label>
               </div>
               <div className="form-actions">
                 <button type="submit" className="primary-button">{editingSchedule ? 'Save Changes' : 'Create Schedule'}</button>
@@ -364,12 +394,7 @@ export function InstitutionDashboard({ orders, showNotice }) {
           ) : (
             <div className="quality-list">
               {qualityRecords.map((record) => (
-                <QualityCard key={record.id} record={record} onDelete={() => {
-                  if (confirm('Delete this quality record?')) {
-                    const updated = qualityRecords.filter((r) => r.id !== record.id);
-                    // Would need a setter - simplified for now
-                  }
-                }} />
+                <QualityCard key={record.id} record={record} onDelete={() => deleteQualityRecord(record.id)} />
               ))}
             </div>
           )}
@@ -426,19 +451,33 @@ export function InstitutionDashboard({ orders, showNotice }) {
               <span className="section-kicker">USAGE ANALYTICS</span>
               <h2>Delivery patterns and trends</h2>
             </div>
-            <button className="outline-button" type="button" onClick={refreshData} disabled={refreshing}>
-              {refreshing ? 'Refreshing…' : '↻ Refresh'}
+            <button className="outline-button" type="button" onClick={refreshForecast} disabled={forecastLoading}>
+              {forecastLoading ? 'Refreshing…' : '↻ Refresh'}
             </button>
           </div>
 
           <div className="analytics-grid">
             <article className="analytics-card">
               <h3>Monthly Trend</h3>
-              <p className="analytics-placeholder">Connect a data warehouse or enable order history sync to see monthly delivery volume trends.</p>
+              {forecastSummary ? (
+                <>
+                  <p className="analytics-value">{trend}</p>
+                  <p className="analytics-placeholder">{forecastSummary.next30DaysOrders} orders forecast over the next 30 days, from {orders.length} real orders.</p>
+                </>
+              ) : (
+                <p className="analytics-placeholder">Connect a data warehouse or enable order history sync to see monthly delivery volume trends.</p>
+              )}
             </article>
             <article className="analytics-card">
               <h3>Peak Demand</h3>
-              <p className="analytics-placeholder">No forecasting model connected. Add 6+ months of order data to enable peak detection.</p>
+              {peakHours.length > 0 ? (
+                <>
+                  <p className="analytics-value">Peak at {peakHours[0].hour}:00</p>
+                  <p className="analytics-placeholder">{peakHours[0].count} orders placed at peak hour, from real order history.</p>
+                </>
+              ) : (
+                <p className="analytics-placeholder">No forecasting model connected. Add 6+ months of order data to enable peak detection.</p>
+              )}
             </article>
             <article className="analytics-card">
               <h3>Cost per Unit</h3>

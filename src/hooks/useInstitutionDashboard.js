@@ -20,14 +20,11 @@ export function useInstitutionDashboard({ orders, onNotice }) {
   useEffect(() => {
     const saved = list('institutionSchedules');
     if (saved.length) setSchedules(saved);
-    else {
-      // Seed demo schedules
-      const demo = [
-        { id: 'sched_1', name: 'Main campus', frequency: 'weekly', day: 'Monday', volume: '2,000 gallons', active: true, nextDelivery: '2026-08-26' },
-        { id: 'sched_2', name: 'Student housing', frequency: 'biweekly', day: 'Wednesday', volume: '5,000 gallons', active: true, nextDelivery: '2026-09-03' },
-      ];
-      setSchedules(demo);
-    }
+    // Deliberately no seeded demo schedules. An institution workspace that
+    // shows "Main campus · Monday · 2,000 gallons" before anyone has booked a
+    // delivery is advertising a plan that does not exist, the same way the old
+    // buyer rewards panel advertised a Silver balance nobody had earned. The
+    // schedule list is empty until the institution creates one.
   }, []);
 
   // Load quality records
@@ -40,7 +37,8 @@ export function useInstitutionDashboard({ orders, onNotice }) {
   useEffect(() => {
     const saved = list('institutionBudget');
     if (saved.length) setBudget(saved[0]);
-    else setBudget({ monthly: 15000, spent: 0, alerts: [] });
+    // No seeded budget either. An institution that has not set a monthly limit
+    // should see GH₵0.00, not a GH¢15,000 plan nobody subscribed to.
   }, []);
 
   // Update budget when orders change
@@ -94,6 +92,12 @@ export function useInstitutionDashboard({ orders, onNotice }) {
     setQualityRecords(newRecords);
     onNotice('Water quality record added.');
   }, [qualityRecords, onNotice]);
+
+  // Remove a quality record
+  const deleteQualityRecord = useCallback((id) => {
+    setQualityRecords((prev) => prev.filter((r) => r.id !== id));
+    onNotice('Water quality record removed.');
+  }, [onNotice]);
 
   // Update budget
   const updateBudget = useCallback((newBudget) => {
@@ -153,6 +157,7 @@ export function useInstitutionDashboard({ orders, onNotice }) {
     // Quality
     qualityRecords,
     addQualityRecord,
+    deleteQualityRecord,
     // Budget
     budget,
     updateBudget,

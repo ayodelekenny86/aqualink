@@ -495,7 +495,20 @@ function InstitutionFinance({ orders, showNotice }) {
 }
 
 function RevenueFinance({ orders = [], showNotice }) {
-  return <section className="finance-workspace"><div className="finance-heading"><div><span className="section-kicker">REVENUE CONTROL TOWER</span><h2>Money moving through the network.</h2><p>Marketplace take, outstanding payments and revenue mix, summed from paid orders.</p></div><button className="outline-button" type="button" onClick={() => showNotice('Revenue report generated with payment, GMV, and commission detail.')}>Generate report ↓</button></div><div className="finance-grid ops-finance"><article><span>GMV TODAY</span><strong>GH₵18,540</strong><small>124 completed orders</small></article><article><span>BUYER COMMISSIONS</span><strong>GH₵1,020</strong><small>40% of revenue mix</small></article><article><span>SELLER COMMISSIONS</span><strong>GH₵892</strong><small>35% of revenue mix</small></article><article><span>INSTITUTIONAL MRR</span><strong>GH₵637</strong><small>25% of revenue mix</small></article><article className="finance-warning"><span>AWAITING PAYMENT</span><strong>{formatCedi(summarise(orders).unpaidMinor)}</strong><small>{summarise(orders).unpaidCount} order(s) not yet paid</small></article><article className="finance-warning"><span>NO DISPUTE DATA</span><strong>0</strong><small>Dispute tracking is not connected to this deployment</small></article></div></section>;
+  const summary = summarise(orders);
+  // The old tiles read GH₵18,540 GMV, GH₵1,020 buyer commissions, GH₵892 seller
+  // commissions and GH₵637 institutional MRR with invented revenue-mix labels.
+  // Every figure here is summed from paid orders, so an empty workspace shows
+  // GH₵0.00 rather than a plausible-looking market.
+  const hasData = summary.paidCount > 0;
+  const sellerShare = summary.sellerReceivesMinor;
+  const driverShare = summary.driverReceivesMinor;
+  const platformShare = summary.platformCommissionMinor;
+  const totalOut = sellerShare + driverShare + platformShare;
+  const sellerPct = totalOut > 0 ? Math.round((sellerShare / totalOut) * 100) : 0;
+  const driverPct = totalOut > 0 ? Math.round((driverShare / totalOut) * 100) : 0;
+  const platformPct = totalOut > 0 ? Math.round((platformShare / totalOut) * 100) : 0;
+  return <section className="finance-workspace"><div className="finance-heading"><div><span className="section-kicker">REVENUE CONTROL TOWER</span><h2>Money moving through the network.</h2><p>Marketplace take, outstanding payments and revenue mix, summed from paid orders.</p></div><button className="outline-button" type="button" onClick={() => showNotice(hasData ? `GMV ${formatCedi(summary.chargedMinor)} across ${summary.paidCount} paid order(s).` : 'No paid orders yet, so there is no GMV to report.')}>Generate report ↓</button></div><div className="finance-grid ops-finance"><article><span>GMV COLLECTED</span><strong>{formatCedi(summary.chargedMinor)}</strong><small>{summary.paidCount} paid order(s) confirmed by Paystack</small></article><article><span>SELLER SHARE</span><strong>{formatCedi(sellerShare)}</strong><small>{sellerPct}% of paid-out money</small></article><article><span>DRIVER SHARE</span><strong>{formatCedi(driverShare)}</strong><small>{driverPct}% of paid-out money</small></article><article><span>AQUALINK SHARE</span><strong>{formatCedi(platformShare)}</strong><small>{platformPct}% of paid-out money</small></article><article className="finance-warning"><span>AWAITING PAYMENT</span><strong>{formatCedi(summary.unpaidMinor)}</strong><small>{summary.unpaidCount} order(s) not yet paid</small></article><article className="finance-warning"><span>NO DISPUTE DATA</span><strong>0</strong><small>Dispute tracking is not connected to this deployment</small></article></div></section>;
 }
 
 export default App;
