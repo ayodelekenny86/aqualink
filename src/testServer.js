@@ -36,7 +36,16 @@ let currentSplit = DEFAULT_SPLIT;
 export const STUB_OPS_CREDENTIALS = { email: OPS_EMAIL, password: OPS_PASSWORD };
 
 function json(body, status = 200) {
-  return { ok: status >= 200 && status < 300, status, text: async () => JSON.stringify(body) };
+  const text = JSON.stringify(body);
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    text: async () => text,
+    // Real Response objects have both. Code that calls `response.json()`
+    // directly must not fail against the stub for a reason production does not
+    // have.
+    json: async () => JSON.parse(text),
+  };
 }
 
 function authorised(init) {
@@ -98,7 +107,14 @@ export function installFakeApi({ pricing = DEFAULT_PRICING, split = DEFAULT_SPLI
       return json({ order: serverOrder(JSON.parse(init.body), currentPricing, currentSplit) }, 201);
     }
     if (path.endsWith('/api/pricing')) {
-      return json({ quote: priceOrder({ pricing: currentPricing, split: currentSplit }), split: currentSplit });
+      // Mirrors `apiPricing`: the stored config alongside the derived quote, so
+      // the console has to pick the config to edit it.
+      return json({
+        currency: 'GHS',
+        pricing: currentPricing,
+        split: currentSplit,
+        quote: priceOrder({ pricing: currentPricing, split: currentSplit }),
+      });
     }
     if (path.endsWith('/api/pricing/update')) {
       // Mirrors the real handler: a request without a valid operator token is

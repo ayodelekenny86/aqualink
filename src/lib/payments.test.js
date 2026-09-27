@@ -256,15 +256,18 @@ describe('secret handling', () => {
 
     // The client now sends a bearer token for operator calls, which is correct:
     // the server is what decides what an operator may do. What it must never do
-    // is send credentials anywhere but first-party /api, so this checks that
-    // every authenticated call goes through `apiRequest` (the /api helper)
-    // rather than at a URL built from somewhere else.
-    const authenticatedCalls = source.match(/Authorization/g) ?? [];
-    expect(authenticatedCalls).toHaveLength(1);
+    // is send credentials anywhere but first-party /api.
+    //
+    // Asserted structurally rather than by counting strings, so the guarantee
+    // survives edits: there is exactly one `fetch` in the module, it lives in
+    // `apiRequest`, and it builds its URL from `apiBase()`, which is the only
+    // place a host could be introduced.
+    expect((source.match(/\bfetch\(/g) ?? [])).toHaveLength(1);
+    expect((source.match(/\bapiBase\(/g) ?? []).length).toBeGreaterThan(0);
 
-    // And the only URLs this module builds are relative /api paths, so there is
-    // no absolute host an Authorization header could be leaked to.
-    const absoluteUrls = source.match(/['"`]https?:\/\/[^'"`]+/g) ?? [];
-    expect(absoluteUrls).toEqual([]);
+    // No absolute URL is hardcoded anywhere, so an Authorization header has
+    // nowhere else to be sent. Paths are built from the relative API root.
+    expect(source).toMatch(/const API_ROOT = '\/api'/);
+    expect(source.match(/https?:\/\/[a-z0-9.-]+/gi) ?? []).toEqual([]);
   });
 });

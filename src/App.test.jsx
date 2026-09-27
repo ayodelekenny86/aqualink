@@ -104,14 +104,19 @@ async function approveSeller(user) {
 
   await screen.findByText(/pending operator review/i);
 
+  const checkButton = screen.getByRole('button', { name: /check approval status/i });
+
   // The workspace must still be locked: a status check with nobody having
   // approved anything is what a self-approval exploit would look like.
-  await user.click(screen.getByRole('button', { name: /check approval status/i }));
-  await screen.findByText(/pending operator review/i);
+  await user.click(checkButton);
+  // Wait for the in-flight check to settle before approving. Clicking again while
+  // the first request is still open lets the stale 'pending' answer land after
+  // the approval and lock the workspace again.
+  await waitFor(() => expect(checkButton).toBeEnabled());
   expect(screen.queryByRole('heading', { name: /ready for the next job/i })).not.toBeInTheDocument();
 
   reviewSellerApplication((await screen.findByTestId('seller-application-id')).textContent, 'approve');
-  await user.click(screen.getByRole('button', { name: /check approval status/i }));
+  await user.click(checkButton);
   await screen.findByRole('heading', { name: /ready for the next job/i });
 }
 
@@ -234,10 +239,32 @@ test('lets a seller submit onboarding details', async () => {
   await user.click(screen.getByRole('button', { name: /seller app manage your fleet/i }));
   await user.type(screen.getByRole('textbox', { name: /business name/i }), 'AquaFlow Tankers');
   await user.type(screen.getByRole('textbox', { name: /seller phone/i }), '0244000000');
+  // The server requires a vehicle registration, so the form has to carry one
+  // before an application can even be recorded.
+  await user.type(screen.getByRole('textbox', { name: /vehicle registration/i }), 'GT-8891-11');
   await user.click(screen.getByRole('button', { name: /submit signup for review/i }));
 
-  expect(screen.getByRole('heading', { name: /application awaiting approval/i })).toBeInTheDocument();
-  expect(screen.getByText(/pending manual review/i)).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: /application awaiting approval/i })).toBeInTheDocument();
+  expect(screen.getByText(/pending operator review/i)).toBeInTheDocument();
+
+  // The control that made this self-service is gone, not merely hidden.
+  expect(screen.queryByRole('button', { name: /generate approval code/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole('textbox', { name: /seller approval code/i })).not.toBeInTheDocument();
+});
+
+test('will not accept a seller application with no vehicle registration', async () => {
+  const user = userEvent.setup();
+  render(<App />);
+
+  await waitForRegistry();
+  await user.click(screen.getByRole('button', { name: /seller app manage your fleet/i }));
+  await user.type(screen.getByRole('textbox', { name: /business name/i }), 'AquaFlow Tankers');
+  await user.type(screen.getByRole('textbox', { name: /seller phone/i }), '0244000000');
+  await user.click(screen.getByRole('button', { name: /submit signup for review/i }));
+
+  // Stays on the form rather than pretending the application was submitted.
+  expect(await screen.findByText(/add a vehicle registration before applying/i)).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: /application awaiting approval/i })).not.toBeInTheDocument();
 });
 
 test('shows human support channels to a buyer', async () => {

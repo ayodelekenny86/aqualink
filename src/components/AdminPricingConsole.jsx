@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { readValue, writeValue } from '../lib/storage';
-import { updatePricing } from '../lib/payments';
+import { fetchQuote, updatePricing } from '../lib/payments';
 import {
   DEFAULT_PRICING,
   DEFAULT_SPLIT,
@@ -54,6 +54,10 @@ export default function AdminPricingConsole({ onNotice, onPricingChange, opsToke
   const [split, setSplit] = useState(stored.split);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  // Set as soon as the operator types. A live-price read can land after they have
+  // started editing, and merging the server copy over their input would silently
+  // revert their change under the cursor.
+  const editingRef = useRef(false);
 
   // Show the operator what is actually live, not whatever this browser last
   // cached, so the console cannot be used to edit a price nobody is charged.
@@ -62,11 +66,14 @@ export default function AdminPricingConsole({ onNotice, onPricingChange, opsToke
     let cancelled = false;
     (async () => {
       try {
-        const response = await fetch('/api/pricing');
-        if (!response.ok) return;
-        const data = await response.json();
-        const live = data.quote ?? data.pricing;
-        if (cancelled || !live) return;
+        // Through the shared helper so this honours VITE_API_BASE like every
+        // other call, rather than assuming a same-origin /api path.
+        const data = await fetchQuote();
+        // `pricing` is the stored config; `quote` is the derived breakdown for
+        // one order. The console edits the config, so config wins: merging the
+        // quote would overwrite the inputs with computed figures.
+        const live = data.pricing ?? data.quote;
+        if (cancelled || !live || editingRef.current) return;
         setPricing((current) => ({ ...current, ...live }));
         if (data.split) setSplit((current) => ({ ...current, ...data.split }));
       } catch {
@@ -77,6 +84,7 @@ export default function AdminPricingConsole({ onNotice, onPricingChange, opsToke
   }, [opsToken]);
 
   const update = useCallback((field, raw) => {
+    editingRef.current = true;
     const rule = NUMERIC_FIELDS[field];
     const value = raw === '' ? 0 : Number(raw);
     const next = field in pricing ? { ...pricing, [field]: value } : { ...split, [field]: value };
@@ -152,6 +160,7 @@ export default function AdminPricingConsole({ onNotice, onPricingChange, opsToke
   }
 
   function reset() {
+    editingRef.current = true;
     setPricing(DEFAULT_PRICING);
     setSplit(DEFAULT_SPLIT);
     setErrors({});
@@ -210,7 +219,7 @@ export default function AdminPricingConsole({ onNotice, onPricingChange, opsToke
               value={pricing.surgeReason}
               maxLength={120}
               placeholder="e.g. Dry season - tanker availability low"
-              onChange={(event) => setPricing({ ...pricing, surgeReason: event.target.value })}
+              onChange={(event) => { editingRef.current = true; setPricing({ ...pricing, surgeReason: event.target.value }); }}
             />
           </label>
         </fieldset>

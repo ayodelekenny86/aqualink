@@ -350,11 +350,14 @@ export function useAuth() {
    * workspace cannot be unlocked by editing browser storage.
    */
   const refreshSellerApproval = useCallback(async () => {
-    const identifier = readValue('seller.profile.phone', '');
-    if (!identifier) return { ok: false, reason: 'no-phone' };
+    // From state, not from a dotted storage lookup: `writeValue('seller.profile', …)`
+    // stores one flat key, so readValue('seller.profile.phone') would find
+    // nothing and every status check would report "pending" forever.
+    const phone = sellerProfile.phone;
+    if (!phone) return { ok: false, reason: 'no-phone' };
 
     try {
-      const result = await sellerStatus(identifier);
+      const result = await sellerStatus(phone);
       const approved = result.status === 'approved';
       setSellerApproved(approved);
       if (approved) {
@@ -366,7 +369,7 @@ export function useAuth() {
       showNotice(error.message || 'Could not read the application status.');
       return { ok: false, reason: 'status-failed' };
     }
-  }, [showNotice]);
+  }, [sellerProfile, showNotice]);
 
   /**
    * Sign in a seller whose application the server has approved.
