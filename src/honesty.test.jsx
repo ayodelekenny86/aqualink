@@ -4,18 +4,27 @@ import { installFakeApi, teardownFakeApi } from './testServer';
 import { clearAll } from './lib/storage';
 
 /**
- * Guards against fabricated figures reappearing in the app shell.
+ * Guards against fabricated figures and false claims reappearing in the app.
  *
- * Every one of these strings was hardcoded at some point and shown to a user as
- * if it were measured: a GH₵8,420 seller month, 52 deliveries, a 4.8★ rating,
- * three invented Accra job locations, two invented disputes, an escrow account
- * that this app does not have, and a weekday-morning demand claim with no model
- * behind it. A business cannot tell invented numbers from measured ones, which
- * is why they were removed rather than kept as sample data.
+ * Each string below was hardcoded at some point and shown to a user as though it
+ * were measured: a GH\u20b58,420 seller month, 52 deliveries, a 4.8\u2605 rating, three
+ * invented Accra job locations, two invented disputes, an escrow account this app
+ * does not have, a "100% \u2014 certificates up to date" water-quality score, a
+ * GH\u20b53,500/month subscription with a renewal date, a pending-payout queue, and a
+ * weekday-morning demand claim with no model behind it.
  *
- * These are source-level assertions on purpose: the numbers were literals, so a
- * source check catches them anywhere in the file, including in a component that
- * is awkward to render.
+ * A business cannot tell invented numbers from measured ones, which is why they
+ * were removed rather than kept as sample data. For a drinking-water supplier the
+ * quality claim is the dangerous one: it asserts something about the safety of
+ * people's water with no document behind it.
+ *
+ * These are source-level assertions on purpose. The claims were literals spread
+ * across components that are awkward to render individually, so a source check
+ * catches them anywhere in the file.
+ *
+ * Comments are exempt. The note explaining that a claim was removed necessarily
+ * quotes it, and deleting those notes would remove the only record of why the
+ * figure is gone. So the checks look for the claim in code the user can see.
  */
 
 beforeEach(() => {
@@ -29,107 +38,97 @@ afterEach(() => {
   clearAll();
 });
 
-const FABRICATED = [
-  // Anchored to the closing JSX tag so these match rendered markup, not a
-  // comment that happens to quote the old figure while explaining it was removed.
-  { label: 'seller month figure', pattern: /GH\u20b58,420<\/strong>/ },
-  { label: 'seller delivery count', pattern: />52<\/strong>/ },
-  { label: 'seller rating', pattern: /4\.8 <small>/ },
-  { label: 'invented job location', pattern: /Osu, Oxford Street/ },
-  { label: 'invented dispute', pattern: /AQ-1043/ },
-  { label: 'dispute count claim', pattern: /refund available/ },
-];
+const APP = 'src/App.jsx';
 
-for (const { label, pattern } of FABRICATED) {
-  test(`no fabricated ${label} in the app source`, async () => {
-    const source = await readFile('src/App.jsx', 'utf8');
-    expect(source).not.toMatch(pattern);
-  });
+/** Every match of `pattern` that is not inside a `//` comment. */
+function visible(source, pattern) {
+  return [...source.matchAll(new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`))]
+    .filter((match) => !isCommentedOut(source, match.index));
 }
 
-test('no escrow account is claimed to the user', async () => {
-  // useBooking.js established there is no escrow: Paystack collects the buyer's
-  // money directly. Promising a buyer that payouts are "held in escrow" is how
-  // an operator ends up owing money that is being held nowhere.
-  //
-  // The word still appears in this codebase, deliberately: in comments that
-  // record that escrow does not exist, and in one CSS class name. So this checks
-  // the specific false claims rather than banning the word, which would also
-  // delete the note explaining the absence.
-  const files = ['src/App.jsx', 'src/components/RevenueBreakdown.jsx'];
-  const falseClaims = [
-    /escrow only releases/gi,
-    /escrow holds/gi,
-    /held in escrow/gi,
-    /in escrow/gi,
-  ];
-
-  for (const file of files) {
-    const source = await readFile(file, 'utf8');
-    for (const claim of falseClaims) {
-      // Allowed only inside a comment that is recording the removal.
-      const occurrences = [...source.matchAll(claim)].filter(
-        (match) => !isCommentedOut(source, match.index),
-      );
-      expect(`${file}: ${String(claim)} -> ${occurrences.length}`).toBe(`${file}: ${String(claim)} -> 0`);
-    }
-  }
-});
-
 /**
- * True when the match sits inside a `//` or block comment.
+ * True when the match sits inside a `//` comment.
  *
- * Only line comments are checked, which is enough here: every explanatory note
- * that mentions escrow is a `//` comment, and a block comment would be a false
- * pass rather than a false failure.
+ * Only line comments are considered. Every explanatory note in this repo is a
+ * `//` comment, and treating an unhandled block comment as "not visible" would
+ * be a false pass rather than a false failure.
  */
 function isCommentedOut(source, index) {
   const lineStart = source.lastIndexOf('\n', index) + 1;
   return source.slice(lineStart, index).includes('//');
 }
 
-test('the institution agent no longer claims to know when demand peaks', async () => {
-  const source = await readFile('src/App.jsx', 'utf8');
-  expect(source).not.toMatch(/demand is typically highest/i);
-  expect(source).not.toMatch(/reserve capacity/i);
-});
+const GROUPS = [
+  {
+    name: 'fabricated figures in the app shell',
+    file: APP,
+    claims: [
+      { label: 'seller month figure', pattern: /GH\u20b58,420/ },
+      { label: 'seller delivery count', pattern: />52</ },
+      { label: 'seller rating', pattern: /4\.8 <small>/ },
+      { label: 'invented job location', pattern: /Osu, Oxford Street/ },
+      { label: 'invented dispute', pattern: /AQ-1043/ },
+      { label: 'refund availability claim', pattern: /refund available/ },
+    ],
+  },
+  {
+    name: 'an escrow account that does not exist',
+    files: [APP, 'src/components/RevenueBreakdown.jsx'],
+    claims: [
+      { label: 'escrow release promise', pattern: /escrow only releases/i },
+      { label: 'escrow holding promise', pattern: /escrow holds/i },
+      { label: 'held-in-escrow claim', pattern: /held in escrow/i },
+      { label: 'in-escrow claim', pattern: /\bin escrow\b/i },
+    ],
+  },
+  {
+    name: 'a pending-payout queue with no payout system',
+    file: APP,
+    claims: [
+      { label: 'pending payout label', pattern: /PENDING PAYOUT/i },
+      { label: 'unpaid-out-to-sellers claim', pattern: /not yet paid out/i },
+    ],
+  },
+  {
+    name: 'unverifiable water-quality or certification claims',
+    file: APP,
+    claims: [
+      { label: 'certificates-up-to-date claim', pattern: /certificates up to date/i },
+      { label: 'quality score element', pattern: /quality-score/ },
+      { label: 'uploaded-certification claim', pattern: /Certification uploaded/i },
+      { label: 'badge publication claim', pattern: /Approve to publish the verified-water badge/i },
+    ],
+  },
+  {
+    name: 'a subscription plan with no billing system',
+    file: APP,
+    claims: [
+      { label: 'plan name', pattern: /Reliability Plus/ },
+      { label: 'deliveries-remaining counter', pattern: /deliveries remaining/i },
+      { label: 'renewal date', pattern: /renews \d/i },
+      { label: 'plan management action', pattern: /Manage plan/ },
+    ],
+  },
+  {
+    name: 'demand claims with no forecasting model',
+    file: APP,
+    claims: [
+      { label: 'peak demand assertion', pattern: /demand is typically highest/i },
+      { label: 'reserve recommendation', pattern: /reserve capacity/i },
+    ],
+  },
+];
 
-test('no unverifiable quality or certification claim is made to users', async () => {
-  // The riskiest invention in this app. It is a drinking-water supplier: claiming
-  // certified, in-date water quality that no document in the system supports is
-  // the claim most likely to cause real harm, and the old institution workspace
-  // scored itself a flat "100% \u2014 certificates up to date".
-  const source = await readFile('src/App.jsx', 'utf8');
-  const claims = [
-    /certificates up to date/i,
-    /Reliability Plus/,
-    /quality-score/,
-    /verified-water badge/i,
-    /Certification uploaded/i,
-  ];
-  for (const claim of claims) {
-    expect(`${String(claim)} present`).toBe(`${String(claim)} absent`);
+for (const group of GROUPS) {
+  const files = group.files ?? [group.file];
+
+  for (const { label, pattern } of group.claims) {
+    test(`no ${label} is shown to users (${group.name})`, async () => {
+      for (const file of files) {
+        const source = await readFile(file, 'utf8');
+        expect(`${file} :: ${label} -> ${visible(source, pattern).length} visible`)
+          .toBe(`${file} :: ${label} -> 0 visible`);
+      }
+    });
   }
-});
-
-test('no subscription plan is invented', async () => {
-  // There is no billing, plan, or renewal system. A monthly price and a renewal
-  // date imply a contract the app cannot honour or cancel.
-  const source = await readFile('src/App.jsx', 'utf8');
-  expect(source).not.toMatch(/deliveries remaining/i);
-  expect(source).not.toMatch(/renews \d/i);
-  expect(source).not.toMatch(/Manage plan/);
-});
-
-test('no payout queue is claimed, because no payout system exists', async () => {
-  // Paystack collects the buyer's money into the platform account. Promising a
-  // seller a "pending payout" is a liability the app cannot meet.
-  const source = await readFile('src/App.jsx', 'utf8');
-  const claims = [/PENDING PAYOUT/i, /not yet paid out/i, /escrow only releases/i, /escrow holds/i];
-  for (const claim of claims) {
-    const occurrences = [...source.matchAll(new RegExp(claim.source, 'gi'))].filter(
-      (match) => !isCommentedOut(source, match.index),
-    );
-    expect(`${String(claim)} -> ${occurrences.length}`).toBe(`${String(claim)} -> 0`);
-  }
-});
+}
