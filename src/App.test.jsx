@@ -246,7 +246,11 @@ test('shows AI business health signals in ops', async () => {
   await user.click(screen.getByRole('button', { name: /admin authorized operations access/i }));
   await signInAdmin(user);
   expect(screen.getByRole('heading', { name: /business health signals/i })).toBeInTheDocument();
-  expect(screen.getByText(/GH₵4,820 remains in escrow/i)).toBeInTheDocument();
+  // The panel used to report a GH₵4,820 escrow balance and three complaining
+  // buyers. There is no escrow and no dispute tracking, so it must not.
+  expect(screen.queryByText(/in escrow/i)).not.toBeInTheDocument();
+  expect(screen.getByText(/unpaid orders/i)).toBeInTheDocument();
+  expect(screen.getByText(/no risk model/i)).toBeInTheDocument();
 });
 
 test('refreshes a buyer live driver update', async () => {
