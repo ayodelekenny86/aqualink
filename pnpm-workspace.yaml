@@ -1,3 +1,5 @@
 allowBuilds:
-  '@prisma/engines': set this to true or false
-  prisma: set this to true or false
+  '@firebase/util': true
+  '@firebase/util@1.15.3': true
+  protobufjs: true
+  protobufjs@7.6.6: true
