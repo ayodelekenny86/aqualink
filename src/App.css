@@ -212,34 +212,6 @@ button { cursor: pointer; }
 .contact-button.call { background: rgba(18,140,126,.12); color: #0d6f64; border-color: rgba(18,140,126,.3); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
-/* ---------- Driver workspace ---------- */
-.driver-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 4px 0 22px; }
-.driver-stat { background: #fff; border: 1px solid #e6eceb; border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 5px; }
-.driver-stat span { font-size: 10.5px; letter-spacing: .1em; color: #7d8c8a; font-weight: 700; }
-.driver-stat strong { font-size: 28px; line-height: 1; color: #0f2a2e; }
-.driver-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
-.driver-tab { display: inline-flex; align-items: center; gap: 7px; padding: 9px 15px; border-radius: 999px; border: 1px solid #dde5e4; background: #fff; font-size: 13px; font-weight: 600; color: #5d6f6d; cursor: pointer; }
-.driver-tab.active { background: #0f6b62; border-color: #0f6b62; color: #fff; }
-.driver-tab em { font-style: normal; font-size: 11px; background: rgba(0,0,0,.08); border-radius: 999px; padding: 1px 7px; }
-.driver-tab.active em { background: rgba(255,255,255,.22); }
-.driver-feed { display: grid; gap: 13px; }
-.empty-feed { padding: 26px; text-align: center; color: #7d8c8a; background: #fff; border: 1px dashed #dbe4e3; border-radius: 14px; }
-.driver-card { padding: 17px 19px; }
-.driver-card-main { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-.driver-card-main > div { display: flex; flex-direction: column; gap: 3px; }
-.driver-code { font-size: 15px; color: #0f2a2e; }
-.driver-location { font-size: 13.5px; color: #4a5c5a; }
-.driver-meta { font-size: 12px; color: #8b9997; }
-.driver-card-actions { display: flex; align-items: center; gap: 11px; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px solid #eef2f1; }
-.driver-otp { display: flex; flex-direction: column; gap: 6px; }
-.driver-otp label { font-size: 11.5px; color: #7d8c8a; font-weight: 600; }
-.driver-otp-row { display: flex; gap: 8px; }
-.driver-otp-row input { width: 130px; padding: 8px 11px; border: 1px solid #dbe4e3; border-radius: 9px; font-size: 14px; letter-spacing: .08em; }
-.driver-done { font-size: 12.5px; font-weight: 600; color: #0d7a4f; }
-.driver-gate .gate-error { color: #b3261e; font-size: 13px; margin: 10px 0; }
-.role-icon.driver { background: #1f6feb; }
-.role-button.driver.active { border-color: #1f6feb; }
-
 /* ---------- Notifications panel ---------- */
 .notifications-panel { position: fixed; top: 68px; right: 26px; z-index: 60; width: min(370px, calc(100vw - 32px)); max-height: 74vh; overflow-y: auto; background: #fff; border: 1px solid #e2eae9; border-radius: 16px; box-shadow: 0 20px 48px rgba(15,42,46,.16); padding: 18px; }
 .notifications-panel header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
@@ -281,12 +253,12 @@ button { cursor: pointer; }
 .order-modal-foot { display: flex; align-items: center; gap: 11px; flex-wrap: wrap; margin-top: 20px; padding-top: 17px; border-top: 1px solid #eef2f1; }
 
 @media (max-width: 650px) {
-  .driver-stats { grid-template-columns: 1fr; }
+
   .notifications-panel { top: auto; bottom: 0; right: 0; left: 0; width: 100%; max-height: 78vh; border-radius: 16px 16px 0 0; }
   .order-modal { padding: 19px; border-radius: 16px; }
   .order-facts { grid-template-columns: 1fr; }
-  .driver-card-actions { flex-direction: column; align-items: stretch; }
-  .driver-otp-row input { width: 100%; }
+
+
   .contact-button { justify-content: center; }
 }
 

@@ -41,7 +41,7 @@ function App() {
   const {
     ready, role, selectRole, notice, showNotice, dismissNotice,
     session, signOut, accountExists,
-    buyerAuthenticated, adminAuthenticated, sellerAuthenticated, driverAuthenticated,
+    buyerAuthenticated, adminAuthenticated, sellerAuthenticated,
     startPhoneSignIn, confirmPhoneCode, signInWithPassword, registerAccount,
     phoneCode, phoneIdentifier, signInError, demoCredentials,
     authStep, email, setEmail, emailCode, sendOtp, confirmEmailCode,
@@ -56,7 +56,7 @@ function App() {
   const {
     orders, booking, updateBooking, requestDelivery, repeatBooking,
     savedAddresses, setSavedAddresses, driverUpdate, refreshDriverUpdate,
-    updateOrderStatus, acceptOrder, advanceOrder, completeDelivery, issueDeliveryCode, confirmDelivery, requestRefund,
+    updateOrderStatus, issueDeliveryCode, confirmDelivery, requestRefund,
   } = useBooking({ email, onNotice: showNotice, notify });
 
   const { aiOpen, toggleAi, closeAi, aiInput, setAiInput, aiMessages, askAi } = useAquaAi({
@@ -69,19 +69,6 @@ function App() {
   const roleNotifications = forRole(role);
   const roleUnread = unreadCount(role);
   const detailOrder = orders.find((order) => order.id === detailOrderId) ?? null;
-
-  /** Every status change fans out a notification to the roles that care. */
-  const advanceWithNotice = (orderId, status) => {
-    advanceOrder(orderId, status);
-    const order = orders.find((item) => item.id === orderId);
-    notify({
-      role: 'buyer',
-      title: `${orderId} is now ${status.toLowerCase()}`,
-      body: order?.location ? `Delivery to ${order.location}.` : '',
-      orderId,
-      kind: 'status',
-    });
-  };
 
   return (
     <div className="app-shell">
@@ -125,7 +112,7 @@ function App() {
             onContactBuyer
           />
         )}
-        {ready && role === 'seller' && (sellerAuthenticated ? <SellerView available={available} setAvailable={setAvailable} showNotice={showNotice} orders={orders} updateOrderStatus={updateOrderStatus} issueDeliveryCode={issueDeliveryCode} sellerProfile={sellerProfile} setSellerProfile={setSellerProfile} /> : <SellerAccessGate sellerProfile={sellerProfile} setSellerProfile={setSellerProfile} onApproved={completeSellerApproval} issueCode={issueSellerCode} currentCode={sellerCode} />)}
+        {ready && role === 'seller' && (sellerAuthenticated ? <SellerView available={available} setAvailable={setAvailable} showNotice={showNotice} orders={orders} updateOrderStatus={(id, status) => updateOrderStatus(id, status, notify)} issueDeliveryCode={issueDeliveryCode} sellerProfile={sellerProfile} setSellerProfile={setSellerProfile} /> : <SellerAccessGate sellerProfile={sellerProfile} setSellerProfile={setSellerProfile} onApproved={completeSellerApproval} issueCode={issueSellerCode} currentCode={sellerCode} />)}
         {role === 'seller' && <SellerFinance showNotice={showNotice} />}
         {role === 'seller' && <LiveAgentCard role="seller" showNotice={showNotice} />}
         {role === 'institution' && <InstitutionView showNotice={showNotice} />}        {role === 'institution' && <InstitutionFinance showNotice={showNotice} />}

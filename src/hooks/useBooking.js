@@ -24,7 +24,7 @@ const initialSavedAddresses = ['Home · East Legon, Accra', 'Office · Cantonmen
  * delivery confirmation code that the seller side generates when handing over.
  */
 export function useBooking({ email, onNotice, notify }) {
-  // Orders live in the shared `orders` collection so the buyer, seller and driver
+  // Orders live in the shared `orders` collection so the buyer, seller and ops
   // workspaces all read one list rather than three divergent copies.
   const [orders, setOrders] = useState(() => {
     seedFleet();
@@ -35,14 +35,18 @@ export function useBooking({ email, onNotice, notify }) {
   const [savedAddresses, setSavedAddresses] = useState(initialSavedAddresses);
   const [driverUpdate, setDriverUpdate] = useState('Driver Kojo · assigned seller · ETA 18 min');
 
-  /** Write-through: update React state and persist so other roles see the change. */
+  /**
+   * Write-through: persist first, then update React state.
+   *
+   * The collection is written synchronously rather than from inside a setState
+   * updater, because a subsequent call in the same handler (dispatch assignment,
+   * for one) must be able to read the row this one just wrote.
+   */
   const commit = useCallback((updater) => {
-    setOrders((items) => {
-      const next = updater(items);
-      replaceAll('orders', next);
-      return next;
-    });
-  }, []);
+    const next = updater(orders);
+    replaceAll('orders', next);
+    setOrders(next);
+  }, [orders]);
 
   const updateBooking = useCallback((event) => {
     const { name, value } = event.target;
