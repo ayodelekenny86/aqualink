@@ -99,6 +99,7 @@ export function PWADetectOffline({ onOfflineChange }) {
 }
 
 export default function PWASetup() {
+export function PWASetup() {
   if (isTest) {
     return null;
   }
