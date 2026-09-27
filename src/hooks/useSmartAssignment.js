@@ -147,8 +147,8 @@ function buildDistanceMatrix(locations) {
   return matrix;
 }
 
-function scoreDriver(driver, order, allOrders, driverLocations) {
-  const driverLoc = driverLocations[driver.id]?.location || driver.base?.split(',')[0] || 'central';
+function scoreDriver(driver, order, allOrders, driverPositions) {
+  const driverLoc = driverPositions[driver.id]?.location || driver.base?.split(',')[0] || 'central';
   const orderLoc = order.location || 'central';
   const travel = estimateTravelTime(driverLoc, orderLoc);
   
@@ -188,7 +188,7 @@ function optimizeMultiStopRoute(driverId, orders, driverLocations) {
   return optimizedIndices.map(idx => orders[idx - 1]);
 }
 
-export function useSmartAssignment({ orders, driverPositions, onNotice, updateOrderStatus }) {
+export function useSmartAssignment({ orders, driverPositions, driverLocations, onNotice, updateOrderStatus }) {
   const [assignments, setAssignments] = useState([]);
   const [optimizationQueue, setOptimizationQueue] = useState([]);
   const [autoAssignEnabled, setAutoAssignEnabled] = useState(true);
@@ -246,7 +246,7 @@ export function useSmartAssignment({ orders, driverPositions, onNotice, updateOr
         .sort((a, b) => b.score - a.score);
       
       if (scoredDrivers.length > 0) {
-        await assignOrder(order.id, scoredDrivers[0].driver.driverId);
+        await assignOrder(order.id, scoredDrivers[0].driver.id);
       }
     }
   }, [autoAssignEnabled, unassignedOrders, availableDrivers, orders, assignOrder]);
