@@ -110,7 +110,10 @@ test('renders the buyer booking workspace', async () => {
 
   expect(screen.getByRole('heading', { name: /good morning, alex/i })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: /where should we deliver/i })).toBeInTheDocument();
-  expect(screen.getByText(/GH₵300 · GH₵250/)).toBeInTheDocument();
+  // The booking form used to hardcode "GH₵300 · GH₵250". The price now comes
+  // from the server, so the form says so rather than quoting a stale figure.
+  expect(screen.getByText(/calculated on the server/i)).toBeInTheDocument();
+  expect(screen.queryByText('GH₵300 · GH₵250')).not.toBeInTheDocument();
   expect(screen.getByText(/silver tier/i)).toBeInTheDocument();
 });
 

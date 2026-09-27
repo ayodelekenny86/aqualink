@@ -40,7 +40,81 @@ See the section about [deployment](https://facebook.github.io/create-react-app/d
 ## Configuration
 
 Copy `.env.example` to `.env` and fill in what you need. Everything in this app
-is optional, but Google sign-in is unusable without its one variable.
+is optional, but payments and Google sign-in are unusable without theirs.
+
+### Payments (Paystack)
+
+AquaLink takes real payments through [Paystack](https://paystack.com). This
+requires a server, because the Paystack secret key must never reach a browser.
+The repo now includes one, in `functions/`.
+
+**The server owns the price of an order.** The browser sends what the customer
+wants (volume, location, contact details); the server computes what it costs,
+stores that, and charges that. If the browser could name the amount, a modified
+client would simply book a GH₵300 order for GH₵1. `functions/lib/pricing.js` is
+the authority, and the client copy in `src/lib/money.js` is display-only.
+
+**Settlement is the server's decision, never the browser's.** After Paystack
+returns the customer, the server queries Paystack and compares the result to the
+stored order on reference, amount and currency. A transaction that is successful
+but for a different amount, or for a different order, is refused. A client-side
+"success" is not evidence of payment, and there is no code path in the app that
+marks an order paid on the browser's word.
+
+Set the secret key, then deploy:
+
+```sh
+firebase login
+firebase use --add            # requires the Blaze (pay-as-you-go) plan
+npm --prefix functions install
+firebase functions:secrets:set PAYSTACK_SECRET_KEY
+firebase deploy --only functions,hosting
+```
+
+Then set the webhook URL in the Paystack dashboard to
+`https://<your-domain>/api/webhooks/paystack`. Webhooks are verified with
+HMAC-SHA512 against the raw request body; an unverified webhook is an
+unauthenticated instruction to mark orders paid, so it is refused outright. The
+browser never calls Paystack directly — `firebase.json` proxies `/api/*` to the
+functions, which keeps the functions domain out of the client.
+
+There is **no demo or sandbox payment path**. If the server is unreachable or
+unconfigured, the app says so and no order can be marked paid. An earlier
+version had a demo mode whose verify step returned `settled` on a timer; that
+was not a convenience, it let the app report revenue that did not exist.
+
+### Accounts
+
+There are **no seeded accounts and no passwords shown on screen**. The previous
+version invented a buyer and an ops account on first run and printed the ops
+password on the sign-in page, which published a real admin credential to anyone
+who loaded the app.
+
+- **Buyers and sellers** register from the app's own sign-up form.
+- **The operations account** is created once by the `apiBootstrapOps` function
+  from secrets you set in the environment. It refuses to run a second time.
+
+```sh
+firebase functions:secrets:set OPS_BOOTSTRAP_TOKEN
+firebase functions:secrets:set OPS_ADMIN_PASSWORD   # 12+ characters
+firebase functions:config:set  # or set OPS_ADMIN_EMAIL as a plain env var
+curl -X POST https://<your-domain>/api/bootstrap/ops \
+  -H "X-Ops-Token: <your-token>"
+```
+
+### Honest figures
+
+Money shown in the app is summed from real orders by `src/lib/summary.js`. The
+finance panels, the ops dashboard and the downloadable report all read from it,
+and an empty workspace says it has no data. Invented figures ("124 orders",
+"GH₵18,540 GMV", a 15% buyer fee when the configured charge is 10%) have been
+removed rather than kept as sample data, because a business cannot tell invented
+numbers from measured ones. The Aqua panel says it cannot forecast demand rather
+than inventing a forecast.
+
+There is no escrow. Paystack collects money directly into the AquaLink account,
+so confirming delivery marks an order delivered and records that the seller
+payout is handled separately by operations.
 
 ### Google sign-in
 
