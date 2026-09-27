@@ -19,6 +19,8 @@ const COLLECTIONS = {
   orders: 'db.orders',
   notifications: 'db.notifications',
   otpCodes: 'db.otpCodes',
+  drivers: 'db.drivers',
+  sellers: 'db.sellers',
 };
 
 export const COLLECTION_NAMES = Object.keys(COLLECTIONS);

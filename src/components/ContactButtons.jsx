@@ -42,23 +42,25 @@ export function orderMessage({ code, location, volume, status, eta }) {
   return lines.join('\n');
 }
 
-export default function ContactButtons({ phone = DEFAULT_SUPPORT.phone, name = DEFAULT_SUPPORT.name, message, label = 'Message', className = '', compact = false }) {
-  const digits = internationalPhone(phone);
+export default function ContactButtons({ phone = DEFAULT_SUPPORT.phone, whatsapp, name = DEFAULT_SUPPORT.name, message, label = 'Message', className = '', compact = false }) {
+  // WhatsApp and the phone number are allowed to differ: a customer may have a
+  // separate WhatsApp number. wa.me targets WhatsApp, tel: dials the phone, so
+  // each link uses the right one and falls back to the other when unset.
+  const whatsappNumber = whatsapp || phone;
   return (
     <span className={`contact-buttons ${className}`.trim()}>
       <a
         className="contact-button whatsapp"
-        href={whatsappHref(phone, message)}
+        href={whatsappHref(whatsappNumber, message)}
         target="_blank"
         rel="noreferrer noopener"
-        aria-label={`WhatsApp ${name} ${formatPhoneForDisplay(phone)}`}
+        aria-label={`WhatsApp ${name} ${formatPhoneForDisplay(whatsappNumber)}`}
       >
         <span aria-hidden="true">✆</span>{!compact && label}
       </a>
       <a className="contact-button call" href={telHref(phone)} aria-label={`Call ${name} ${formatPhoneForDisplay(phone)}`}>
         <span aria-hidden="true">☏</span>{!compact && 'Call'}
       </a>
-      <span className="sr-only" aria-hidden="true">{digits}</span>
     </span>
   );
 }

@@ -1,6 +1,9 @@
 import { useCallback, useState } from 'react';
 import { generateBookingCode, generateConfirmationCode } from '../lib/secureCode';
 import { list, replaceAll } from '../lib/collections';
+import { assignSeller, rankCandidates } from '../lib/dispatch';
+import { getFleet, recordAssignment, seedFleet } from '../lib/fleet';
+import { toMinor, allocate, formatCedi } from '../lib/money';
 
 export const initialOrders = [
   { id: 'AQ-1048-2', code: 'AQ-1048-2', location: 'East Legon, Accra', volume: '2,000 gal', status: 'Delivered', payment: 'Released', date: 'Today, 09:42', price: 'GH₵250', confirmCode: '', driverName: 'Kojo Mensah', buyerName: 'Buyer', buyerPhone: '0544001122' },
@@ -8,7 +11,7 @@ export const initialOrders = [
   { id: 'AQ-1051-3', code: 'AQ-1051-3', location: 'Airport Residential, Accra', volume: '5,000 gal', status: 'Placed', payment: 'Held in escrow', date: 'Just now', price: 'GH₵980', confirmCode: '', driverName: '', buyerName: 'Buyer', buyerPhone: '0544001122' },
 ];
 
-const initialBooking = { location: '', volume: '2,000 gallons', window: 'As soon as possible', payment: 'Mobile money' };
+const initialBooking = { location: '', volume: '2,000 gallons', window: 'As soon as possible', payment: 'Mobile money', whatsapp: '' };
 
 const initialSavedAddresses = ['Home · East Legon, Accra', 'Office · Cantonments, Accra'];
 
@@ -24,6 +27,7 @@ export function useBooking({ email, onNotice, notify }) {
   // Orders live in the shared `orders` collection so the buyer, seller and driver
   // workspaces all read one list rather than three divergent copies.
   const [orders, setOrders] = useState(() => {
+    seedFleet();
     const stored = list('orders');
     return stored.length ? stored : replaceAll('orders', initialOrders);
   });
@@ -65,15 +69,28 @@ export function useBooking({ email, onNotice, notify }) {
         payment: 'Held in escrow',
         date: 'Just now',
         price: 'GH₵250',
+        grossMinor: toMinor(250),
+        whatsapp: booking.whatsapp ?? '',
         confirmCode: '',
-        driverName: '',
         buyerName: email ? `Buyer ${email}` : 'Buyer',
         buyerPhone: '0544001122',
       },
       ...items,
     ]);
-    onNotice(`Booking confirmed. Your reference is ${reference}. Payment is held in escrow until delivery.`);
-    // Drivers are the ones who can act on this, so tell them a job opened up.
+
+    // Secure a seller immediately: inventory has to be locked before anyone can
+    // accept the job. Drivers are ranked and recommended, but the accept stays
+    // with them so the gig-style flow and the dispatch feed both still work.
+    const { drivers, sellers } = getFleet();
+    const dispatchable = { location, volumeGallons: Number.parseInt(volume, 10) || 0 };
+    const seller = assignSeller({ order: dispatchable, sellers });
+    const ranked = rankCandidates({ order: dispatchable, candidates: drivers, kind: 'driver' });
+    const recommended = ranked.find((row) => row.eligible) ?? null;
+    recordAssignment(reference, { seller, recommendedDriver: recommended });
+
+    const money = allocate(toMinor(250));
+    const who = recommended ? `${recommended.candidate.name} (${recommended.candidate.base.split(',')[0]}) is closest and can take it` : 'a driver is being assigned';
+    onNotice(`Booking confirmed. Your reference is ${reference}. Service charge ${formatCedi(money.buyerServiceCharge)} applied. ${who}.`);
     notify?.({ role: 'driver', title: `New job available · ${location}`, body: `${volume} · tap to accept.`, kind: 'job' });
   }, [booking, orders, onNotice, commit, notify]);
 

@@ -289,3 +289,27 @@ button { cursor: pointer; }
   .driver-otp-row input { width: 100%; }
   .contact-button { justify-content: center; }
 }
+
+/* ---------- Revenue breakdown ---------- */
+.revenue-breakdown { padding: 20px 22px; margin-top: 18px; }
+.revenue-bar { display: flex; height: 12px; border-radius: 999px; overflow: hidden; margin: 16px 0 18px; background: #eef2f1; }
+.revenue-bar .seg { display: block; height: 100%; }
+.revenue-bar .seller { background: #128c7e; }
+.revenue-bar .driver { background: #1f6feb; }
+.revenue-bar .company { background: #f0a202; }
+.revenue-rows { display: flex; flex-direction: column; }
+.revenue-row { display: flex; align-items: baseline; gap: 10px; padding: 9px 0; border-top: 1px solid #f0f4f3; }
+.revenue-row > span { flex: 1; font-size: 13.5px; color: #3d5150; display: flex; align-items: baseline; gap: 7px; }
+.revenue-row > span small { font-size: 10.5px; font-weight: 700; color: #8b9997; background: #eef3f2; border-radius: 999px; padding: 1px 7px; }
+.revenue-row > strong { font-size: 14.5px; color: #16333a; }
+.revenue-row > em { font-style: normal; font-size: 11.5px; color: #9aa7a5; min-width: 92px; text-align: right; }
+.revenue-row.fee > strong { color: #b26a00; }
+.revenue-row.company > strong { color: #0f6b62; }
+.revenue-note { display: block; margin-top: 12px; font-size: 11.5px; color: #7d8c8a; line-height: 1.5; }
+.field-hint { font-weight: 400; color: #8b9997; font-size: 11.5px; }
+
+@media (max-width: 650px) {
+  .revenue-row { flex-wrap: wrap; }
+  .revenue-row > em { min-width: 0; width: 100%; text-align: left; }
+  .revenue-breakdown { padding: 16px; }
+}
