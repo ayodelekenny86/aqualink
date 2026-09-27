@@ -92,7 +92,6 @@ export function useAuth() {
   const buyerAuthenticated = signedInAs('buyer');
   const adminAuthenticated = signedInAs('ops');
   const sellerAuthenticated = signedInAs('seller') && sellerApproved;
-  const driverAuthenticated = signedInAs('driver');
 
   const startSession = useCallback((account) => {
     setSession({
@@ -363,7 +362,6 @@ export function useAuth() {
     buyerAuthenticated,
     adminAuthenticated,
     sellerAuthenticated,
-    driverAuthenticated,
     startPhoneSignIn,
     confirmPhoneCode,
     signInWithPassword,

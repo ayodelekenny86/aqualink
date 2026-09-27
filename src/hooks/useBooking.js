@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { generateBookingCode, generateConfirmationCode } from '../lib/secureCode';
 import { list, replaceAll } from '../lib/collections';
-import { assignSeller, rankCandidates } from '../lib/dispatch';
+import { assignDriver, assignSeller } from '../lib/dispatch';
 import { getFleet, recordAssignment, seedFleet } from '../lib/fleet';
 import { toMinor, allocate, formatCedi } from '../lib/money';
 
@@ -78,20 +78,22 @@ export function useBooking({ email, onNotice, notify }) {
       ...items,
     ]);
 
-    // Secure a seller immediately: inventory has to be locked before anyone can
-    // accept the job. Drivers are ranked and recommended, but the accept stays
-    // with them so the gig-style flow and the dispatch feed both still work.
+    // Dispatch automatically. There is no driver-side app to accept from, so the
+    // best available driver and a seller with enough capacity are committed to
+    // the order at creation time, and the buyer is told who is coming.
     const { drivers, sellers } = getFleet();
     const dispatchable = { location, volumeGallons: Number.parseInt(volume, 10) || 0 };
+    const driver = assignDriver({ order: dispatchable, drivers });
     const seller = assignSeller({ order: dispatchable, sellers });
-    const ranked = rankCandidates({ order: dispatchable, candidates: drivers, kind: 'driver' });
-    const recommended = ranked.find((row) => row.eligible) ?? null;
-    recordAssignment(reference, { seller, recommendedDriver: recommended });
+    recordAssignment(reference, { driver, seller });
 
     const money = allocate(toMinor(250));
-    const who = recommended ? `${recommended.candidate.name} (${recommended.candidate.base.split(',')[0]}) is closest and can take it` : 'a driver is being assigned';
+    const who = driver
+      ? `${driver.candidate.name} (${driver.candidate.base.split(',')[0]}) is assigned`
+      : 'a driver is being assigned';
     onNotice(`Booking confirmed. Your reference is ${reference}. Service charge ${formatCedi(money.buyerServiceCharge)} applied. ${who}.`);
-    notify?.({ role: 'driver', title: `New job available · ${location}`, body: `${volume} · tap to accept.`, kind: 'job' });
+    // Dispatchers need to see every new job, since assignment is automatic.
+    notify?.({ role: 'ops', title: `New order ${reference} · ${location}`, body: `${volume} · auto-assigned to ${who}.`, orderId: reference, kind: 'job' });
   }, [booking, orders, onNotice, commit, notify]);
 
   const repeatBooking = useCallback((address) => {
@@ -104,47 +106,19 @@ export function useBooking({ email, onNotice, notify }) {
     onNotice('Live delivery update received from the seller app.');
   }, [onNotice]);
 
-  const updateOrderStatus = useCallback((orderId, status) => {
+  const updateOrderStatus = useCallback((orderId, status, notify) => {
     commit((items) => items.map((item) => (item.id === orderId ? { ...item, status } : item)));
     onNotice(`Order ${orderId} is now ${status.toLowerCase()}.`);
-  }, [onNotice, commit]);
-
-  /** Driver claims an unclaimed job. */
-  const acceptOrder = useCallback((orderId, driverName = 'Kojo Mensah', notify) => {
-    commit((items) => items.map((item) => (item.id === orderId ? { ...item, driverName, status: 'Accepted' } : item)));
-    onNotice(`Job ${orderId} accepted. Head to the pickup point.`);
+    // A status change is the buyer's cue to expect the tank, so tell them.
     const order = orders.find((item) => item.id === orderId);
     notify?.({
       role: 'buyer',
-      title: `${driverName} accepted ${orderId}`,
-      body: order?.location ? `Heading to your delivery at ${order.location}.` : 'Your driver is on the way.',
+      title: `${orderId} is now ${String(status).toLowerCase()}`,
+      body: order?.location ? `Delivery to ${order.location}.` : '',
       orderId,
       kind: 'status',
     });
   }, [onNotice, commit, orders]);
-
-  /** Driver advances a claimed job through the handover steps. */
-  const advanceOrder = useCallback((orderId, status) => {
-    commit((items) => items.map((item) => (item.id === orderId ? { ...item, status } : item)));
-    onNotice(`${orderId} updated to ${status.toLowerCase()}. The buyer has been notified.`);
-  }, [onNotice, commit]);
-
-  /**
-   * Driver closes a delivery. Escrow only releases when the buyer quotes the
-   * code the seller issued at handover, so a wrong or empty code is rejected.
-   */
-  const completeDelivery = useCallback((orderId, code) => {
-    const order = orders.find((item) => item.id === orderId);
-    if (!order) return { ok: false, reason: 'unknown-order' };
-    if (!order.confirmCode) return { ok: false, reason: 'not-handed-over' };
-    if (String(code ?? '').trim().toUpperCase() !== order.confirmCode.toUpperCase()) {
-      onNotice('That delivery code does not match. Ask the buyer to confirm their code.');
-      return { ok: false, reason: 'mismatch' };
-    }
-    commit((items) => items.map((item) => (item.id === orderId ? { ...item, status: 'Delivered', payment: 'Released', confirmCode: '' } : item)));
-    onNotice(`Delivery completed for ${orderId}. Escrow released.`);
-    return { ok: true };
-  }, [orders, onNotice, commit]);
 
   /**
    * Seller-side handover: issues the delivery confirmation code the buyer must
@@ -186,9 +160,6 @@ export function useBooking({ email, onNotice, notify }) {
     driverUpdate,
     refreshDriverUpdate,
     updateOrderStatus,
-    acceptOrder,
-    advanceOrder,
-    completeDelivery,
     issueDeliveryCode,
     confirmDelivery,
     requestRefund,

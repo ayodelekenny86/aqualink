@@ -35,26 +35,28 @@ export function getFleet() {
 }
 
 /**
- * Persist dispatch results onto the order row.
+ * Commit dispatch results onto the order row.
  *
- * A seller is committed immediately because inventory must be secured. The
- * driver is only *recommended*: `driverName` stays empty so the job remains in
- * the drivers' available feed until one of them accepts.
+ * Both a driver and a seller are assigned at creation time: there is no
+ * driver-side app to accept from, so the order is fully allocated before the
+ * buyer sees it. The reason string is stored alongside so ops can audit why a
+ * given driver or seller was chosen.
  */
-export function recordAssignment(orderId, { seller, recommendedDriver }) {
+export function recordAssignment(orderId, { driver, seller }) {
   const order = findBy('orders', (row) => row.id === orderId);
   if (!order) return null;
 
   return update('orders', orderId, {
+    driverName: driver?.candidate?.name ?? order.driverName ?? '',
+    driverId: driver?.candidate?.id ?? order.driverId ?? '',
+    driverPhone: driver?.candidate?.phone ?? order.driverPhone ?? '',
+    driverScore: driver?.score ?? order.driverScore ?? null,
     sellerName: seller?.candidate?.name ?? order.sellerName ?? '',
     sellerId: seller?.candidate?.id ?? order.sellerId ?? '',
-    recommendedDriverId: recommendedDriver?.candidate?.id ?? order.recommendedDriverId ?? '',
-    recommendedDriverName: recommendedDriver?.candidate?.name ?? order.recommendedDriverName ?? '',
-    recommendedDriverScore: recommendedDriver?.score ?? order.recommendedDriverScore ?? null,
     assignmentReason: [
-      seller ? `seller ${explain(seller)}` : null,
-      recommendedDriver ? `recommended driver ${explain(recommendedDriver)}` : null,
-    ].filter(Boolean).join('; '),
+      driver ? `driver ${explain(driver)}` : 'no driver available',
+      seller ? `seller ${explain(seller)}` : 'no seller with capacity',
+    ].join('; '),
   });
 }
 

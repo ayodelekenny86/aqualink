@@ -8,7 +8,6 @@ import useReports from './hooks/useReports';
 import useNotifications from './hooks/useNotifications';
 import { formatPhoneForDisplay, normalizePhone } from './lib/accounts';
 import { seedProducts } from './lib/collections';
-import DriverView, { DriverAccessGate } from './components/DriverView';
 import NotificationsPanel from './components/NotificationsPanel';
 import OrderDetailModal from './components/OrderDetailModal';
 import RevenueBreakdown from './components/RevenueBreakdown';
@@ -16,13 +15,12 @@ import ContactButtons from './components/ContactButtons';
 
 const roles = [
   ['buyer', 'Buyer app', 'Book reliable water'],
-  ['driver', 'Driver app', 'Deliver and get paid'],
   ['seller', 'Seller app', 'Manage your fleet'],
   ['institution', 'Institution', 'Plan your supply'],
   ['ops', 'Admin', 'Authorized operations access'],
 ];
 
-const ROLE_ICONS = { buyer: '⌂', driver: '⇢', seller: '↗', institution: '▦', ops: '◈' };
+const ROLE_ICONS = { buyer: '⌂', seller: '↗', institution: '▦', ops: '◈' };
 
 const SUPPORT_PHONE = '0545009046';
 
@@ -127,19 +125,7 @@ function App() {
             onContactBuyer
           />
         )}
-        {ready && role === 'driver' && (driverAuthenticated
-          ? <DriverView orders={orders} onAccept={(id) => acceptOrder(id, 'Kojo Mensah', notify)} onAdvance={advanceWithNotice} onComplete={completeDelivery} driver={{ region, name: session?.displayName ?? 'Driver' }} showNotice={showNotice} />
-          : <DriverAccessGate
-              onStartSignIn={startPhoneSignIn}
-              onConfirmCode={confirmPhoneCode}
-              onRegister={(value) => registerAccount({ identifier: value, role: 'driver', displayName: 'Driver' })}
-              identifier={phoneIdentifier}
-              generatedCode={phoneCode}
-              error={signInError}
-              accountExists={accountExists}
-            />)}
         {ready && role === 'seller' && (sellerAuthenticated ? <SellerView available={available} setAvailable={setAvailable} showNotice={showNotice} orders={orders} updateOrderStatus={updateOrderStatus} issueDeliveryCode={issueDeliveryCode} sellerProfile={sellerProfile} setSellerProfile={setSellerProfile} /> : <SellerAccessGate sellerProfile={sellerProfile} setSellerProfile={setSellerProfile} onApproved={completeSellerApproval} issueCode={issueSellerCode} currentCode={sellerCode} />)}
-        {ready && role === 'driver' && <RevenueBreakdown amountCedi={250} role="driver" title="Your earnings on a GH₵250 order" />}
         {role === 'seller' && <SellerFinance showNotice={showNotice} />}
         {role === 'seller' && <LiveAgentCard role="seller" showNotice={showNotice} />}
         {role === 'institution' && <InstitutionView showNotice={showNotice} />}        {role === 'institution' && <InstitutionFinance showNotice={showNotice} />}
