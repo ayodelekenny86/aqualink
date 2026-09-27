@@ -57,7 +57,9 @@ export default function RevenueBreakdown({ amountCedi = 250, split = DEFAULT_SPL
       </div>
 
       <small className="revenue-note">
-        Escrow holds the seller and driver payouts until delivery is confirmed with the handover code.
+        These are the shares this order would be split into. There is no escrow account: Paystack
+        collects the buyer's money directly, and the seller and driver shares are calculated from the
+        amount the server actually verified. They are not funds held on anyone's behalf.
         {role === 'driver' && ` Your cut on this order is ${formatCedi(driverReceives)}.`}
         {role === 'seller' && ` Your cut on this order is ${formatCedi(sellerReceives)}.`}
       </small>

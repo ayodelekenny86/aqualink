@@ -39,6 +39,10 @@
         "function": { "functionId": "apiReviewSeller", "region": "europe-west1" }
       },
       {
+        "source": "/api/sellers/applications",
+        "function": { "functionId": "apiSellerApplications", "region": "europe-west1" }
+      },
+      {
         "source": "/api/sellers/status",
         "function": { "functionId": "apiSellerStatus", "region": "europe-west1" }
       },

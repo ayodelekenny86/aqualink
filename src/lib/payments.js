@@ -312,6 +312,17 @@ export async function reviewSeller({ applicationId, decision, note, token }, { s
 }
 
 /**
+ * Load the seller applications waiting on review.
+ *
+ * Operator-only, and the real source for the ops approval queue. That panel used
+ * to render three invented sellers and a hardcoded "3 pending".
+ */
+export async function listSellerApplications({ status = 'pending', token }, { signal } = {}) {
+  const query = new URLSearchParams({ status: String(status ?? 'pending') });
+  return apiRequest(`/sellers/applications?${query}`, { signal, auth: token });
+}
+
+/**
  * Submit a seller application for review.
  *
  * The seller cannot approve themselves; this only records the request.

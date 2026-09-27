@@ -329,6 +329,53 @@ export const apiApplySeller = onRequest(async (req, res) => {
   }
 });
 
+/**
+ * List seller applications for review. Operator-only.
+ *
+ * This is what the ops approval queue reads. The panel it replaces hardcoded
+ * "3 pending" and three invented sellers (S-019, S-021, S-024), so an operator
+ * reviewing that list was reading fiction.
+ */
+export const apiSellerApplications = onRequest({ secrets: [OPS_SESSION_SECRET] }, async (req, res) => {
+  applyCors(req, res);
+  if (req.method === 'OPTIONS') return res.status(204).send('');
+  if (req.method !== 'GET') return fail(res, 405, 'method_not_allowed', 'Use GET.');
+
+  const operator = requireOps(req, res);
+  if (!operator) return undefined;
+
+  try {
+    const requested = String(req.query.status ?? 'pending');
+    const status = ['pending', 'approved', 'rejected'].includes(requested) ? requested : 'pending';
+
+    const snapshot = await db.collection('sellers')
+      .where('status', '==', status)
+      .limit(200)
+      .get();
+
+    const applications = snapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        applicationId: data.id,
+        business: data.business ?? '',
+        phone: data.phone ?? '',
+        vehicle: data.vehicle ?? '',
+        capacity: data.capacity ?? '',
+        status: data.status,
+        appliedAt: data.appliedAt ?? null,
+        // The audit trail the README claims exists: who decided, and when.
+        reviewedAt: data.reviewedAt ?? null,
+        reviewedBy: data.reviewedBy ?? null,
+      };
+    });
+
+    return res.status(200).json({ applications, status, count: applications.length });
+  } catch (error) {
+    logger.error('seller applications list failed', error);
+    return fail(res, 500, 'list_failed', 'Could not load the review queue.');
+  }
+});
+
 export const apiReviewSeller = onRequest({ secrets: [OPS_SESSION_SECRET] }, async (req, res) => {
   applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).send('');

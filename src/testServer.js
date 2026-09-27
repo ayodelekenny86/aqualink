@@ -138,7 +138,7 @@ export function installFakeApi({ pricing = DEFAULT_PRICING, split = DEFAULT_SPLI
     if (path.endsWith('/api/sellers/apply') && init.method === 'POST') {
       const body = JSON.parse(init.body);
       const applicationId = `app-${String(body.phone).replace(/\D/g, '').slice(-8)}`;
-      SELLERS.set(applicationId, { ...body, status: 'pending' });
+      SELLERS.set(applicationId, { ...body, applicationId, status: 'pending' });
       return json({ applicationId, status: 'pending' }, 201);
     }
     if (path.endsWith('/api/sellers/status')) {
@@ -148,6 +148,24 @@ export function installFakeApi({ pricing = DEFAULT_PRICING, split = DEFAULT_SPLI
       // Unknown numbers read as 'pending' rather than 404, matching the server so
       // this endpoint cannot be used to find out who has applied.
       return json({ status: seller?.status ?? 'pending' });
+    }
+    if (path.endsWith('/api/sellers/applications')) {
+      if (!authorised(init)) {
+        return json({ code: 'not_authorised', message: 'Sign in as an operator to do that.' }, 401);
+      }
+      const status = new URL(String(url), 'http://test').searchParams.get('status') ?? 'pending';
+      const applications = [...SELLERS.values()]
+        .filter((seller) => seller.status === status)
+        .map((seller) => ({
+          applicationId: seller.applicationId,
+          business: seller.business,
+          phone: seller.phone,
+          vehicle: seller.vehicle,
+          capacity: seller.capacity,
+          status: seller.status,
+          reviewedBy: null,
+        }));
+      return json({ applications, status, count: applications.length });
     }
     if (path.endsWith('/api/sellers/review') && init.method === 'POST') {
       if (!authorised(init)) {
@@ -177,6 +195,12 @@ export function reviewSellerApplication(applicationId, decision) {
   const seller = SELLERS.get(applicationId);
   if (seller) seller.status = decision === 'approve' ? 'approved' : 'rejected';
   return seller;
+}
+
+/** Put an application in the queue without going through the seller form. */
+export function seedSellerApplication({ applicationId, business, phone, vehicle, capacity, status = 'pending' }) {
+  SELLERS.set(applicationId, { applicationId, business, phone, vehicle, capacity, status });
+  return applicationId;
 }
 
 /** The pricing the stub is currently serving, i.e. what a real order would be charged. */
