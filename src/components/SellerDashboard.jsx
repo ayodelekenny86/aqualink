@@ -67,6 +67,22 @@ function JobCard({ order, driver, onAccept, onStart, onComplete, onView }) {
 }
 
 function DriverCard({ driver, location, onUpdateLocation }) {
+  const [open, setOpen] = useState(false);
+  const [loc, setLoc] = useState('');
+  const [eta, setEta] = useState('');
+
+  // There is no driver-side app feeding this dashboard, so the only honest
+  // source of a driver's live position is the seller typing it. The old
+  // "Simulate Move" button injected an invented "8 min" ETA; that is gone.
+  function submit(event) {
+    event.preventDefault();
+    if (!loc.trim()) return;
+    onUpdateLocation(driver.id, loc.trim(), eta.trim() || 'ETA unknown');
+    setLoc('');
+    setEta('');
+    setOpen(false);
+  }
+
   return (
     <article className="driver-card panel">
       <div className="driver-header">
@@ -95,12 +111,26 @@ function DriverCard({ driver, location, onUpdateLocation }) {
       )}
 
       <div className="driver-actions">
-        <button type="button" onClick={() => onUpdateLocation(driver.id, 'East Legon, Accra', '12 min')}>
-          Update Location
-        </button>
-        <button type="button" className="outline-button" onClick={() => onUpdateLocation(driver.id, 'Cantonments, Accra', '8 min')}>
-          Simulate Move
-        </button>
+        {!open ? (
+          <button type="button" onClick={() => setOpen(true)}>Update location</button>
+        ) : (
+          <form className="driver-location-form" onSubmit={submit}>
+            <input
+              aria-label={`Current location for ${driver.name}`}
+              value={loc}
+              onChange={(event) => setLoc(event.target.value)}
+              placeholder="e.g. Labone, Accra"
+            />
+            <input
+              aria-label={`ETA for ${driver.name}`}
+              value={eta}
+              onChange={(event) => setEta(event.target.value)}
+              placeholder="ETA (e.g. 12 min)"
+            />
+            <button type="submit">Save</button>
+            <button type="button" onClick={() => setOpen(false)}>Cancel</button>
+          </form>
+        )}
       </div>
     </article>
   );
