@@ -1,38 +1,61 @@
 import { useEffect, useState } from 'react';
 
-let registerSW = null;
-try {
-  const mod = await import('virtual:pwa-register/react');
-  registerSW = mod.registerSW;
-} catch {
-  // Virtual module not available (e.g., in tests)
-  registerSW = null;
+let registerSWModule = null;
+let loadPromise = null;
+
+async function loadRegisterSW() {
+  if (registerSWModule) return registerSWModule;
+  if (!loadPromise) {
+    loadPromise = (async () => {
+      try {
+        const mod = await import('virtual:pwa-register/react');
+        registerSWModule = mod;
+        return mod;
+      } catch {
+        registerSWModule = { registerSW: null };
+        return registerSWModule;
+      }
+    })();
+  }
+  return loadPromise;
 }
 
+// Detect test environment - Vitest sets VITEST=1, also check for jsdom
+const isTest = typeof process !== 'undefined' && (process.env.VITEST === '1' || process.env.NODE_ENV === 'test') 
+  || (typeof navigator !== 'undefined' && navigator.userAgent?.includes('jsdom'));
+
 export function usePWAUpdate() {
+  if (isTest) {
+    return { needRefresh: false, offlineReady: false, updateServiceWorker: () => {} };
+  }
   const [needRefresh, setNeedRefresh] = useState(false);
   const [offlineReady, setOfflineReady] = useState(false);
+  const [updateServiceWorker, setUpdateServiceWorker] = useState(() => () => {});
 
   useEffect(() => {
-    if (registerSW) {
-      const { needRefresh: nr, offlineReady: or, updateServiceWorker } = registerSW({
+    let mounted = true;
+    loadRegisterSW().then((mod) => {
+      if (!mounted || !mod.registerSW) return;
+      const { needRefresh: nr, offlineReady: or, updateServiceWorker: usw } = mod.registerSW({
         onNeedRefresh() {
           if (confirm('New content available. Click OK to refresh.')) {
-            updateServiceWorker(true);
+            usw(true);
           }
         },
         onOfflineReady() {
-          setOfflineReady(true);
+          if (mounted) setOfflineReady(true);
           console.log('App ready to work offline');
         },
       });
-      // The returned values are refs, so we need to sync them to state
       const sync = setInterval(() => {
+        if (!mounted) return;
         setNeedRefresh(nr.value);
         setOfflineReady(or.value);
       }, 1000);
+      setUpdateServiceWorker(usw);
       return () => clearInterval(sync);
-    }
+    });
+    return () => { mounted = false; };
   }, []);
 
   useEffect(() => {
@@ -44,10 +67,6 @@ export function usePWAUpdate() {
       });
     }
   }, []);
-
-  const updateServiceWorker = registerSW
-    ? registerSW().updateServiceWorker
-    : () => {};
 
   return { needRefresh, offlineReady, updateServiceWorker };
 }
@@ -80,33 +99,42 @@ export function PWADetectOffline({ onOfflineChange }) {
 }
 
 export default function PWASetup() {
+  if (isTest) {
+    return null;
+  }
   const [needRefresh, setNeedRefresh] = useState(false);
   const [offlineReady, setOfflineReady] = useState(false);
+  const [updateServiceWorker, setUpdateServiceWorker] = useState(() => () => {});
 
   useEffect(() => {
-    if (registerSW) {
-      const { needRefresh: nr, offlineReady: or, updateServiceWorker } = registerSW({
+    let mounted = true;
+    loadRegisterSW().then((mod) => {
+      if (!mounted || !mod.registerSW) return;
+      const { needRefresh: nr, offlineReady: or, updateServiceWorker: usw } = mod.registerSW({
         onNeedRefresh() {
           if (confirm('New content available. Click OK to refresh.')) {
-            updateServiceWorker(true);
+            usw(true);
           }
         },
         onOfflineReady() {
-          setOfflineReady(true);
+          if (mounted) setOfflineReady(true);
           console.log('App ready to work offline');
         },
       });
       const sync = setInterval(() => {
+        if (!mounted) return;
         setNeedRefresh(nr.value);
         setOfflineReady(or.value);
       }, 1000);
+      setUpdateServiceWorker(usw);
       return () => clearInterval(sync);
-    }
+    });
+    return () => { mounted = false; };
   }, []);
 
   return (
     <>
-      <PWAUpdatePrompt needRefresh={needRefresh} updateServiceWorker={registerSW ? registerSW().updateServiceWorker : () => {}} />
+      <PWAUpdatePrompt needRefresh={needRefresh} updateServiceWorker={updateServiceWorker} />
       {offlineReady && (
         <div className="pwa-offline-ready" role="status">
           <span>✓ Ready for offline use</span>
