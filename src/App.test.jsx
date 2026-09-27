@@ -14,8 +14,41 @@ async function waitForRegistry() {
   await screen.findByRole('heading', { name: /sign in to view your orders|application awaiting approval|operations data needs a verified admin|create your seller account/i });
 }
 
-async function verifyBuyer(user, identifier = '0545009046') {
+const OPS_EMAIL = 'ops@aqualink.gh';
+const OPS_PASSWORD = 'ops-test-password-42';
+
+/**
+ * Create the ops account the tests sign in with.
+ *
+ * The app no longer seeds an ops account or prints its password, because doing
+ * so published an admin credential to anyone who loaded the page. In production
+ * the account is created once by the `apiBootstrapOps` function. Here the test
+ * owns the credential outright and signs in through the real form, so this still
+ * covers the sign-in path rather than stubbing it.
+ */
+async function createOpsAccount() {
+  const { createAccount } = await import('./lib/accounts');
+  await createAccount({
+    identifier: OPS_EMAIL,
+    role: 'ops',
+    displayName: 'Operations',
+    password: OPS_PASSWORD,
+  });
+}
+
+async function verifyBuyer(user, identifier = '0544007788') {
   await waitForRegistry();
+
+  // No account is seeded, so register through the real sign-up form first.
+  await user.click(screen.getByRole('button', { name: /create an account/i }));
+  await user.type(screen.getByRole('textbox', { name: /new buyer phone/i }), identifier);
+  await user.click(screen.getByRole('button', { name: /^create account/i }));
+  // Registration runs 210k PBKDF2 iterations, so wait for the field to clear:
+  // that only happens once the account actually exists.
+  const newPhone = screen.getByRole('textbox', { name: /new buyer phone/i });
+  await waitFor(() => expect(newPhone).toHaveValue(''));
+  await user.click(screen.getByRole('button', { name: /back to sign in/i }));
+
   await user.type(screen.getByRole('textbox', { name: /buyer phone number/i }), identifier);
   await user.click(screen.getByRole('button', { name: /send otp/i }));
 
@@ -27,14 +60,11 @@ async function verifyBuyer(user, identifier = '0545009046') {
   await screen.findByRole('heading', { name: /good morning, alex/i });
 }
 
-/** Signs in to ops with the seeded admin account and its generated password. */
+/** Signs in to ops with the account the test created. */
 async function signInAdmin(user) {
   await waitForRegistry();
-  const password = (await screen.findByTestId('demo-ops-password')).textContent;
-  expect(password.length).toBeGreaterThanOrEqual(8);
-
-  await user.type(screen.getByRole('textbox', { name: /admin account/i }), 'ops@aqualink.gh');
-  await user.type(screen.getByLabelText(/admin password/i), password);
+  await user.type(screen.getByRole('textbox', { name: /admin account/i }), OPS_EMAIL);
+  await user.type(screen.getByLabelText(/admin password/i), OPS_PASSWORD);
   await user.click(screen.getByRole('button', { name: /open admin console/i }));
   // Password verification is async (PBKDF2), so wait for the console itself.
   await screen.findByText(/manual ops mode/i);
@@ -164,6 +194,7 @@ test('supports repeat booking and language switching', async () => {
 
 test('shows AI business health signals in ops', async () => {
   const user = userEvent.setup();
+  await createOpsAccount();
   render(<App />);
 
   await user.click(screen.getByRole('button', { name: /admin authorized operations access/i }));
@@ -207,18 +238,18 @@ test('shows seller net payout and commission', async () => {
 
 test('rejects a wrong admin password and never stores the plaintext', async () => {
   const user = userEvent.setup();
+  await createOpsAccount();
   render(<App />);
 
   await user.click(screen.getByRole('button', { name: /admin authorized operations access/i }));
-  const password = (await screen.findByTestId('demo-ops-password')).textContent;
 
   // The stored credential must be a salt plus a hash, never the password.
   const [record] = JSON.parse(localStorage.getItem('aqualink.v1.accounts.list'));
   expect(record.passwordSalt).toMatch(/^[0-9a-f]{32}$/);
   expect(record.passwordHash).toMatch(/^[0-9a-f]{64}$/);
-  expect(localStorage.getItem('aqualink.v1.accounts.list')).not.toContain(password);
+  expect(localStorage.getItem('aqualink.v1.accounts.list')).not.toContain(OPS_PASSWORD);
 
-  await user.type(screen.getByRole('textbox', { name: /admin account/i }), 'ops@aqualink.gh');
+  await user.type(screen.getByRole('textbox', { name: /admin account/i }), OPS_EMAIL);
   await user.type(screen.getByLabelText(/admin password/i), 'not-the-password');
   await user.click(screen.getByRole('button', { name: /open admin console/i }));
 
@@ -254,6 +285,7 @@ test('rejects a malformed phone number before any lookup', async () => {
 
 test('shows institution billing and ops revenue control tower', async () => {
   const user = userEvent.setup();
+  await createOpsAccount();
   render(<App />);
 
   await user.click(screen.getByRole('button', { name: /institution plan your supply/i }));

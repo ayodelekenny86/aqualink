@@ -1,169 +1,193 @@
 import { readValue, writeValue } from './storage';
-import { normalizePhone } from './accounts';
 import { formatCedi, toMinor } from './money';
 
 /**
- * Mobile-money payments via Hubtel.
+ * Payment client.
  *
- * Security boundary, stated plainly because it is the thing most likely to be
- * got wrong: Hubtel's API secret **must never reach the browser**. Anything
- * shipped in a JS bundle is public. So this module never accepts a secret and
- * never calls Hubtel's money-moving endpoints directly. It talks to
- * `paymentsEndpoint`, which must be a server you control that holds the secret
- * and returns only the fields the client needs.
+ * This module no longer contains a demo path, and that is the most important
+ * thing in it. The previous version had a `demo` mode whose `verifyPayment`
+ * returned `status: 'settled'` whenever a timer elapsed, which meant the app
+ * could mark an order paid, mint a receipt, and report revenue without any money
+ * moving. That is not a demo, it is a way to make a business believe it was
+ * paid.
  *
- * With no endpoint configured the provider runs in `demo` mode: the full
- * lifecycle (initialise -> pay -> verify -> receipt) executes locally so the
- * product can be exercised end to end without moving money. Demo payments are
- * marked as such on the receipt and are never treated as settled in an
- * accounting export.
+ * So there is exactly one code path now, and it talks to the AquaLink server:
  *
- * To go live: deploy a server exposing POST /api/payments/initialise and
- * /api/payments/verify, set VITE_PAYMENTS_ENDPOINT to its URL, and the
- * provider switches to live mode with no other change here.
+ *   - the server holds the Paystack secret and is never shipped to a browser;
+ *   - the server prices the order, so a tampered client cannot lower the amount;
+ *   - the server asks Paystack whether money arrived and compares that answer to
+ *     the order it stored before reporting `settled`.
+ *
+ * When the server is unreachable or unconfigured, every function here throws.
+ * Nothing is faked, and no receipt can be produced.
  */
 
-export const PAYMENT_METHODS = [
-  { id: 'mtn_momo', label: 'MTN Mobile Money', network: 'mtn' },
-  { id: 'telecel_cash', label: 'Telecel Cash', network: 'telecel' },
-  { id: 'atmo_money', label: 'ATMo Money', network: 'atmo' },
-];
-
-const MODE_KEY = 'payments.mode';
 const RECEIPTS_KEY = 'payments.receipts';
-
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-/** Endpoint supplied at build time; absent means demo mode. */
-function paymentsEndpoint() {
-  const configured = import.meta.env?.VITE_PAYMENTS_ENDPOINT;
-  return typeof configured === 'string' && configured.startsWith('http') ? configured.replace(/\/$/, '') : null;
-}
-
-export function paymentMode() {
-  const override = readValue(MODE_KEY, null);
-  if (override === 'demo' || override === 'live') return override;
-  return paymentsEndpoint() ? 'live' : 'demo';
-}
-
-export function setPaymentMode(mode) {
-  writeValue(MODE_KEY, mode === 'live' ? 'live' : 'demo');
-}
+const API_ROOT = '/api';
 
 /**
- * Start a payment.
+ * Whether the deployment can take payments at all.
  *
- * Returns the reference plus, in live mode, the redirect/prompt payload Hubtel
- * expects. Network and account name are validated first: a malformed MSISDN is
- * rejected before any request, so a typo cannot become a failed charge against
- * a real number.
+ * The server is the only thing that knows if it is configured, so this is a hint
+ * for the UI, never a decision. The UI uses it to explain itself early; the
+ * authoritative check is the server refusing to charge.
  */
-export async function initialisePayment({ orderId, amountMinor, network, accountName, accountNumber }) {
-  // Normalise before validating and sending, so the same account always reaches
-  // the provider as the same string. Passing raw digits through would send
-  // "0240000000" and "+233240000000" as two different accounts.
-  let e164 = '';
+export function paymentsConfigured() {
+  return typeof import.meta.env?.VITE_API_BASE === 'string'
+    ? import.meta.env.VITE_API_BASE.length > 0
+    : true;
+}
+
+function apiBase() {
+  const configured = import.meta.env?.VITE_API_BASE;
+  if (typeof configured === 'string' && configured.trim()) {
+    return configured.trim().replace(/\/$/, '');
+  }
+  // Same origin by default: Firebase Hosting proxies /api/* to the functions in
+  // firebase.json, which keeps the functions domain out of the client entirely.
+  return API_ROOT;
+}
+
+async function apiRequest(path, { method = 'GET', body, signal } = {}) {
+  const response = await fetch(`${apiBase()}${path}`, {
+    method,
+    signal,
+    headers: { 'Content-Type': 'application/json' },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+
+  const text = await response.text();
+  let payload = {};
   try {
-    e164 = normalizePhone(String(accountNumber ?? '').trim());
+    payload = text ? JSON.parse(text) : {};
   } catch {
-    e164 = '';
-  }
-  const digits = String(e164 ?? '').replace(/\D/g, '');
-  if (!/^233\d{9}$/.test(digits)) {
-    throw new Error('Enter a valid Ghanaian mobile money number.');
-  }
-  if (!accountName || String(accountName).trim().length < 2) {
-    throw new Error('Enter the mobile money account name.');
-  }
-  if (!Number.isInteger(amountMinor) || amountMinor <= 0) {
-    throw new Error('Payment amount is invalid.');
+    throw new Error('The payments service returned an unreadable response.');
   }
 
-  const endpoint = paymentsEndpoint();
-  const reference = orderId;
-
-  if (endpoint && paymentMode() === 'live') {
-    const response = await fetch(`${endpoint}/initialise`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderId, amountMinor, network, accountName, accountNumber: digits }),
-    });
-    if (!response.ok) throw new Error('The payment provider rejected this request.');
-    return response.json();
+  if (!response.ok) {
+    // The server's message is written for a customer, so prefer it over anything
+    // generic. Fall back only when there is none.
+    throw new Error(payload.message || `The payments service is unavailable (${response.status}).`);
   }
-
-  // Demo mode: simulate the provider round trip without moving money.
-  await wait(400);
-  return {
-    mode: 'demo',
-    reference,
-    amountMinor,
-    network,
-    accountName,
-    accountNumber: digits,
-    status: 'pending',
-    message: `Demo payment initiated for ${formatCedi(amountMinor)}. No money was taken.`,
-  };
+  return payload;
 }
 
 /**
- * Confirm payment.
+ * Fetch the authoritative price for a booking.
  *
- * A client-side "success" is never proof of settlement. In live mode this asks
- * the server to verify with Hubtel and only returns `settled` when the server
- * says so; the demo mode returns a clearly-labelled simulated result.
+ * The figure the buyer is shown comes from the same function that will price
+ * the order, so the two cannot disagree.
  */
-export async function verifyPayment({ reference, amountMinor }) {
-  const endpoint = paymentsEndpoint();
-  if (endpoint && paymentMode() === 'live') {
-    const response = await fetch(`${endpoint}/verify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reference }),
-    });
-    if (!response.ok) throw new Error('Could not confirm this payment yet. Try again shortly.');
-    return response.json();
-  }
+export async function fetchQuote({ volumeLitres = 0, signal } = {}) {
+  const query = new URLSearchParams({ volume: String(volumeLitres) });
+  return apiRequest(`/pricing?${query}`, { signal });
+}
 
-  await wait(300);
-  return { mode: 'demo', reference, amountMinor, status: 'settled', simulated: true };
+/**
+ * Create an order. The server decides the price and returns it; any amount the
+ * browser might have wanted to send is not accepted.
+ */
+export async function createOrder({ email, phone, location, volumeLitres }, { signal } = {}) {
+  const payload = await apiRequest('/orders', {
+    method: 'POST',
+    signal,
+    body: { email, phone, location, volumeLitres },
+  });
+  return payload.order;
+}
+
+/**
+ * Start a payment and hand back the URL to send the customer to.
+ *
+ * The result is `status: 'pending'` even on success. Creating a Paystack
+ * transaction is not receiving money, and returning anything else here is how a
+ * redirect flow ends up telling a customer they paid before they have.
+ */
+export async function initialisePayment({ orderId, email }, { signal } = {}) {
+  const payload = await apiRequest('/payments/initialize', {
+    method: 'POST',
+    signal,
+    body: { orderId, email },
+  });
+
+  if (payload.alreadyPaid) {
+    return { ...payload, status: 'settled', alreadyPaid: true };
+  }
+  if (!payload.authorizationUrl) {
+    throw new Error('The payment provider did not return a payment page.');
+  }
+  // Deliberately normalised to `pending` no matter what the response said. The
+  // initialise leg creates a transaction; it is not the thing that proves money
+  // moved, so it is never allowed to report otherwise.
+  return { ...payload, status: 'pending' };
+}
+
+/**
+ * Ask the server whether a payment actually settled.
+ *
+ * This is a question, not a decision. `settled: true` is the only thing in the
+ * app that means money arrived, and it is set by the server after it has
+ * compared Paystack's record to the stored order.
+ */
+export async function verifyPayment({ reference }, { signal } = {}) {
+  if (!reference) throw new Error('A payment reference is required.');
+  return apiRequest(`/payments/verify?reference=${encodeURIComponent(reference)}`, { signal });
+}
+
+/**
+ * Read a Paystack reference out of the return URL.
+ *
+ * Paystack appends `reference` (and `trxref`) to the callback URL, which is a
+ * hash route here, so the query can arrive inside the fragment.
+ */
+export function referenceFromLocation(location = globalThis.location) {
+  if (!location) return '';
+  const hash = String(location.hash ?? '');
+  const fromHash = hash.includes('?') ? hash.slice(hash.indexOf('?') + 1) : '';
+  const params = new URLSearchParams(fromHash || String(location.search ?? ''));
+  return String(params.get('reference') ?? '').trim();
 }
 
 export function listReceipts() {
-  return readValue(RECEIPTS_KEY, []);
+  const rows = readValue(RECEIPTS_KEY, []);
+  return Array.isArray(rows) ? rows : [];
 }
 
 export function saveReceipt(receipt) {
   const rows = listReceipts();
-  const next = [receipt, ...rows.filter((row) => row.reference !== receipt.reference)];
-  writeValue(RECEIPTS_KEY, next);
+  writeValue(RECEIPTS_KEY, [receipt, ...rows.filter((row) => row.reference !== receipt.reference)]);
   return receipt;
 }
 
 /**
- * Build a receipt from a settled payment.
+ * Build a receipt from a settlement the server has already confirmed.
  *
- * The stored copy is the record; the HTML file is only a rendering of it, so a
- * downloaded receipt can always be reproduced from what the app holds.
+ * There is no `simulated` flag any more because there is no simulated result to
+ * flag. A receipt is only ever built from `settled: true`.
  */
-export function buildReceipt({ order, breakdown, payment, issuedAt = new Date().toISOString() }) {
+export function buildReceipt({ order, payment, breakdown, issuedAt = new Date().toISOString() }) {
+  // The customer paid the order value plus the service charge. Deriving the
+  // total from the order value alone would quietly under-report what was taken.
+  const grossMinor = breakdown?.grossMinor ?? 0;
+  const buyerServiceCharge = breakdown?.buyerServiceCharge ?? 0;
+  const totalChargedMinor = breakdown?.buyerPays ?? breakdown?.chargedMinor ?? grossMinor + buyerServiceCharge;
+
   return {
-    reference: order.code ?? order.id,
+    reference: payment.reference ?? order.code ?? order.id,
+    orderId: order.id ?? order.code,
     issuedAt,
-    simulated: Boolean(payment?.simulated),
-    mode: payment?.mode ?? 'demo',
-    status: payment?.status ?? 'settled',
-    network: payment?.network ?? 'mtn',
-    accountName: payment?.accountName ?? '',
-    orderValue: formatCedi(breakdown.gross),
-    serviceCharge: formatCedi(breakdown.buyerServiceCharge),
-    totalCharged: formatCedi(breakdown.buyerPays),
-    sellerShare: formatCedi(breakdown.sellerReceives),
-    driverShare: formatCedi(breakdown.driverReceives),
-    platformShare: formatCedi(breakdown.companyTake),
+    status: 'settled',
+    paidAt: payment.paidAt ?? null,
+    accountName: order.email ?? '',
+    currency: payment.currency ?? 'GHS',
+    orderValue: formatCedi(grossMinor),
+    serviceCharge: formatCedi(buyerServiceCharge),
+    totalCharged: formatCedi(totalChargedMinor),
+    sellerShare: formatCedi(breakdown?.sellerReceives ?? 0),
+    driverShare: formatCedi(breakdown?.driverReceives ?? 0),
+    platformShare: formatCedi(breakdown?.platformCommission ?? 0),
     location: order.location ?? '',
-    volume: order.volume ?? '',
-    driverName: order.driverName ?? '',
+    volume: order.volumeLitres ? `${order.volumeLitres} litres` : '',
   };
 }
 
@@ -175,17 +199,17 @@ function escapeHtml(value) {
 
 /**
  * Render a receipt as a self-contained HTML document for download and print.
- * Values are escaped, so a customer-supplied address cannot inject markup into
- * the downloaded file.
+ * Every value is escaped, so a customer-supplied address cannot inject markup
+ * into the downloaded file.
  */
 export function receiptHtml(receipt) {
   const rows = [
     ['Order reference', receipt.reference],
+    ['Order number', receipt.orderId],
     ['Issued', new Date(receipt.issuedAt).toLocaleString('en-GB')],
     ['Location', receipt.location],
     ['Volume', receipt.volume],
-    ['Driver', receipt.driverName],
-    ['Payment method', `${receipt.network} · ${receipt.accountName}`],
+    ['Paid to', receipt.accountName],
     ['Order value', receipt.orderValue],
     ['Service charge', receipt.serviceCharge],
     ['Total charged', receipt.totalCharged],
@@ -208,21 +232,18 @@ export function receiptHtml(receipt) {
   td:first-child{color:#5d6f6d;width:52%}
   td:last-child{text-align:right;font-weight:600}
   .total td{font-size:17px;border-bottom:none;border-top:2px solid #16333a;padding-top:13px}
-  .sim{margin-top:18px;padding:11px 13px;background:#fff6e5;border:1px solid #f0c674;border-radius:9px;font-size:12.5px;color:#7a4b00}
   .foot{margin-top:20px;font-size:11.5px;color:#8b9997;text-align:center}
   @media print{body{background:#fff;padding:0}.card{border:none}}
 </style></head>
 <body><div class="card">
 <h1>AquaLink receipt</h1>
-<p class="sub">${escapeHtml(receipt.status === 'settled' ? 'Payment settled' : `Payment ${receipt.status}`)}</p>
+<p class="sub">Payment confirmed by Paystack</p>
 <table>${rows.map(([label, value]) => `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(value)}</td></tr>`).join('')}
 <tr class="total"><td>Total charged</td><td>${escapeHtml(receipt.totalCharged)}</td></tr></table>
-${receipt.simulated ? '<p class="sim"><b>Demo payment.</b> No money was taken and this receipt is not a record of a real transaction.</p>' : ''}
 <p class="foot">AquaLink · water delivery coordination</p>
 </div></body></html>`;
 }
 
-/** Trigger a browser download of the receipt without leaving the app. */
 export function downloadReceipt(receipt) {
   const blob = new Blob([receiptHtml(receipt)], { type: 'text/html;charset=utf-8' });
   const url = URL.createObjectURL(blob);

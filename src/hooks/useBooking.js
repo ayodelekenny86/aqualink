@@ -3,17 +3,25 @@ import { generateBookingCode, generateConfirmationCode } from '../lib/secureCode
 import { list, replaceAll } from '../lib/collections';
 import { assignDriver, assignSeller } from '../lib/dispatch';
 import { getFleet, recordAssignment, seedFleet } from '../lib/fleet';
-import { toMinor, allocate, formatCedi, quotePrice, DEFAULT_PRICING, DEFAULT_SPLIT } from '../lib/money';
+import { createOrder } from '../lib/payments';
+import { allocate, formatCedi, DEFAULT_PRICING, DEFAULT_SPLIT } from '../lib/money';
 
-export const initialOrders = [
-  { id: 'AQ-1048-2', code: 'AQ-1048-2', location: 'East Legon, Accra', volume: '2,000 gal', status: 'Delivered', payment: 'Released', date: 'Today, 09:42', price: 'GH₵250', confirmCode: '', driverName: 'Kojo Mensah', buyerName: 'Buyer', buyerPhone: '0544001122' },
-  { id: 'AQ-1032-7', code: 'AQ-1032-7', location: 'Cantonments, Accra', volume: '1,000 gal', status: 'Delivered', payment: 'Released', date: 'Jun 18, 14:20', price: 'GH₵250', confirmCode: '', driverName: 'Ama Boateng', buyerName: 'Buyer', buyerPhone: '0544001122' },
-  { id: 'AQ-1051-3', code: 'AQ-1051-3', location: 'Airport Residential, Accra', volume: '5,000 gal', status: 'Placed', payment: 'Held in escrow', date: 'Just now', price: 'GH₵980', confirmCode: '', driverName: '', buyerName: 'Buyer', buyerPhone: '0544001122' },
-];
+/**
+ * US liquid gallon to litre. The booking form is in gallons because that is what
+ * tank sizes are quoted in locally, and the server prices in litres, so the
+ * conversion happens here rather than being guessed at twice.
+ */
+const LITRES_PER_GALLON = 3.785411784;
+
+function toLitres(volumeLabel) {
+  const gallons = Number.parseInt(String(volumeLabel ?? ''), 10);
+  if (!Number.isFinite(gallons) || gallons <= 0) return 0;
+  return Math.round(gallons * LITRES_PER_GALLON);
+}
 
 const initialBooking = { location: '', volume: '2,000 gallons', window: 'As soon as possible', payment: 'Mobile money', whatsapp: '' };
 
-const initialSavedAddresses = ['Home · East Legon, Accra', 'Office · Cantonments, Accra'];
+const initialSavedAddresses = [];
 
 /**
  * Owns booking form state, the order list, saved addresses and the driver
@@ -23,13 +31,15 @@ const initialSavedAddresses = ['Home · East Legon, Accra', 'Office · Cantonmen
  * gets a checksummed `AQ-####-X` reference, and releasing escrow requires the
  * delivery confirmation code that the seller side generates when handing over.
  */
-export function useBooking({ email, onNotice, notify, pricing = DEFAULT_PRICING, split = DEFAULT_SPLIT }) {
+export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing = DEFAULT_PRICING, split = DEFAULT_SPLIT }) {
   // Orders live in the shared `orders` collection so the buyer, seller and ops
   // workspaces all read one list rather than three divergent copies.
   const [orders, setOrders] = useState(() => {
     seedFleet();
-    const stored = list('orders');
-    return stored.length ? stored : replaceAll('orders', initialOrders);
+    // No fabricated history. An empty workspace shows an honest empty state
+    // rather than three invented orders with made-over prices and a
+    // "held in escrow" status that no payment system ever set.
+    return list('orders');
   });
   const [booking, setBooking] = useState(initialBooking);
   const [savedAddresses, setSavedAddresses] = useState(initialSavedAddresses);
@@ -53,40 +63,68 @@ export function useBooking({ email, onNotice, notify, pricing = DEFAULT_PRICING,
     setBooking((current) => ({ ...current, [name]: value }));
   }, []);
 
-  const requestDelivery = useCallback((event) => {
+  const requestDelivery = useCallback(async (event) => {
     event.preventDefault();
     if (!booking.location.trim()) {
       onNotice('Add a delivery location to continue.');
       return;
     }
-    const { location, volume } = booking;
-    // The app issues the reference itself, continuing from the highest in use.
-    const reference = generateBookingCode(orders.map((order) => order.id));
-    setBooking((current) => ({ ...current, location: '' }));
+    if (!buyerPhone) {
+      onNotice('Add your phone number to your account so the driver can reach you.');
+      return;
+    }
 
-    // Price comes from the admin's live pricing, not a hardcoded figure.
-    const priced = quotePrice(pricing);
-    const money = allocate(priced.totalMinor, split);
+    const { location, volume } = booking;
+    const volumeLitres = toLitres(volume);
+    if (volumeLitres <= 0) {
+      onNotice('Choose a tank size before booking.');
+      return;
+    }
+
+    let serverOrder;
+    try {
+      // The order is created server-side, and the price that comes back is the
+      // price that will be charged. The browser does not get to name an amount,
+      // which is what stops a tampered client from booking at GH¢1.
+      serverOrder = await createOrder({ email, phone: buyerPhone, location, volumeLitres });
+    } catch (caught) {
+      onNotice(caught.message || 'Could not reach the booking service. Please try again.');
+      return;
+    }
+
+    const reference = serverOrder.id ?? serverOrder.code;
+    const money = allocate(serverOrder.grossMinor, serverOrder.split);
+    setBooking((current) => ({ ...current, location: '' }));
 
     commit((items) => [
       {
         id: reference,
-        code: reference,
-        location,
+        code: serverOrder.code ?? reference,
+        location: serverOrder.location,
         volume: volume.replace(' gallons', ' gal'),
-        status: 'Confirmed',
-        payment: 'Held in escrow',
+        status: 'Awaiting payment',
+        // No escrow claim: Paystack collects the money directly, so saying it is
+        // "held in escrow" would describe a system that does not exist.
+        payment: 'Not yet paid',
         date: 'Just now',
-        price: formatCedi(priced.totalMinor),
-        listPrice: formatCedi(priced.listMinor),
-        discountPercent: pricing.discountPercent,
-        surgePercent: pricing.surgePercent,
-        grossMinor: priced.totalMinor,
-        chargedMinor: money.buyerPays,
+        price: formatCedi(serverOrder.chargedMinor),
+        listPrice: formatCedi(serverOrder.listMinor ?? serverOrder.grossMinor),
+        // The pricing snapshot the server used, so the order shows why it cost
+        // what it did even after the admin changes the price.
+        discountPercent: serverOrder.pricing?.discountPercent ?? DEFAULT_PRICING.discountPercent,
+        surgePercent: serverOrder.pricing?.surgePercent ?? DEFAULT_PRICING.surgePercent,
+        surgeMinor: serverOrder.surgeMinor ?? 0,
+        grossMinor: serverOrder.grossMinor,
+        chargedMinor: serverOrder.chargedMinor,
+        buyerServiceCharge: serverOrder.buyerServiceCharge,
+        sellerReceives: serverOrder.sellerReceives,
+        driverReceives: serverOrder.driverReceives,
+        platformCommission: serverOrder.platformCommission,
+        volumeLitres,
         whatsapp: booking.whatsapp ?? '',
         confirmCode: '',
-        buyerName: email ? `Buyer ${email}` : 'Buyer',
-        buyerPhone: '0544001122',
+        buyerName: email || 'Buyer',
+        buyerPhone,
       },
       ...items,
     ]);
@@ -103,11 +141,11 @@ export function useBooking({ email, onNotice, notify, pricing = DEFAULT_PRICING,
     const who = driver
       ? `${driver.candidate.name} (${driver.candidate.base.split(',')[0]}) is assigned`
       : 'a driver is being assigned';
-    const surgeNote = priced.surgeMinor > 0 ? ` Surge ${formatCedi(priced.surgeMinor)} applied.` : '';
-    onNotice(`Booking confirmed. Your reference is ${reference}. Charged ${formatCedi(money.buyerPays)} including ${formatCedi(money.buyerServiceCharge)} service charge.${surgeNote} ${who}.`);
+    const surgeNote = (serverOrder.surgeMinor ?? 0) > 0 ? ` Surge ${formatCedi(serverOrder.surgeMinor)} applied.` : '';
+    onNotice(`Booking confirmed. Your reference is ${reference}. You will be charged ${formatCedi(serverOrder.chargedMinor)} including ${formatCedi(serverOrder.buyerServiceCharge)} service charge.${surgeNote} ${who}.`);
     // Dispatchers need to see every new order, since assignment is automatic.
-    notify?.({ role: 'ops', title: `New order ${reference} · ${location}`, body: `${volume} · ${formatCedi(money.buyerPays)} · auto-assigned to ${who}.`, orderId: reference, kind: 'job' });
-  }, [booking, orders, onNotice, commit, notify, pricing, split]);
+    notify?.({ role: 'ops', title: `New order ${reference} · ${location}`, body: `${volume} · ${formatCedi(serverOrder.chargedMinor)} · awaiting payment · auto-assigned to ${who}.`, orderId: reference, kind: 'job' });
+  }, [booking, commit, onNotice, notify, email, buyerPhone]);
 
   const repeatBooking = useCallback((address) => {
     setBooking((current) => ({ ...current, location: address.replace(/^.* · /, '') }));

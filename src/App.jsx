@@ -50,7 +50,7 @@ function App() {
     session, signOut, accountExists,
     buyerAuthenticated, adminAuthenticated, sellerAuthenticated,
     startPhoneSignIn, confirmPhoneCode, signInWithPassword, signInWithGoogleIdentity, registerAccount,
-    phoneCode, phoneIdentifier, signInError, demoCredentials,
+    phoneCode, phoneIdentifier, signInError,
     authStep, email, setEmail, emailCode, sendOtp, confirmEmailCode,
     sellerProfile, setSellerProfile, sellerApproved, sellerCode, issueSellerCode, completeSellerApproval,
     available, setAvailable,
@@ -66,7 +66,7 @@ function App() {
     orders, booking, updateBooking, requestDelivery, repeatBooking,
     savedAddresses, setSavedAddresses, driverUpdate, refreshDriverUpdate,
     updateOrderStatus, issueDeliveryCode, confirmDelivery, requestRefund,
-  } = useBooking({ email, onNotice: showNotice, notify, pricing, split });
+  } = useBooking({ email, buyerPhone: session?.identifier ?? '', onNotice: showNotice, notify });
 
   const { aiOpen, toggleAi, closeAi, aiInput, setAiInput, aiMessages, askAi } = useAquaAi({
     language,
@@ -100,7 +100,7 @@ function App() {
         {notice && <div className="notice" role="status"><span>✓</span>{notice}<button type="button" aria-label="Dismiss notification" onClick={dismissNotice}>×</button></div>}
         {aiOpen && <AiPanel role={role} input={aiInput} setInput={setAiInput} messages={aiMessages} askAi={askAi} close={closeAi} />}
         {!ready && <section className="access-gate panel"><span className="access-lock">⌁</span><p className="eyebrow">Preparing secure workspace</p><h1>Setting up your accounts.</h1><p>AquaLink is generating the local account registry and its credentials on this device. This takes a moment and needs no network access.</p></section>}
-        {ready && role === 'buyer' && (buyerAuthenticated ? <><BuyerView booking={booking} updateBooking={updateBooking} requestDelivery={requestDelivery} orders={orders} showNotice={showNotice} authStep={authStep} email={email} setEmail={setEmail} emailCode={emailCode} sendOtp={sendOtp} confirmEmailCode={confirmEmailCode} confirmDelivery={confirmDelivery} requestRefund={requestRefund} savedAddresses={savedAddresses} repeatBooking={repeatBooking} setSavedAddresses={setSavedAddresses} t={t} driverUpdate={driverUpdate} refreshDriverUpdate={refreshDriverUpdate} /><BuyerFinance showNotice={showNotice} /></> : <BuyerAccessGate onSignedIn={() => {}} startSignIn={startPhoneSignIn} confirmCode={confirmPhoneCode} generatedCode={phoneCode} identifier={phoneIdentifier} error={signInError} demo={demoCredentials} onRegister={(value) => registerAccount({ identifier: value, role: 'buyer', displayName: 'Buyer' })} accountExists={accountExists} onGoogle={signInWithGoogleIdentity} showNotice={showNotice} />)}
+        {ready && role === 'buyer' && (buyerAuthenticated ? <><BuyerView booking={booking} updateBooking={updateBooking} requestDelivery={requestDelivery} orders={orders} showNotice={showNotice} authStep={authStep} email={email} setEmail={setEmail} emailCode={emailCode} sendOtp={sendOtp} confirmEmailCode={confirmEmailCode} confirmDelivery={confirmDelivery} requestRefund={requestRefund} savedAddresses={savedAddresses} repeatBooking={repeatBooking} setSavedAddresses={setSavedAddresses} t={t} driverUpdate={driverUpdate} refreshDriverUpdate={refreshDriverUpdate} /><BuyerFinance showNotice={showNotice} /></> : <BuyerAccessGate onSignedIn={() => {}} startSignIn={startPhoneSignIn} confirmCode={confirmPhoneCode} generatedCode={phoneCode} identifier={phoneIdentifier} error={signInError} onRegister={(value) => registerAccount({ identifier: value, role: 'buyer', displayName: 'Buyer' })} accountExists={accountExists} onGoogle={signInWithGoogleIdentity} showNotice={showNotice} />)}
         {notificationsOpen && (
           <Suspense fallback={null}>
             <NotificationsPanel
@@ -128,10 +128,8 @@ function App() {
         {ready && role === 'buyer' && buyerAuthenticated && (
           <Suspense fallback={<div className="panel lazy-fallback" aria-hidden="true" />}>
             <PaymentPanel
-              order={orders.find((order) => order.status === 'Confirmed') ?? orders[0]}
-              pricing={pricing}
-              split={split}
-              onPaid={(orderId) => { updateOrderStatus(orderId, 'Paid', notify); refreshDriverUpdate(); }}
+              order={orders.find((order) => order.status !== 'Paid') ?? orders[0]}
+              onPaid={(orderId) => { updateOrderStatus(orderId, 'Paid', notify); }}
               showNotice={showNotice}
             />
           </Suspense>
@@ -141,7 +139,7 @@ function App() {
         {role === 'seller' && <LiveAgentCard role="seller" showNotice={showNotice} />}
         {role === 'institution' && <InstitutionView showNotice={showNotice} />}        {role === 'institution' && <InstitutionFinance showNotice={showNotice} />}
         {role === 'institution' && <InstitutionAgentCard showNotice={showNotice} />}
-        {ready && role === 'ops' && (adminAuthenticated ? <OpsView downloadReport={downloadReport} /> : <AdminAccessGate onSignIn={signInWithPassword} error={signInError} demo={demoCredentials} onGoogle={signInWithGoogleIdentity} showNotice={showNotice} />)}
+        {ready && role === 'ops' && (adminAuthenticated ? <OpsView downloadReport={downloadReport} /> : <AdminAccessGate onSignIn={signInWithPassword} error={signInError} onGoogle={signInWithGoogleIdentity} showNotice={showNotice} />)}
         {ready && role === 'ops' && adminAuthenticated && <ReportActions downloadReport={downloadReport} />}
         {ready && role === 'ops' && adminAuthenticated && <OperationalRiskPanel />}
         {ready && role === 'ops' && adminAuthenticated && <RevenueFinance showNotice={showNotice} />}
@@ -151,7 +149,7 @@ function App() {
   );
 }
 
-function BuyerAccessGate({ onSignedIn, startSignIn, confirmCode, generatedCode, identifier, error, demo, onRegister, accountExists, onGoogle, showNotice }) {
+function BuyerAccessGate({ onSignedIn, startSignIn, confirmCode, generatedCode, identifier, error, onRegister, accountExists, onGoogle, showNotice }) {
   const [localPhone, setLocalPhone] = useState('');
   const [step, setStep] = useState('phone');
   const [otp, setOtp] = useState('');
@@ -178,7 +176,7 @@ function BuyerAccessGate({ onSignedIn, startSignIn, confirmCode, generatedCode, 
 
   const known = localPhone.trim() ? accountExists(localPhone) : null;
 
-  return <section className="access-gate panel"><span className="access-lock">⌁</span><p className="eyebrow">Verified buyer access</p><h1>Sign in to view your orders.</h1><p>Enter the phone number on your account. AquaLink checks it against the account registry, then generates a one-time code.</p>{registering ? <form onSubmit={handleRegister}><div className="otp-delivery"><span className="section-kicker">NEW ACCOUNT</span><strong>{formatPhoneForDisplay(normalizePhone(localPhone) ?? localPhone)}</strong><small>An account will be created for this number with a generated password.</small></div><input aria-label="New buyer phone" value={localPhone} onChange={(event) => setLocalPhone(event.target.value)} placeholder="Phone number" inputMode="tel" /><button className="primary-button" type="submit">Create account →</button><button className="text-button" type="button" onClick={() => setRegistering(false)}>Back to sign in</button></form> : step === 'phone' ? <form onSubmit={handleSend}><input aria-label="Buyer phone number" value={localPhone} onChange={(event) => setLocalPhone(event.target.value)} placeholder="Phone number" inputMode="tel" />{known === false && <p className="form-hint">No account uses that number yet.</p>}<button className="primary-button" type="submit">Send OTP →</button></form> : <form onSubmit={handleVerify}><div className="otp-delivery"><span className="section-kicker">GENERATED BY AQUALINK</span><strong data-testid="otp-code">{generatedCode || '···'}</strong><small>For {formatPhoneForDisplay(identifier)} · expires in 5 minutes</small></div><input aria-label="Buyer OTP" value={otp} onChange={(event) => setOtp(event.target.value)} placeholder="Enter the generated code" inputMode="numeric" />{error && <p className="form-error" role="alert">{error}</p>}<button className="primary-button" type="submit">Verify OTP →</button><button className="text-button" type="button" onClick={() => { setStep('phone'); setOtp(''); }}>Use a different number</button></form>}{!registering && step === 'phone' && <button className="text-button" type="button" onClick={() => setRegistering(true)}>Create an account →</button>}{error && step === 'phone' && <p className="form-error" role="alert">{error}</p>}<small>{demo && <>Demo buyer: <b>{formatPhoneForDisplay(demo.buyer.identifier)}</b>. </>}Codes are generated on this device by the browser&apos;s Web Crypto API and verified locally against a real account. No SMS or email provider is involved, so the code is shown here instead of being sent.</small><GoogleSignInButton role="buyer" onVerified={onGoogle} showNotice={showNotice} /></section>;
+  return <section className="access-gate panel"><span className="access-lock">⌁</span><p className="eyebrow">Verified buyer access</p><h1>Sign in to view your orders.</h1><p>Enter the phone number on your account. AquaLink checks it against the account registry, then generates a one-time code.</p>{registering ? <form onSubmit={handleRegister}><div className="otp-delivery"><span className="section-kicker">NEW ACCOUNT</span><strong>{formatPhoneForDisplay(normalizePhone(localPhone) ?? localPhone)}</strong><small>An account will be created for this number with a generated password.</small></div><input aria-label="New buyer phone" value={localPhone} onChange={(event) => setLocalPhone(event.target.value)} placeholder="Phone number" inputMode="tel" /><button className="primary-button" type="submit">Create account →</button><button className="text-button" type="button" onClick={() => setRegistering(false)}>Back to sign in</button></form> : step === 'phone' ? <form onSubmit={handleSend}><input aria-label="Buyer phone number" value={localPhone} onChange={(event) => setLocalPhone(event.target.value)} placeholder="Phone number" inputMode="tel" />{known === false && <p className="form-hint">No account uses that number yet.</p>}<button className="primary-button" type="submit">Send OTP →</button></form> : <form onSubmit={handleVerify}><div className="otp-delivery"><span className="section-kicker">GENERATED BY AQUALINK</span><strong data-testid="otp-code">{generatedCode || '···'}</strong><small>For {formatPhoneForDisplay(identifier)} · expires in 5 minutes</small></div><input aria-label="Buyer OTP" value={otp} onChange={(event) => setOtp(event.target.value)} placeholder="Enter the generated code" inputMode="numeric" />{error && <p className="form-error" role="alert">{error}</p>}<button className="primary-button" type="submit">Verify OTP →</button><button className="text-button" type="button" onClick={() => { setStep('phone'); setOtp(''); }}>Use a different number</button></form>}{!registering && step === 'phone' && <button className="text-button" type="button" onClick={() => setRegistering(true)}>Create an account →</button>}{error && step === 'phone' && <p className="form-error" role="alert">{error}</p>}<small>Create an account below to get started. Codes are generated on this device by the browser&apos;s Web Crypto API and verified locally against a real account. No SMS or email provider is involved, so the code is shown here instead of being sent.</small><GoogleSignInButton role="buyer" onVerified={onGoogle} showNotice={showNotice} /></section>;
 }
 
 function SellerAccessGate({ sellerProfile, setSellerProfile, onApproved, issueCode, currentCode }) {
@@ -200,7 +198,7 @@ function SellerAccessGate({ sellerProfile, setSellerProfile, onApproved, issueCo
   return <section className="access-gate panel seller-gate"><span className="access-lock">↗</span><p className="eyebrow">Seller signup & approval</p><h1>Create your seller account.</h1><p>Complete your business and vehicle details. Your seller workspace stays locked until Admin approves the application.</p><form onSubmit={(event) => { event.preventDefault(); setSubmitted(true); }}><input aria-label="Business name" name="business" value={sellerProfile.business} onChange={update} placeholder="Business or trading name" /><input aria-label="Seller phone" name="phone" value={sellerProfile.phone} onChange={update} placeholder="Registered phone number" /><input aria-label="Vehicle registration" name="vehicle" value={sellerProfile.vehicle} onChange={update} placeholder="Vehicle registration" /><select aria-label="Tank capacity" name="capacity" value={sellerProfile.capacity} onChange={update}><option>1,000 gallons</option><option>2,000 gallons</option><option>5,000 gallons</option></select><button className="primary-button" type="submit">Submit signup for review →</button></form><small>Required controls: ID, vehicle registration, tank capacity, water-source evidence, approval audit trail, and payout verification.</small></section>;
 }
 
-function AdminAccessGate({ onSignIn, error, demo, onGoogle, showNotice }) {
+function AdminAccessGate({ onSignIn, error, onGoogle, showNotice }) {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
 
@@ -210,7 +208,7 @@ function AdminAccessGate({ onSignIn, error, demo, onGoogle, showNotice }) {
     if (result?.ok) setPassword('');
   }
 
-  return <section className="access-gate panel admin-gate"><span className="access-lock">▣</span><p className="eyebrow">Restricted admin area</p><h1>Operations data needs a verified admin.</h1><p>Sign in with the account registered for ops. The identifier is matched against the account registry and the password is checked against a salted PBKDF2 hash.</p><form onSubmit={handleSubmit}><input aria-label="Admin account" value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder="Admin email or phone" autoComplete="username" /><input aria-label="Admin password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" type="password" autoComplete="current-password" />{error && <p className="form-error" role="alert">{error}</p>}<button className="primary-button" type="submit">Open admin console →</button></form>{demo && <div className="demo-credentials"><span className="section-kicker">DEMO OPS ACCOUNT</span><strong>{demo.ops.identifier}</strong><small>Password (shown once): <code data-testid="demo-ops-password">{demo.ops.password}</code></small></div>}<small>Five failed attempts lock the account for five minutes. This is local access control, not server-side identity: anyone with access to the browser profile can read the same storage.</small><GoogleSignInButton role="ops" onVerified={onGoogle} showNotice={showNotice} /></section>;
+  return <section className="access-gate panel admin-gate"><span className="access-lock">▣</span><p className="eyebrow">Restricted admin area</p><h1>Operations data needs a verified admin.</h1><p>Sign in with the account registered for ops. The identifier is matched against the account registry and the password is checked against a salted PBKDF2 hash.</p><form onSubmit={handleSubmit}><input aria-label="Admin account" value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder="Admin email or phone" autoComplete="username" /><input aria-label="Admin password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" type="password" autoComplete="current-password" />{error && <p className="form-error" role="alert">{error}</p>}<button className="primary-button" type="submit">Open admin console →</button></form><small>Five failed attempts lock the account for five minutes. The operations account is created once from your deployment environment and its password is never displayed here.</small><GoogleSignInButton role="ops" onVerified={onGoogle} showNotice={showNotice} /></section>;
 }
 
 function ReportActions({ downloadReport }) {

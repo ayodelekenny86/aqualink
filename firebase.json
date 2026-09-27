@@ -1,4 +1,15 @@
 {
+  "functions": {
+    "source": "functions",
+    "predeploy": ["npm --prefix \"$RESOURCE_DIR\" run build --if-present"],
+    "ignore": [
+      "node_modules",
+      ".git",
+      "firebase-debug.log",
+      "firebase-debug.*.log",
+      "*.local"
+    ]
+  },
   "hosting": {
     "public": "dist",
     "ignore": [
@@ -7,6 +18,30 @@
       "**/node_modules/**"
     ],
     "rewrites": [
+      {
+        "source": "/api/pricing",
+        "function": { "functionId": "apiPricing", "region": "europe-west1" }
+      },
+      {
+        "source": "/api/orders",
+        "function": { "functionId": "apiCreateOrder", "region": "europe-west1" }
+      },
+      {
+        "source": "/api/payments/initialize",
+        "function": { "functionId": "apiInitializePayment", "region": "europe-west1" }
+      },
+      {
+        "source": "/api/payments/verify",
+        "function": { "functionId": "apiVerifyPayment", "region": "europe-west1" }
+      },
+      {
+        "source": "/api/webhooks/paystack",
+        "function": { "functionId": "apiPaystackWebhook", "region": "europe-west1" }
+      },
+      {
+        "source": "/api/bootstrap/ops",
+        "function": { "functionId": "apiBootstrapOps", "region": "europe-west1" }
+      },
       {
         "source": "**",
         "destination": "/index.html"
@@ -40,7 +75,7 @@
           { "key": "Permissions-Policy", "value": "geolocation=(), microphone=(), camera=()" },
           {
             "key": "Content-Security-Policy",
-            "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https://api.hubtel.com; upgrade-insecure-requests"
+            "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://checkout.paystack.com; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' https://accounts.google.com; connect-src 'self' https://api.paystack.co https://accounts.google.com https://www.googleapis.com; frame-src https://accounts.google.com https://checkout.paystack.com; upgrade-insecure-requests"
           },
           {
             "key": "Strict-Transport-Security",

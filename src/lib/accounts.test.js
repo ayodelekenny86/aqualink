@@ -20,7 +20,7 @@ import {
   listAccounts,
   normalizeEmail,
   normalizePhone,
-  seedDemoAccounts,
+  registerAccount,
   validateIdentifier,
 } from './accounts';
 import { clearAll, readValue } from './storage';
@@ -277,29 +277,33 @@ describe('phone sign-in with one-time codes', () => {
   });
 });
 
-describe('demo seed', () => {
-  test('creates a buyer and an ops account with generated passwords', async () => {
-    const seeded = await seedDemoAccounts();
-    expect(seeded.buyer.identifier).toBe('+233545009046');
-    expect(seeded.ops.identifier).toBe('ops@aqualink.gh');
-    expect(seeded.buyer.password).not.toBe(seeded.ops.password);
-    expect(listAccounts()).toHaveLength(2);
-
-    await expect(authenticateWithPassword('ops@aqualink.gh', seeded.ops.password)).resolves.toMatchObject({ ok: true });
+describe('account provisioning', () => {
+  test('no account is invented on first run', () => {
+    // The old behaviour seeded a buyer and an ops account and printed both
+    // passwords on the sign-in page, which published a real admin credential to
+    // anyone who loaded the app. Nothing may be created implicitly now.
+    expect(listAccounts()).toEqual([]);
+    expect(readValue('accounts.seeded')).toBeUndefined();
   });
 
-  test('is idempotent', async () => {
-    await seedDemoAccounts();
-    await expect(seedDemoAccounts()).resolves.toBeNull();
-    expect(listAccounts()).toHaveLength(2);
+  test('registering creates exactly the one account asked for', async () => {
+    await registerAccount({ identifier: '0544007788', role: 'buyer', displayName: 'Ama Serwaa' });
+    const accounts = listAccounts();
+    expect(accounts).toHaveLength(1);
+    expect(accounts[0].identifier).toBe('+233544007788');
+    expect(accounts[0].role).toBe('buyer');
   });
 
-  test('never persists the generated passwords in plaintext', async () => {
-    const seeded = await seedDemoAccounts();
+  test('a registered password is hashed, never stored in the clear', async () => {
+    await registerAccount({ identifier: 'ops@aqualink.gh', role: 'ops', displayName: 'Operations', password: 'a-long-enough-password' });
     const raw = JSON.stringify(listAccounts());
-    expect(raw).not.toContain(seeded.ops.password);
-    expect(raw).not.toContain(seeded.buyer.password);
-    expect(readValue('accounts.seeded')).toBe(true);
+    expect(raw).not.toContain('a-long-enough-password');
+    expect(listAccounts()[0].passwordHash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  test('a registered password actually authenticates', async () => {
+    await registerAccount({ identifier: 'ops@aqualink.gh', role: 'ops', password: 'a-long-enough-password' });
+    await expect(authenticateWithPassword('ops@aqualink.gh', 'a-long-enough-password')).resolves.toMatchObject({ ok: true });
   });
 });
 

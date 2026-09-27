@@ -350,37 +350,25 @@ export async function completePhoneSignIn({ identifier, challenge, code, secret 
   return { ok: true, account: recordSuccess(account) };
 }
 
-/* ------------------------------------------------------------------ */
-/* Demo seed data                                                       */
-/* ------------------------------------------------------------------ */
-
 /**
- * Creates the starter accounts on first run so the app is usable immediately.
- * Passwords are generated here and returned once so the UI can reveal them; they
- * are never stored in plaintext.
+ * Create the operator's first admin account.
+ *
+ * This used to be `seedDemoAccounts`, which invented a buyer and an ops account
+ * on every first run and printed both passwords on the sign-in page. That is not
+ * a demo convenience, it is a published admin credential: anyone who loaded the
+ * app could read it and reach the operations console, the pricing controls, and
+ * the seller approval queue.
+ *
+ * There is no replacement that keeps a credential in the browser. The ops
+ * account is created server-side by the `apiBootstrapOps` function from a secret
+ * the operator sets in the environment, and the browser only ever sees the
+ * resulting session. If you need an account in development, register normally.
  */
-export async function seedDemoAccounts() {
-  if (readValue('accounts.seeded', false)) return null;
-
-  const buyerPassword = generatePassword({ length: 16 });
-  const opsPassword = generatePassword({ length: 20 });
-
-  const buyer = await createAccount({
-    identifier: '0545009046',
-    role: 'buyer',
-    displayName: 'Alex K.',
-    password: buyerPassword,
-  });
-  const ops = await createAccount({
-    identifier: 'ops@aqualink.gh',
-    role: 'ops',
-    displayName: 'Operations',
-    password: opsPassword,
-  });
-
-  writeValue('accounts.seeded', true);
-  return {
-    buyer: { identifier: buyer.identifier, displayName: buyer.displayName, password: buyerPassword },
-    ops: { identifier: ops.identifier, displayName: ops.displayName, password: opsPassword },
-  };
+export async function registerAccount({
+  identifier,
+  role = 'buyer',
+  displayName = '',
+  password,
+}) {
+  return createAccount({ identifier, role, displayName, password });
 }

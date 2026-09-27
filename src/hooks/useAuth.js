@@ -13,7 +13,6 @@ import {
   findAccount,
   formatPhoneForDisplay,
   listAccounts,
-  seedDemoAccounts,
   validateIdentifier,
 } from '../lib/accounts';
 import { persistedState, readValue, writeValue } from '../lib/storage';
@@ -41,9 +40,8 @@ export function useAuth() {
   const [role, setRole] = useState('buyer');
   const [notice, setNotice] = useState('');
   const [session, setSession] = useState(persistedState('session', null));
-  const [email, setEmail] = useState('alex@example.com');
+  const [email, setEmail] = useState('');
   const [available, setAvailable] = useState(true);
-  const [demoCredentials, setDemoCredentials] = useState(null);
   const [ready, setReady] = useState(false);
 
   // Phone sign-in state.
@@ -62,19 +60,12 @@ export function useAuth() {
   const [sellerApproved, setSellerApproved] = useState(persistedState('auth.seller', false));
   const [sellerCode, setSellerCode] = useState(() => readValue('seller.code', ''));
 
-  // Creates the starter accounts on first run and reveals their passwords once.
+  // Ready once the local registry has been read. There is no seeding step: the
+  // app no longer invents accounts, so there is nothing to create on first run.
   useEffect(() => {
     let cancelled = false;
-    seedDemoAccounts()
-      .then((seeded) => {
-        if (!cancelled && seeded) setDemoCredentials(seeded);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          syncUsers(listAccounts());
-          setReady(true);
-        }
-      });
+    syncUsers(listAccounts());
+    if (!cancelled) setReady(true);
     return () => {
       cancelled = true;
     };
@@ -408,8 +399,6 @@ export function useAuth() {
     phoneCode,
     phoneIdentifier,
     signInError,
-
-    demoCredentials,
 
     authStep,
     email,
