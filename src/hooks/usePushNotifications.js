@@ -3,6 +3,31 @@ import { messaging } from '../lib/firebase';
 import { getToken, onMessage, deleteToken } from 'firebase/messaging';
 
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
+const API_BASE = import.meta.env.VITE_API_BASE || '/api';
+
+async function syncTokenToServer(userId, token, platform = 'web') {
+  try {
+    await fetch(`${API_BASE}/fcmToken`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, token, platform }),
+    });
+  } catch (err) {
+    console.warn('Failed to sync FCM token to server:', err);
+  }
+}
+
+async function revokeTokenOnServer(token) {
+  try {
+    await fetch(`${API_BASE}/fcmTokenDelete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+  } catch (err) {
+    console.warn('Failed to revoke FCM token on server:', err);
+  }
+}
 
 export function usePushNotifications() {
   const [token, setToken] = useState(null);
@@ -48,6 +73,8 @@ export function usePushNotifications() {
     if (!messaging) return;
     try {
       await deleteToken(messaging);
+      const oldToken = localStorage.getItem('fcm_token');
+      if (oldToken) await revokeTokenOnServer(oldToken);
       setToken(null);
       localStorage.removeItem('fcm_token');
     } catch (err) {
@@ -80,16 +107,14 @@ export function usePushNotifications() {
     return () => unsubscribe();
   }, []);
 
-  return { token, permission, error, requestPermission, revokeToken };
+  return { token, permission, error, requestPermission, revokeToken, syncTokenToServer };
 }
 
 export function useFCMTokenSync(userId) {
-  const { token } = usePushNotifications();
+  const { token, syncTokenToServer } = usePushNotifications();
 
   useEffect(() => {
     if (!userId || !token) return;
-    // Sync token to Firestore for server-side sending
-    // This would typically call a Cloud Function or update user document
-    console.log('Syncing FCM token for user:', userId, token);
-  }, [userId, token]);
+    syncTokenToServer(userId, token);
+  }, [userId, token, syncTokenToServer]);
 }

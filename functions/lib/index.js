@@ -20,3 +20,12 @@ export {
   normaliseMsisdn,
   verifyPaystackSignature,
 } from './verify.js';
+
+export {
+  sendPushToUser,
+  storeFcmToken,
+  deactivateFcmToken,
+  notifyOrderStatusChange,
+  notifySellerNewOrder,
+  notifyDriverAssignment,
+} from './fcm.js';

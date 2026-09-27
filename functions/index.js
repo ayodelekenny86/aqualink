@@ -27,6 +27,7 @@ import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypt
 
 import { DEFAULT_PRICING, DEFAULT_SPLIT, checkSettlement, newReference, priceOrder, verifyPaystackSignature } from './lib/index.js';
 import { bearerToken, signOpsToken, validatePricingInput, verifyOpsToken } from './lib/session.js';
+import { sendPushToUser, storeFcmToken, deactivateFcmToken, notifyOrderStatusChange } from './lib/fcm.js';
 
 setGlobalOptions({ region: 'europe-west1', maxInstances: 10 });
 
@@ -524,6 +525,8 @@ export const apiCreateOrder = onRequest(async (req, res) => {
     };
 
     await db.collection(COLLECTIONS.orders).doc(orderId).set(order);
+    // Notify available sellers of new order (fire-and-forget)
+    notifySellerNewOrder(order).catch((err) => logger.warn('seller notification failed', err));
     return res.status(201).json({ order: { ...order, createdAt: new Date().toISOString() } });
   } catch (error) {
     logger.error('create order failed', error);
@@ -642,11 +645,14 @@ export const apiVerifyPayment = onRequest({ secrets: [PAYSTACK_SECRET_KEY] }, as
     const verdict = checkSettlement({ transaction, order, currency: order.currency ?? CURRENCY });
 
     if (verdict.settled && order.status !== 'Paid') {
+      const oldStatus = order.status;
       await orderDoc.update({
         status: 'Paid',
         paidAt: transaction.paid_at ?? null,
         paystackChannel: transaction.channel ?? null,
       });
+      // Send push notification for status change
+      await notifyOrderStatusChange({ ...order, status: 'Paid' }, oldStatus);
     }
 
     return res.status(200).json({
@@ -728,11 +734,14 @@ export const apiPaystackWebhook = onRequest({ secrets: [PAYSTACK_SECRET_KEY] }, 
         });
 
         if (verdict.settled && order.status !== 'Paid') {
+          const oldStatus = order.status;
           await orderDoc.update({
             status: 'Paid',
             paidAt: event.data.paid_at ?? null,
             paystackChannel: event.data.channel ?? null,
           });
+          // Send push notification for status change
+          await notifyOrderStatusChange({ ...order, status: 'Paid' }, oldStatus);
           logger.info('order marked paid from webhook', { orderId: order.id, reference });
         } else {
           logger.warn('webhook did not settle the order', { orderId: order.id, reason: verdict.reason });
@@ -806,6 +815,84 @@ export const apiBootstrapOps = onRequest({ secrets: [OPS_BOOTSTRAP_TOKEN, OPS_AD
   } catch (error) {
     logger.error('ops bootstrap failed', error);
     return fail(res, 500, 'bootstrap_failed', 'Could not create the ops account.');
+  }
+});
+
+/* ----------------------------------------------------------- FCM tokens */
+
+export const apiFcmToken = onRequest(async (req, res) => {
+  applyCors(req, res);
+  if (req.method === 'OPTIONS') return res.status(204).send('');
+  if (req.method !== 'POST') return fail(res, 405, 'method_not_allowed', 'Use POST.');
+
+  try {
+    const body = await readJson(req);
+    const userId = String(body.userId ?? '').trim();
+    const token = String(body.token ?? '').trim();
+    const platform = String(body.platform ?? 'web');
+
+    if (!userId || !token) {
+      return fail(res, 400, 'missing_fields', 'userId and token are required.');
+    }
+
+    await storeFcmToken(userId, token, platform);
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    logger.error('fcm token store failed', error);
+    return fail(res, 500, 'token_failed', 'Could not store FCM token.');
+  }
+});
+
+export const apiFcmTokenDelete = onRequest(async (req, res) => {
+  applyCors(req, res);
+  if (req.method === 'OPTIONS') return res.status(204).send('');
+  if (req.method !== 'POST') return fail(res, 405, 'method_not_allowed', 'Use POST.');
+
+  try {
+    const body = await readJson(req);
+    const token = String(body.token ?? '').trim();
+
+    if (!token) {
+      return fail(res, 400, 'missing_token', 'Token is required.');
+    }
+
+    await deactivateFcmToken(token);
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    logger.error('fcm token delete failed', error);
+    return fail(res, 500, 'token_failed', 'Could not remove FCM token.');
+  }
+});
+
+/* ------------------------------------------------------------ test notify */
+
+export const apiTestNotification = onRequest({ secrets: [OPS_SESSION_SECRET] }, async (req, res) => {
+  applyCors(req, res);
+  if (req.method === 'OPTIONS') return res.status(204).send('');
+  if (req.method !== 'POST') return fail(res, 405, 'method_not_allowed', 'Use POST.');
+
+  const operator = requireOps(req, res);
+  if (!operator) return undefined;
+
+  try {
+    const body = await readJson(req);
+    const userId = String(body.userId ?? '').trim();
+    const title = String(body.title ?? 'Test Notification');
+    const bodyText = String(body.body ?? 'This is a test push notification from AquaLink.');
+
+    if (!userId) {
+      return fail(res, 400, 'missing_user', 'userId is required.');
+    }
+
+    const result = await sendPushToUser(userId, {
+      notification: { title, body: bodyText },
+      data: { type: 'test' },
+    });
+
+    return res.status(200).json({ success: true, result });
+  } catch (error) {
+    logger.error('test notification failed', error);
+    return fail(res, 500, 'notify_failed', 'Could not send test notification.');
   }
 });
 

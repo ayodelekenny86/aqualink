@@ -6,7 +6,7 @@ import useBooking from './hooks/useBooking';
 import useAquaAi, { aiQuickActions } from './hooks/useAquaAi';
 import useReports from './hooks/useReports';
 import useNotifications from './hooks/useNotifications';
-import { usePushNotifications } from './hooks/usePushNotifications';
+import { usePushNotifications, useFCMTokenSync } from './hooks/usePushNotifications';
 import { formatPhoneForDisplay, normalizePhone } from './lib/accounts';
 import { seedProducts } from './lib/collections';
 import { formatCedi } from './lib/money';
@@ -127,6 +127,10 @@ function App() {
   const { downloadReport } = useReports({ region, orders, onNotice: showNotice });
 
   const { requestPermission } = usePushNotifications();
+
+  // Sync FCM token for authenticated users
+  const userIdentifier = session?.identifier || email;
+  useFCMTokenSync(userIdentifier);
 
   // Request push notification permission when user is authenticated
   useEffect(() => {

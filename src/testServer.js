@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { DEFAULT_PRICING, DEFAULT_SPLIT, priceOrder } from '../functions/lib/index.js';
+import { DEFAULT_PRICING, DEFAULT_SPLIT, priceOrder } from '../functions/lib/pricing.js';
 
 /**
  * Stubs the AquaLink server for tests.
