@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import './App.css';
 import { languages, translations } from './data/translations';
 import useAuth from './hooks/useAuth';
@@ -8,10 +8,16 @@ import useReports from './hooks/useReports';
 import useNotifications from './hooks/useNotifications';
 import { formatPhoneForDisplay, normalizePhone } from './lib/accounts';
 import { seedProducts } from './lib/collections';
-import NotificationsPanel from './components/NotificationsPanel';
-import OrderDetailModal from './components/OrderDetailModal';
 import RevenueBreakdown from './components/RevenueBreakdown';
 import ContactButtons from './components/ContactButtons';
+import useAdminPricing from './hooks/useAdminPricing';
+
+// Admin-only and overlay surfaces load on demand. A buyer who never opens the
+// admin console never downloads it, which keeps the initial bundle small.
+const AdminPricingConsole = lazy(() => import('./components/AdminPricingConsole'));
+const PaymentPanel = lazy(() => import('./components/PaymentPanel'));
+const OrderDetailModal = lazy(() => import('./components/OrderDetailModal'));
+const NotificationsPanel = lazy(() => import('./components/NotificationsPanel'));
 
 const roles = [
   ['buyer', 'Buyer app', 'Book reliable water'],
@@ -53,11 +59,13 @@ function App() {
     forRole, unreadCount, notify, markRead, markAllRead,
   } = useNotifications();
 
+  const { pricing, split, publish, apply } = useAdminPricing({ onNotice: showNotice });
+
   const {
     orders, booking, updateBooking, requestDelivery, repeatBooking,
     savedAddresses, setSavedAddresses, driverUpdate, refreshDriverUpdate,
     updateOrderStatus, issueDeliveryCode, confirmDelivery, requestRefund,
-  } = useBooking({ email, onNotice: showNotice, notify });
+  } = useBooking({ email, onNotice: showNotice, notify, pricing, split });
 
   const { aiOpen, toggleAi, closeAi, aiInput, setAiInput, aiMessages, askAi } = useAquaAi({
     language,
@@ -112,6 +120,15 @@ function App() {
             onContactBuyer
           />
         )}
+        {ready && role === 'buyer' && buyerAuthenticated && (
+          <PaymentPanel
+            order={orders.find((order) => order.status === 'Confirmed') ?? orders[0]}
+            pricing={pricing}
+            split={split}
+            onPaid={(orderId) => { updateOrderStatus(orderId, 'Paid', notify); refreshDriverUpdate(); }}
+            showNotice={showNotice}
+          />
+        )}
         {ready && role === 'seller' && (sellerAuthenticated ? <SellerView available={available} setAvailable={setAvailable} showNotice={showNotice} orders={orders} updateOrderStatus={(id, status) => updateOrderStatus(id, status, notify)} issueDeliveryCode={issueDeliveryCode} sellerProfile={sellerProfile} setSellerProfile={setSellerProfile} /> : <SellerAccessGate sellerProfile={sellerProfile} setSellerProfile={setSellerProfile} onApproved={completeSellerApproval} issueCode={issueSellerCode} currentCode={sellerCode} />)}
         {role === 'seller' && <SellerFinance showNotice={showNotice} />}
         {role === 'seller' && <LiveAgentCard role="seller" showNotice={showNotice} />}
@@ -121,6 +138,7 @@ function App() {
         {ready && role === 'ops' && adminAuthenticated && <ReportActions downloadReport={downloadReport} />}
         {ready && role === 'ops' && adminAuthenticated && <OperationalRiskPanel />}
         {ready && role === 'ops' && adminAuthenticated && <RevenueFinance showNotice={showNotice} />}
+        {ready && role === 'ops' && adminAuthenticated && <AdminPricingConsole onNotice={showNotice} onPricingChange={(nextPricing, nextSplit) => publish(nextPricing, nextSplit)} />}
         </main>
     </div>
   );

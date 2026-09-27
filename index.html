@@ -9,27 +9,19 @@
       name="description"
       content="AquaLink is the trusted marketplace for booking, delivering, and managing water in Ghana."
     />
-    <link rel="apple-touch-icon" href="/logo192.png" />
     <!--
-      manifest.json provides metadata used when your web app is installed on a
-      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
+      Referrer and permissions are narrowed to what the app actually uses, and
+      the base-uri/origin guards blunt markup-injection and form-hijacking
+      attempts. The CSP is set per-response by the host (see firebase.json) so
+      it can be tightened in production without touching the markup.
     -->
-    <link rel="manifest" href="/manifest.json" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
     <title>AquaLink | Water delivery workspace</title>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
-    <!--
-      This HTML file is a template.
-      If you open it directly in the browser, you will see an empty page.
-
-      You can add webfonts, meta tags, or analytics to this file.
-      The build step will place the bundled scripts into the <body> tag.
-
-      To begin the development, run `npm start` or `yarn start`.
-      To create a production bundle, use `npm run build` or `yarn build`.
-    -->
     <script type="module" src="/src/index.jsx"></script>
   </body>
 </html>

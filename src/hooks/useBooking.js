@@ -3,7 +3,7 @@ import { generateBookingCode, generateConfirmationCode } from '../lib/secureCode
 import { list, replaceAll } from '../lib/collections';
 import { assignDriver, assignSeller } from '../lib/dispatch';
 import { getFleet, recordAssignment, seedFleet } from '../lib/fleet';
-import { toMinor, allocate, formatCedi } from '../lib/money';
+import { toMinor, allocate, formatCedi, quotePrice, DEFAULT_PRICING, DEFAULT_SPLIT } from '../lib/money';
 
 export const initialOrders = [
   { id: 'AQ-1048-2', code: 'AQ-1048-2', location: 'East Legon, Accra', volume: '2,000 gal', status: 'Delivered', payment: 'Released', date: 'Today, 09:42', price: 'GH₵250', confirmCode: '', driverName: 'Kojo Mensah', buyerName: 'Buyer', buyerPhone: '0544001122' },
@@ -23,7 +23,7 @@ const initialSavedAddresses = ['Home · East Legon, Accra', 'Office · Cantonmen
  * gets a checksummed `AQ-####-X` reference, and releasing escrow requires the
  * delivery confirmation code that the seller side generates when handing over.
  */
-export function useBooking({ email, onNotice, notify }) {
+export function useBooking({ email, onNotice, notify, pricing = DEFAULT_PRICING, split = DEFAULT_SPLIT }) {
   // Orders live in the shared `orders` collection so the buyer, seller and ops
   // workspaces all read one list rather than three divergent copies.
   const [orders, setOrders] = useState(() => {
@@ -63,6 +63,11 @@ export function useBooking({ email, onNotice, notify }) {
     // The app issues the reference itself, continuing from the highest in use.
     const reference = generateBookingCode(orders.map((order) => order.id));
     setBooking((current) => ({ ...current, location: '' }));
+
+    // Price comes from the admin's live pricing, not a hardcoded figure.
+    const priced = quotePrice(pricing);
+    const money = allocate(priced.totalMinor, split);
+
     commit((items) => [
       {
         id: reference,
@@ -72,8 +77,12 @@ export function useBooking({ email, onNotice, notify }) {
         status: 'Confirmed',
         payment: 'Held in escrow',
         date: 'Just now',
-        price: 'GH₵250',
-        grossMinor: toMinor(250),
+        price: formatCedi(priced.totalMinor),
+        listPrice: formatCedi(priced.listMinor),
+        discountPercent: pricing.discountPercent,
+        surgePercent: pricing.surgePercent,
+        grossMinor: priced.totalMinor,
+        chargedMinor: money.buyerPays,
         whatsapp: booking.whatsapp ?? '',
         confirmCode: '',
         buyerName: email ? `Buyer ${email}` : 'Buyer',
@@ -91,14 +100,14 @@ export function useBooking({ email, onNotice, notify }) {
     const seller = assignSeller({ order: dispatchable, sellers });
     recordAssignment(reference, { driver, seller });
 
-    const money = allocate(toMinor(250));
     const who = driver
       ? `${driver.candidate.name} (${driver.candidate.base.split(',')[0]}) is assigned`
       : 'a driver is being assigned';
-    onNotice(`Booking confirmed. Your reference is ${reference}. Service charge ${formatCedi(money.buyerServiceCharge)} applied. ${who}.`);
-    // Dispatchers need to see every new job, since assignment is automatic.
-    notify?.({ role: 'ops', title: `New order ${reference} · ${location}`, body: `${volume} · auto-assigned to ${who}.`, orderId: reference, kind: 'job' });
-  }, [booking, orders, onNotice, commit, notify]);
+    const surgeNote = priced.surgeMinor > 0 ? ` Surge ${formatCedi(priced.surgeMinor)} applied.` : '';
+    onNotice(`Booking confirmed. Your reference is ${reference}. Charged ${formatCedi(money.buyerPays)} including ${formatCedi(money.buyerServiceCharge)} service charge.${surgeNote} ${who}.`);
+    // Dispatchers need to see every new order, since assignment is automatic.
+    notify?.({ role: 'ops', title: `New order ${reference} · ${location}`, body: `${volume} · ${formatCedi(money.buyerPays)} · auto-assigned to ${who}.`, orderId: reference, kind: 'job' });
+  }, [booking, orders, onNotice, commit, notify, pricing, split]);
 
   const repeatBooking = useCallback((address) => {
     setBooking((current) => ({ ...current, location: address.replace(/^.* · /, '') }));

@@ -80,13 +80,15 @@ test('a driver in the delivery locality is preferred over one from another town'
   expect(order.driverName).toBe('Ama Boateng');
 });
 
-test('the service charge is quoted to the buyer at booking', async () => {
+test('the total charged and the service charge are both quoted to the buyer', async () => {
   const user = userEvent.setup();
   await signInAsBuyer(user);
   const notice = await bookWater(user);
 
-  const money = allocate(toMinor(250));
-  expect(notice).toHaveTextContent(new RegExp(money.buyerServiceCharge === 2500 ? '25.00' : String(money.buyerServiceCharge)));
+  // GH¢300 order value + 10% service charge = GH¢330 taken from the buyer.
+  const money = allocate(toMinor(300));
+  expect(notice).toHaveTextContent(formatCedi(money.buyerPays));
+  expect(notice).toHaveTextContent(formatCedi(money.buyerServiceCharge));
 });
 
 test('the order stores the gross value so payouts can be recomputed later', async () => {
@@ -95,8 +97,21 @@ test('the order stores the gross value so payouts can be recomputed later', asyn
   await bookWater(user);
 
   const order = list('orders').find((row) => row.status === 'Confirmed');
-  expect(order.grossMinor).toBe(25000);
-  expect(allocate(order.grossMinor).companyTake).toBe(8750);
+  // GH¢600 list less a 50% discount is GH¢300, and the buyer is charged GH¢330.
+  expect(order.grossMinor).toBe(30000);
+  expect(order.chargedMinor).toBe(33000);
+  expect(allocate(order.grossMinor).companyTake).toBe(15000);
+});
+
+test('an admin discount is reflected in what the buyer is charged', async () => {
+  const user = userEvent.setup();
+  await signInAsBuyer(user);
+  await bookWater(user);
+
+  const order = list('orders').find((row) => row.status === 'Confirmed');
+  expect(order.listPrice).toBe('GH₵600.00');
+  expect(order.price).toBe('GH₵300.00');
+  expect(order.discountPercent).toBe(50);
 });
 
 test('dispatchers are notified of the new order', async () => {
@@ -141,6 +156,7 @@ test('no driver-side app is offered in the workspace switcher', async () => {
 });
 
 test('the driver payout is quoted correctly for the order value', async () => {
-  const money = allocate(toMinor(250));
-  expect(formatCedi(money.driverReceives)).toBe('GH₵12.50');
+  // 15% of the discounted GH¢300 order value.
+  const money = allocate(toMinor(300));
+  expect(formatCedi(money.driverReceives)).toBe('GH₵45.00');
 });

@@ -43,18 +43,29 @@ export function formatCedi(minor) {
 }
 
 /**
- * The revenue plan.
+ * The default commercial plan.
  *
- * `buyerServiceCharge` is charged to the buyer **on top of** the order value;
- * the other three shares divide the order value itself and must sum to 100.
+ * The buyer sees a 50% discount off list price, so a GH¢600 list price is sold
+ * at GH¢300. A 10% service charge is added on top of that, making GH¢330 the
+ * amount taken from the buyer, and the platform keeps 40% of the discounted
+ * price. The remaining shares divide the discounted price and must sum to 100.
+ *
  * `platformCommission + buyerServiceCharge` is the company's total take, which
  * is the number that matters for sustainability.
  */
 export const DEFAULT_SPLIT = {
   buyerServiceCharge: 10,
-  seller: 70,
-  driver: 5,
-  platformCommission: 25,
+  seller: 45,
+  driver: 15,
+  platformCommission: 40,
+};
+
+/** Pricing the admin controls: list price, the discount, and surge. */
+export const DEFAULT_PRICING = {
+  listPrice: 600,
+  discountPercent: 50,
+  surgePercent: 0,
+  surgeReason: '',
 };
 
 const SHARES_OF_ORDER_VALUE = ['seller', 'driver', 'platformCommission'];
@@ -148,4 +159,26 @@ export function effectiveTakeRate(split = DEFAULT_SPLIT) {
   validateSplit(split);
   const gross = 100;
   return allocate(gross, split).companyTake / allocate(gross, split).buyerPays * 100;
+}
+
+/**
+ * The price a buyer is quoted.
+ *
+ * Surge is applied to the discounted price, not the list price, so an admin
+ * raising surge during a dry spell raises the actual charge rather than
+ * inflating the discount back to nothing. Returns minor units throughout.
+ */
+export function quotePrice(pricing = DEFAULT_PRICING) {
+  const { listPrice = 0, discountPercent = 0, surgePercent = 0 } = pricing;
+
+  if (!Number.isFinite(listPrice) || listPrice < 0) throw new RangeError('List price cannot be negative.');
+  if (!Number.isFinite(discountPercent) || discountPercent < 0 || discountPercent > 100) {
+    throw new RangeError('Discount must be between 0% and 100%.');
+  }
+  if (!Number.isFinite(surgePercent) || surgePercent < 0) throw new RangeError('Surge cannot be negative.');
+
+  const listMinor = toMinor(listPrice);
+  const discounted = Math.round((listMinor * (100 - discountPercent)) / 100);
+  const surge = Math.round((discounted * surgePercent) / 100);
+  return { listMinor, discounted, surge, surgeMinor: surge, totalMinor: discounted + surge };
 }

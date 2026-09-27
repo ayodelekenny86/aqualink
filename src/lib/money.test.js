@@ -1,10 +1,12 @@
 import { describe, expect, test } from 'vitest';
 import {
+  DEFAULT_PRICING,
   DEFAULT_SPLIT,
   allocate,
   effectiveTakeRate,
   formatCedi,
   grossFromBuyerCharge,
+  quotePrice,
   toMajor,
   toMinor,
   validateSplit,
@@ -60,11 +62,16 @@ describe('allocation', () => {
     const result = allocate(toMinor(100));
     expect(result.gross).toBe(10000);
     expect(result.buyerPays).toBe(11000);
-    expect(result.sellerReceives).toBe(7000);
-    expect(result.driverReceives).toBe(500);
+    expect(result.sellerReceives).toBe(4500);
+    expect(result.driverReceives).toBe(1500);
     expect(result.buyerServiceCharge).toBe(1000);
-    expect(result.platformCommission).toBe(2500);
-    expect(result.companyTake).toBe(3500);
+    expect(result.platformCommission).toBe(4000);
+    expect(result.companyTake).toBe(5000);
+  });
+
+  test('the company take is 40% commission plus the 10% buyer charge', () => {
+    const result = allocate(toMinor(100));
+    expect(result.companyTake).toBe(result.platformCommission + result.buyerServiceCharge);
   });
 
   test('what the buyer pays equals the gross plus the service charge', () => {
@@ -112,12 +119,52 @@ describe('round trips and take rate', () => {
   });
 
   test('the company take rate is reported against what the buyer pays', () => {
-    // 35 of every 110 the buyer hands over = 31.82%.
-    expect(effectiveTakeRate()).toBeCloseTo(31.818, 2);
+    // 50 of every 110 the buyer hands over = 45.45%.
+    expect(effectiveTakeRate()).toBeCloseTo(45.4545, 3);
   });
 
   test('a zero-fee plan has a take rate equal to its commission', () => {
-    const noFee = { buyerServiceCharge: 0, seller: 70, driver: 5, platformCommission: 25 };
-    expect(effectiveTakeRate(noFee)).toBeCloseTo(25, 6);
+    const noFee = { buyerServiceCharge: 0, seller: 45, driver: 15, platformCommission: 40 };
+    expect(effectiveTakeRate(noFee)).toBeCloseTo(40, 6);
+  });
+});
+
+describe('price formation', () => {
+  test('a 50% discount turns a 600 cedi list price into a 300 cedi order', () => {
+    const quote = quotePrice({ listPrice: 600, discountPercent: 50, surgePercent: 0 });
+    expect(quote.listMinor).toBe(60000);
+    expect(quote.discounted).toBe(30000);
+    expect(quote.totalMinor).toBe(30000);
+  });
+
+  test('surge is applied to the discounted price, not the list price', () => {
+    // 300 discounted + 20% surge = 360, not 600 + 20% = 720.
+    const quote = quotePrice({ listPrice: 600, discountPercent: 50, surgePercent: 20 });
+    expect(quote.surgeMinor).toBe(6000);
+    expect(quote.totalMinor).toBe(36000);
+  });
+
+  test('a 100% discount is a free order rather than a negative one', () => {
+    const quote = quotePrice({ listPrice: 600, discountPercent: 100, surgePercent: 0 });
+    expect(quote.totalMinor).toBe(0);
+  });
+
+  test('rejects a discount outside 0-100%', () => {
+    expect(() => quotePrice({ listPrice: 600, discountPercent: 120 })).toThrow(RangeError);
+    expect(() => quotePrice({ listPrice: 600, discountPercent: -5 })).toThrow(RangeError);
+  });
+
+  test('rejects a negative list price or surge', () => {
+    expect(() => quotePrice({ listPrice: -1 })).toThrow(RangeError);
+    expect(() => quotePrice({ listPrice: 600, surgePercent: -10 })).toThrow(RangeError);
+  });
+
+  test('the admin default plan quotes 300 and charges 330', () => {
+    const quote = quotePrice(DEFAULT_PRICING);
+    const money = allocate(quote.totalMinor, DEFAULT_SPLIT);
+    expect(formatCedi(quote.totalMinor)).toBe('GH₵300.00');
+    expect(formatCedi(money.buyerPays)).toBe('GH₵330.00');
+    expect(formatCedi(money.driverReceives)).toBe('GH₵45.00');
+    expect(formatCedi(money.companyTake)).toBe('GH₵150.00');
   });
 });
