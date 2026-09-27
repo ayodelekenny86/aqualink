@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from 'vitest';
 import {
+  ACCOUNT_PROVIDERS,
   ACCOUNT_ROLES,
   LOCKOUT_MS,
   MAX_FAILED_ATTEMPTS,
@@ -299,5 +300,53 @@ describe('demo seed', () => {
     expect(raw).not.toContain(seeded.ops.password);
     expect(raw).not.toContain(seeded.buyer.password);
     expect(readValue('accounts.seeded')).toBe(true);
+  });
+});
+
+describe('provider-backed accounts', () => {
+  test('a Google account stores no password at all', async () => {
+    const account = await createAccount({
+      identifier: 'Ama.Serwaa@Gmail.com',
+      role: 'buyer',
+      displayName: 'Ama Serwaa',
+      provider: 'google',
+      providerSubject: '1234567890',
+    });
+
+    // A Google account is authenticated by Google. Storing any secret here would
+    // be a credential nobody uses but that a reset flow could clobber.
+    expect(account.passwordHash).toBeNull();
+    expect(account.passwordSalt).toBeNull();
+    expect(account.provider).toBe('google');
+    expect(account.providerSubject).toBe('1234567890');
+  });
+
+  test('a Google email is normalized so sign-in finds the same account', async () => {
+    await createAccount({ identifier: 'Ama.Serwaa@Gmail.com', provider: 'google', providerSubject: '1' });
+    const found = findAccount('ama.serwaa@gmail.com');
+    expect(found).not.toBeNull();
+    expect(found.identifier).toBe('ama.serwaa@gmail.com');
+  });
+
+  test('a provider account cannot be given a password', async () => {
+    // Guards the invariant: password storage is the 'local' provider's job only.
+    await expect(createAccount({
+      identifier: 'kwame@gmail.com',
+      provider: 'google',
+      password: 'correct horse battery',
+    })).rejects.toThrow(/local accounts may store a password/i);
+  });
+
+  test('an unknown provider is rejected', async () => {
+    await expect(createAccount({ identifier: 'kwame@gmail.com', provider: 'facebook' }))
+      .rejects.toThrow(/unknown sign-in provider/i);
+    expect(ACCOUNT_PROVIDERS).toEqual(['local', 'google']);
+  });
+
+  test('a local account still owns a hashed password', async () => {
+    const account = await createAccount({ identifier: 'kwame@gmail.com', password: 'correct horse battery' });
+    expect(account.passwordHash).toBeTruthy();
+    expect(account.passwordSalt).toBeTruthy();
+    expect(account.passwordHash).not.toContain('correct horse battery');
   });
 });

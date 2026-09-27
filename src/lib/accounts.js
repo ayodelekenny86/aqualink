@@ -23,6 +23,8 @@ import { readValue, writeValue } from './storage';
 
 const ACCOUNTS_KEY = 'accounts.list';
 export const ACCOUNT_ROLES = ['buyer', 'seller', 'institution', 'ops'];
+/** How an account proves its identity. 'local' owns a password; the rest delegate. */
+export const ACCOUNT_PROVIDERS = ['local', 'google'];
 export const MAX_FAILED_ATTEMPTS = 5;
 export const LOCKOUT_MS = 5 * 60 * 1000;
 
@@ -167,9 +169,12 @@ export async function createAccount({
   displayName = '',
   password,
   status = 'active',
+  provider = 'local',
+  providerSubject = null,
   now = Date.now(),
 } = {}) {
   if (!ACCOUNT_ROLES.includes(role)) throw new ValidationError('Unknown account role.', 'role');
+  if (!ACCOUNT_PROVIDERS.includes(provider)) throw new ValidationError('Unknown sign-in provider.', 'provider');
   const { type, normalized } = validateIdentifier(identifier);
 
   if (listAccounts().some((account) => account.identifier === normalized)) {
@@ -183,7 +188,14 @@ export async function createAccount({
     role,
     displayName: displayName.trim(),
     status,
-    // Phone accounts sign in with a one-time code, so they need no stored secret.
+    // How this account proves who it is: 'local' owns a password, 'google' owns
+    // a verified provider subject. Recorded so the two can be linked later and
+    // so no code has to guess which credential is authoritative.
+    provider,
+    providerSubject,
+    // Phone and Google accounts sign in through their provider, so they keep no
+    // stored secret. Inventing a random password here would only create a fake
+    // secret that looks real and could be "reset" into a broken state later.
     passwordSalt: null,
     passwordHash: null,
     failedAttempts: 0,
@@ -195,6 +207,10 @@ export async function createAccount({
   if (password !== undefined && password !== null) {
     if (String(password).length < 8) {
       throw new ValidationError('Passwords must be at least 8 characters.', 'password');
+    }
+    // A local account is the only kind that may own a password.
+    if (provider !== 'local') {
+      throw new ValidationError('Only local accounts may store a password.', 'provider');
     }
     account.passwordSalt = generateSalt();
     account.passwordHash = await hashPassword(password, account.passwordSalt);

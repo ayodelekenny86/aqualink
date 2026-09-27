@@ -193,6 +193,25 @@ button { cursor: pointer; }
 .demo-credentials { display: grid; gap: 4px; padding: 12px 14px; background: #f5eff9; border: 1px solid #dfd1e9; border-radius: 5px; }
 .demo-credentials strong { font-size: 12px; }
 .demo-credentials small { color: var(--muted); font-size: 9px; }
+
+/* Google sign-in. The unconfigured state is deliberately prominent: it is the
+   only thing standing between a missing env var and a button that cannot work. */
+.google-signin { display: grid; gap: 10px; margin-top: 18px; }
+.google-signin.unconfigured { padding: 14px 16px; background: #fdf6ec; border: 1px solid #e6cfa6; border-radius: 5px; }
+.google-signin.unconfigured strong { font-size: 12px; color: #8a5a15; }
+.google-signin.unconfigured p { margin: 6px 0 0; color: var(--muted); font-size: 9px; line-height: 1.6; }
+.google-signin.unconfigured code { font-family: 'DM Mono', monospace; background: #f3e6d2; padding: 1px 4px; border-radius: 3px; }
+.google-signin .divider { display: flex; align-items: center; gap: 10px; margin: 0; color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .12em; }
+.google-signin .divider::before, .google-signin .divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.google-button { display: flex; align-items: center; justify-content: center; gap: 9px; width: 100%; padding: 12px; background: #fff; color: #1f2933; border: 1px solid #c9d3da; border-radius: 5px; font-family: inherit; font-size: 11px; font-weight: 700; letter-spacing: .04em; cursor: pointer; }
+.google-button:hover:not(:disabled) { background: #f6f8fa; border-color: #a9b6c0; }
+.google-button:disabled { opacity: .6; cursor: progress; }
+.google-note { color: var(--muted); font-size: 9px; text-align: center; }
+.gate-error { margin: 0; color: #a55752; font-size: 10px; font-weight: 600; }
+
+@media (hover: none) {
+  .google-button:hover:not(:disabled) { background: #fff; border-color: #c9d3da; }
+}
 .demo-credentials code { font-family: 'DM Mono', monospace; font-size: 10px; color: #4e3c60; word-break: break-all; }
 .confirm-row { display: inline-flex; gap: 6px; align-items: center; margin-top: 6px; }
 .confirm-row input { width: 130px; padding: 6px 8px; font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: .08em; border: 1px solid #cddbd8; border-radius: 3px; }
@@ -284,4 +303,59 @@ button { cursor: pointer; }
   .revenue-row { flex-wrap: wrap; }
   .revenue-row > em { min-width: 0; width: 100%; text-align: left; }
   .revenue-breakdown { padding: 16px; }
+}
+
+/* ---------- Admin pricing control ---------- */
+.admin-pricing { padding: 22px; margin-top: 18px; }
+.admin-pricing .panel-title p { margin: 6px 0 0; font-size: 13px; color: #6c7d7b; }
+.admin-pricing-actions { display: flex; gap: 9px; flex-wrap: wrap; }
+.pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 18px; margin-top: 18px; }
+.pricing-grid fieldset { border: 1px solid #e6eceb; border-radius: 13px; padding: 15px 16px; display: flex; flex-direction: column; gap: 11px; }
+.pricing-grid legend { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: #0f6b62; padding: 0 6px; }
+.pricing-grid label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: #3d5150; }
+.pricing-grid input { padding: 8px 11px; border: 1px solid #dbe4e3; border-radius: 9px; font-size: 14px; }
+.pricing-grid input:focus-visible { outline: 2px solid #128c7e; outline-offset: 1px; }
+.field-error { color: #b3261e; font-size: 11.5px; }
+.split-total { margin: 2px 0 0; font-size: 12px; font-weight: 600; color: #0d7a4f; }
+.split-total.invalid { color: #b3261e; }
+.pricing-preview { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.pricing-preview div { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
+.pricing-preview dt { color: #6c7d7b; }
+.pricing-preview dd { margin: 0; font-weight: 600; color: #16333a; }
+.pricing-preview .highlight { border-top: 2px solid #16333a; padding-top: 9px; }
+.pricing-preview .highlight dd { color: #0f6b62; font-size: 16px; }
+
+/* ---------- Payments and receipts ---------- */
+.payment-panel { padding: 22px; margin-top: 18px; }
+.mode-pill { font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; padding: 4px 11px; border-radius: 999px; }
+.mode-pill.demo { background: #fff3d6; color: #8a5a00; border: 1px solid #f0c674; }
+.mode-pill.live { background: #dff5e8; color: #0d7a4f; border: 1px solid #7fce9f; }
+.demo-notice { margin: 12px 0 0; padding: 10px 13px; background: #fff8e8; border: 1px solid #f0c674; border-radius: 10px; font-size: 12.5px; color: #7a4b00; line-height: 1.5; }
+.payment-summary { margin: 16px 0; display: flex; flex-direction: column; gap: 7px; }
+.payment-summary div { display: flex; justify-content: space-between; font-size: 13.5px; color: #5d6f6d; }
+.payment-summary dt { color: #5d6f6d; }
+.payment-summary dd { margin: 0; font-weight: 600; color: #16333a; }
+.payment-summary .total { border-top: 2px solid #16333a; padding-top: 9px; font-size: 16px; }
+.payment-summary .total dd { color: #0f6b62; }
+.payment-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; align-items: end; }
+.payment-form label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: #3d5150; }
+.payment-form input, .payment-form select { padding: 9px 12px; border: 1px solid #dbe4e3; border-radius: 9px; font-size: 14px; }
+.receipt-card { margin-top: 16px; padding: 16px; border: 1px solid #cfe3dd; border-radius: 12px; background: #f4fbf9; }
+.receipt-card h3 { margin: 0 0 4px; font-size: 15px; }
+.demo-tag { display: inline-block; margin: 0 0 10px; font-size: 11px; font-weight: 700; color: #8a5a00; background: #fff3d6; border-radius: 999px; padding: 3px 10px; }
+.receipt-card dl { margin: 0 0 12px; display: flex; flex-direction: column; gap: 6px; }
+.receipt-card dl div { display: flex; justify-content: space-between; font-size: 13px; }
+.receipt-card dt { color: #6c7d7b; }
+.receipt-card dd { margin: 0; font-weight: 600; }
+.receipt-history { margin-top: 16px; }
+.receipt-history h3 { font-size: 13px; margin: 0 0 8px; }
+.receipt-history ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.receipt-history li { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 12.5px; color: #5d6f6d; padding: 7px 0; border-top: 1px solid #eef2f1; }
+.lazy-fallback { min-height: 120px; }
+
+@media (max-width: 650px) {
+  .admin-pricing, .payment-panel { padding: 16px; }
+  .admin-pricing-actions { width: 100%; }
+  .admin-pricing-actions button { flex: 1; }
+  .payment-form { grid-template-columns: 1fr; }
 }
