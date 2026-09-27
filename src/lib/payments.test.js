@@ -248,6 +248,23 @@ describe('secret handling', () => {
     expect(source).not.toMatch(/api\.paystack\.co/);
     expect(source).not.toMatch(/sk_(live|test)_/);
     expect(source).not.toMatch(/PAYSTACK_SECRET/);
-    expect(source).not.toMatch(/Authorization/);
+    expect(source).not.toMatch(/OPS_SESSION_SECRET/);
+  });
+
+  test('the client authenticates to its own API and never to a payment provider', async () => {
+    const source = await readFile('src/lib/payments.js', 'utf8');
+
+    // The client now sends a bearer token for operator calls, which is correct:
+    // the server is what decides what an operator may do. What it must never do
+    // is send credentials anywhere but first-party /api, so this checks that
+    // every authenticated call goes through `apiRequest` (the /api helper)
+    // rather than at a URL built from somewhere else.
+    const authenticatedCalls = source.match(/Authorization/g) ?? [];
+    expect(authenticatedCalls).toHaveLength(1);
+
+    // And the only URLs this module builds are relative /api paths, so there is
+    // no absolute host an Authorization header could be leaked to.
+    const absoluteUrls = source.match(/['"`]https?:\/\/[^'"`]+/g) ?? [];
+    expect(absoluteUrls).toEqual([]);
   });
 });

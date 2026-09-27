@@ -15,6 +15,7 @@ import {
   listAccounts,
   validateIdentifier,
 } from '../lib/accounts';
+import { applyAsSeller, opsSignIn, sellerStatus } from '../lib/payments';
 import { persistedState, readValue, writeValue } from '../lib/storage';
 import { syncUsers } from '../lib/collections';
 
@@ -57,8 +58,15 @@ export function useAuth() {
 
   // Seller profile and approval.
   const [sellerProfile, setSellerProfileState] = useState(() => readValue('seller.profile', initialSellerProfile));
+  // A cached "approved" flag is only a hint so the workspace does not flash a
+  // sign-in prompt on every reload. It is re-confirmed against the server before
+  // it is trusted, and it is never what grants access on its own.
   const [sellerApproved, setSellerApproved] = useState(persistedState('auth.seller', false));
-  const [sellerCode, setSellerCode] = useState(() => readValue('seller.code', ''));
+  const [sellerApplicationId, setSellerApplicationId] = useState(() => readValue('seller.applicationId', null));
+
+  // The ops session token. Held in memory only: persisting it to localStorage
+  // would hand an XSS payload a valid admin credential for the token's lifetime.
+  const [opsToken, setOpsToken] = useState(null);
 
   // Ready once the local registry has been read. There is no seeding step: the
   // app no longer invents accounts, so there is nothing to create on first run.
@@ -108,6 +116,9 @@ export function useAuth() {
     setPhoneChallenge(null);
     setPhoneIdentifier('');
     setPhoneCode('');
+    // Dropping the operator token on sign-out means a shared machine does not
+    // leave a valid admin credential behind for the next person to find.
+    setOpsToken(null);
   }, []);
 
   /* ---------------------------------------------------------------- */
@@ -182,6 +193,19 @@ export function useAuth() {
       setSignInError(result.detail);
       return result;
     }
+
+    // An ops sign-in also has to satisfy the server, because the server decides
+    // what an operator may change. The local registry alone cannot grant that.
+    if (result.account.role === 'ops') {
+      try {
+        const session = await opsSignIn({ email: parsed.normalized, password });
+        setOpsToken(session.token);
+      } catch (error) {
+        setSignInError(error.message || 'The server would not accept this operator sign-in.');
+        return { ok: false, reason: 'ops-unauthorised' };
+      }
+    }
+
     startSession(result.account);
     showNotice(`Signed in as ${result.account.displayName || result.account.identifier}.`);
     return result;
@@ -264,47 +288,16 @@ export function useAuth() {
     writeValue('seller.profile', profile);
   }, []);
 
-  /** Issues the one-time approval code Ops would otherwise send by email. */
-  const issueSellerCode = useCallback(() => {
-    const code = `SEL-${generatePassword({ length: 12 }).replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()}`;
-    setSellerCode(code);
-    writeValue('seller.code', code);
-    showNotice(`Approval code ${code} issued. Share it with the seller to unlock the workspace.`);
-    return code;
-  }, [showNotice]);
-
-  const approveSeller = useCallback((code) => {
-    const expected = readValue('seller.code', '');
-    if (!expected) {
-      showNotice('Issue an approval code first.');
-      return { ok: false, reason: 'not-issued' };
-    }
-    if (String(code ?? '').trim().toUpperCase() !== expected.toUpperCase()) {
-      showNotice('That approval code does not match.');
-      return { ok: false, reason: 'mismatch' };
-    }
-    setSellerApproved(true);
-    writeValue('auth.seller', true);
-    showNotice('Seller approved. The seller workspace is now unlocked.');
-    return { ok: true };
-  }, [showNotice]);
-
   /**
-   * Verifies the approval code, makes sure a real seller account exists for the
-   * number on the application, and signs that account in. The seller workspace is
-   * therefore only reachable through a valid account, not just an approval.
+   * Submit this seller for review.
+   *
+   * This replaces an `issueSellerCode` helper that minted an `SEL-XXXXXXXX` code
+   * in the browser, displayed it on screen, and then accepted it on approval.
+   * Anyone who loaded the page could run it and unlock the workspace themselves,
+   * so the control was decorative. Nothing is unlocked here: the application is
+   * recorded on the server and only a signed-in operator can approve it.
    */
-  const completeSellerApproval = useCallback(async (code) => {
-    const expected = readValue('seller.code', '');
-    if (!expected) {
-      showNotice('Issue an approval code first.');
-      return { ok: false, reason: 'not-issued' };
-    }
-    if (String(code ?? '').trim().toUpperCase() !== expected.toUpperCase()) {
-      showNotice('That approval code does not match.');
-      return { ok: false, reason: 'mismatch' };
-    }
-
+  const applyForSellerApproval = useCallback(async () => {
     let parsed;
     try {
       parsed = validateIdentifier(sellerProfile.phone);
@@ -313,16 +306,104 @@ export function useAuth() {
       return { ok: false, reason: 'invalid-identifier' };
     }
     if (parsed.type !== 'phone') {
-      showNotice('Enter a valid phone number on the application before approving.');
+      showNotice('Enter a valid phone number on the application before applying.');
+      return { ok: false, reason: 'wrong-type' };
+    }
+    if (!sellerProfile.business?.trim()) {
+      showNotice('Add a business or trading name before applying.');
+      return { ok: false, reason: 'missing-business' };
+    }
+    if (!sellerProfile.vehicle?.trim()) {
+      showNotice('Add a vehicle registration before applying.');
+      return { ok: false, reason: 'missing-vehicle' };
+    }
+
+    try {
+      const result = await applyAsSeller({
+        phone: parsed.normalized,
+        business: sellerProfile.business.trim(),
+        vehicle: sellerProfile.vehicle.trim(),
+        capacity: sellerProfile.capacity,
+      });
+      setSellerApplicationId(result.applicationId);
+      writeValue('seller.applicationId', result.applicationId);
+      // An already-approved seller skips the wait, but only because the server
+      // said so.
+      if (result.status === 'approved') {
+        setSellerApproved(true);
+        writeValue('auth.seller', true);
+        showNotice('You are already approved as a seller.');
+        return { ok: true, account: null, approved: true };
+      }
+      showNotice('Application submitted. An operator has to approve it before the workspace opens.');
+      return { ok: true, account: null, approved: false };
+    } catch (error) {
+      showNotice(error.message || 'Could not submit the application.');
+      return { ok: false, reason: 'apply-failed' };
+    }
+  }, [sellerProfile, showNotice]);
+
+  /**
+   * Ask the server whether an application has been approved.
+   *
+   * The local `auth.seller` flag is only ever set from this answer, so the
+   * workspace cannot be unlocked by editing browser storage.
+   */
+  const refreshSellerApproval = useCallback(async () => {
+    const identifier = readValue('seller.profile.phone', '');
+    if (!identifier) return { ok: false, reason: 'no-phone' };
+
+    try {
+      const result = await sellerStatus(identifier);
+      const approved = result.status === 'approved';
+      setSellerApproved(approved);
+      if (approved) {
+        writeValue('auth.seller', true);
+        showNotice('Approved. The seller workspace is now unlocked.');
+      }
+      return { ok: true, status: result.status, approved };
+    } catch (error) {
+      showNotice(error.message || 'Could not read the application status.');
+      return { ok: false, reason: 'status-failed' };
+    }
+  }, [showNotice]);
+
+  /**
+   * Sign in a seller whose application the server has approved.
+   *
+   * Approval is confirmed against the server first, so possession of the phone
+   * number alone is not enough to reach the workspace.
+   */
+  const completeSellerApproval = useCallback(async () => {
+    let parsed;
+    try {
+      parsed = validateIdentifier(sellerProfile.phone);
+    } catch (error) {
+      showNotice(error.message);
+      return { ok: false, reason: 'invalid-identifier' };
+    }
+    if (parsed.type !== 'phone') {
+      showNotice('Enter a valid phone number on the application before signing in.');
       return { ok: false, reason: 'wrong-type' };
     }
 
-    // Approval is what creates the seller account, so an unknown number is
-    // expected here. An existing account must still be a seller.
     const existing = findAccount(parsed.normalized);
     if (existing && existing.role !== 'seller') {
       showNotice('That number already belongs to a different kind of account.');
       return { ok: false, reason: 'role-mismatch' };
+    }
+
+    let status;
+    try {
+      ({ status } = await sellerStatus(parsed.normalized));
+    } catch (error) {
+      showNotice(error.message || 'Could not confirm your approval.');
+      return { ok: false, reason: 'status-failed' };
+    }
+
+    if (status !== 'approved') {
+      showNotice('That application has not been approved yet.');
+      return { ok: false, reason: 'not-approved' };
     }
 
     const account = existing ?? await createAccount({
@@ -337,7 +418,7 @@ export function useAuth() {
     startSession(account);
     showNotice('Seller approved and signed in.');
     return { ok: true, account };
-  }, [sellerProfile, accountExists, startSession, showNotice]);
+  }, [sellerProfile, startSession, showNotice]);
 
   /**
    * Create (or sign in to) an account from a Google identity whose signature
@@ -399,6 +480,7 @@ export function useAuth() {
     phoneCode,
     phoneIdentifier,
     signInError,
+    opsToken,
 
     authStep,
     email,
@@ -410,9 +492,9 @@ export function useAuth() {
     sellerProfile,
     setSellerProfile,
     sellerApproved,
-    sellerCode,
-    issueSellerCode,
-    approveSeller,
+    sellerApplicationId,
+    applyForSellerApproval,
+    refreshSellerApproval,
     completeSellerApproval,
 
     available,

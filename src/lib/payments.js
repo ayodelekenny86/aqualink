@@ -48,11 +48,16 @@ function apiBase() {
   return API_ROOT;
 }
 
-async function apiRequest(path, { method = 'GET', body, signal } = {}) {
+async function apiRequest(path, { method = 'GET', body, signal, auth = null } = {}) {
   const response = await fetch(`${apiBase()}${path}`, {
     method,
     signal,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      // Only sent when there is a token, so unauthenticated calls carry no
+      // Authorization header at all rather than an empty one.
+      ...(auth ? { Authorization: `Bearer ${auth}` } : {}),
+    },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
 
@@ -67,7 +72,10 @@ async function apiRequest(path, { method = 'GET', body, signal } = {}) {
   if (!response.ok) {
     // The server's message is written for a customer, so prefer it over anything
     // generic. Fall back only when there is none.
-    throw new Error(payload.message || `The payments service is unavailable (${response.status}).`);
+    const error = new Error(payload.message || `The payments service is unavailable (${response.status}).`);
+    error.code = payload.code ?? null;
+    error.status = response.status;
+    throw error;
   }
   return payload;
 }
@@ -257,3 +265,72 @@ export function downloadReceipt(receipt) {
 }
 
 export { toMinor };
+
+/* --------------------------------------------------- operator and seller API */
+
+/**
+ * Sign an operator in and get a session token back.
+ *
+ * This is what replaced the old localStorage password check. The token is what
+ * proves to the server that a pricing change or a seller approval came from a
+ * real operator, so it must come from the server and not be manufactured here.
+ */
+export async function opsSignIn({ email, password }, { signal } = {}) {
+  const payload = await apiRequest('/ops/login', {
+    method: 'POST',
+    signal,
+    body: { email, password },
+  });
+  return { token: payload.token, email: payload.email, expiresInSeconds: payload.expiresInSeconds };
+}
+
+/**
+ * Publish a new price or revenue split.
+ *
+ * The server validates the change and rejects it if it would produce a nonsense
+ * price, so a typo here costs a round trip but cannot reach a customer.
+ */
+export async function updatePricing({ pricing, split, token }, { signal } = {}) {
+  return apiRequest('/pricing/update', {
+    method: 'POST',
+    signal,
+    auth: token,
+    body: { pricing, split },
+  });
+}
+
+/**
+ * Record an operator's decision on a seller application.
+ */
+export async function reviewSeller({ applicationId, decision, note, token }, { signal } = {}) {
+  return apiRequest('/sellers/review', {
+    method: 'POST',
+    signal,
+    auth: token,
+    body: { applicationId, decision, note },
+  });
+}
+
+/**
+ * Submit a seller application for review.
+ *
+ * The seller cannot approve themselves; this only records the request.
+ */
+export async function applyAsSeller({ phone, business, vehicle, capacity }, { signal } = {}) {
+  return apiRequest('/sellers/apply', {
+    method: 'POST',
+    signal,
+    body: { phone, business, vehicle, capacity },
+  });
+}
+
+/**
+ * Ask whether a seller application has been approved yet.
+ *
+ * Returns 'pending' for an unknown number, matching the server, so this cannot be
+ * used to find out which numbers have applied.
+ */
+export async function sellerStatus(phone, { signal } = {}) {
+  const query = new URLSearchParams({ phone: String(phone ?? '') });
+  return apiRequest(`/sellers/status?${query}`, { signal });
+}

@@ -392,7 +392,7 @@ export const apiSellerStatus = onRequest(async (req, res) => {
   }
 });
 
-/* ------------------------------------------------------------------ pricing */
+/* ------------------------------------------------- public price read-back */
 
 export const apiPricing = onRequest(async (req, res) => {
   applyCors(req, res);

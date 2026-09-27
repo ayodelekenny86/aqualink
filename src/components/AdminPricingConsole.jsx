@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { readValue, writeValue } from '../lib/storage';
+import { updatePricing } from '../lib/payments';
 import {
   DEFAULT_PRICING,
   DEFAULT_SPLIT,
@@ -21,6 +22,11 @@ import {
  * The split cannot be saved unless it totals 100%. That guard is the whole
  * reason this lives in one component: an operator who divides 300 cedi three
  * ways that do not sum will get an error, not a silent shortfall.
+ *
+ * Publishing is server-side and operator-authenticated. The previous version
+ * only wrote to `localStorage`, so the console looked like it controlled pricing
+ * while every order was still priced by untouched server config. `localStorage`
+ * is now only a display cache of what the server accepted.
  */
 
 const STORAGE_KEY = 'admin.pricing';
@@ -42,11 +48,33 @@ function readStored() {
   };
 }
 
-export default function AdminPricingConsole({ onNotice, onPricingChange }) {
+export default function AdminPricingConsole({ onNotice, onPricingChange, opsToken = null }) {
   const [stored] = useState(readStored);
   const [pricing, setPricing] = useState(stored.pricing);
   const [split, setSplit] = useState(stored.split);
   const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  // Show the operator what is actually live, not whatever this browser last
+  // cached, so the console cannot be used to edit a price nobody is charged.
+  useEffect(() => {
+    if (!opsToken) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch('/api/pricing');
+        if (!response.ok) return;
+        const data = await response.json();
+        const live = data.quote ?? data.pricing;
+        if (cancelled || !live) return;
+        setPricing((current) => ({ ...current, ...live }));
+        if (data.split) setSplit((current) => ({ ...current, ...data.split }));
+      } catch {
+        // A read failure must not block editing; the save below is authoritative.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [opsToken]);
 
   const update = useCallback((field, raw) => {
     const rule = NUMERIC_FIELDS[field];
@@ -93,25 +121,42 @@ export default function AdminPricingConsole({ onNotice, onPricingChange }) {
     }
   }, [quote, split]);
 
-  function save() {
+  async function save() {
     if (splitError) {
       onNotice?.('Fix the revenue split before saving.');
       return;
     }
-    writeValue(`${STORAGE_KEY}.pricing`, pricing);
-    writeValue(`${STORAGE_KEY}.split`, split);
-    onPricingChange?.(pricing, split);
-    onNotice?.('Pricing and revenue split published. New orders use these figures.');
+    if (!opsToken) {
+      // Refusing is the point. Writing to localStorage and reporting success here
+      // is what made this console look authoritative while changing nothing.
+      onNotice?.('Sign in as an operator to publish pricing. Prices are set on the server.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const result = await updatePricing({ pricing, split, token: opsToken });
+      // Only mirror to localStorage after the server has accepted the change, so
+      // the cache can never show a price the server rejected.
+      writeValue(`${STORAGE_KEY}.pricing`, result.pricing ?? pricing);
+      writeValue(`${STORAGE_KEY}.split`, result.split ?? split);
+      setPricing(result.pricing ?? pricing);
+      setSplit(result.split ?? split);
+      onPricingChange?.(result.pricing ?? pricing, result.split ?? split);
+      onNotice?.('Pricing published. New orders are charged these figures.');
+    } catch (error) {
+      onNotice?.(error.message || 'The server rejected this pricing change.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   function reset() {
     setPricing(DEFAULT_PRICING);
     setSplit(DEFAULT_SPLIT);
     setErrors({});
-    writeValue(`${STORAGE_KEY}.pricing`, DEFAULT_PRICING);
-    writeValue(`${STORAGE_KEY}.split`, DEFAULT_SPLIT);
     onPricingChange?.(DEFAULT_PRICING, DEFAULT_SPLIT);
-    onNotice?.('Pricing reset to the default plan.');
+    onNotice?.('Defaults loaded into the form. Select Publish pricing to make them live.');
   }
 
   return (
@@ -123,10 +168,19 @@ export default function AdminPricingConsole({ onNotice, onPricingChange }) {
           <p>Buyers always see the discounted price. Surge and revenue shares apply underneath it.</p>
         </div>
         <div className="admin-pricing-actions">
-          <button className="outline-button" type="button" onClick={reset}>Reset to default</button>
-          <button className="primary-button" type="button" onClick={save}>Publish pricing</button>
+          <button className="outline-button" type="button" onClick={reset}>Load defaults</button>
+          <button className="primary-button" type="button" onClick={save} disabled={saving}>
+            {saving ? 'Publishing…' : 'Publish pricing'}
+          </button>
         </div>
       </div>
+
+      {!opsToken && (
+        <p className="field-error" role="status">
+          You are not signed in as an operator, so pricing cannot be published. This form previews a
+          quote only; the price an order is actually charged is decided on the server.
+        </p>
+      )}
 
       <div className="pricing-grid">
         <fieldset>

@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App';
 import { clearAll } from './lib/storage';
-import { installFakeApi, teardownFakeApi } from './testServer';
+import { installFakeApi, reviewSellerApplication, STUB_OPS_CREDENTIALS, teardownFakeApi } from './testServer';
 
 /**
  * The app mints its own one-time codes, so tests cannot hardcode a value.
@@ -28,8 +28,10 @@ async function waitForRegistry() {
   await screen.findByRole('heading', { name: /sign in to view your orders|application awaiting approval|operations data needs a verified admin|create your seller account/i });
 }
 
-const OPS_EMAIL = 'ops@aqualink.gh';
-const OPS_PASSWORD = 'ops-test-password-42';
+// One source of truth: the same credential the fake server accepts on
+// `POST /api/ops/login`, so this exercises the real sign-in path end to end.
+const OPS_EMAIL = STUB_OPS_CREDENTIALS.email;
+const OPS_PASSWORD = STUB_OPS_CREDENTIALS.password;
 
 /**
  * Create the ops account the tests sign in with.
@@ -84,21 +86,32 @@ async function signInAdmin(user) {
   await screen.findByText(/manual ops mode/i);
 }
 
-/** Applies as a seller, is approved with a generated code, and signs in. */
+/**
+ * Applies as a seller and has an operator approve it, then signs in.
+ *
+ * There is deliberately no "generate approval code" step. That control minted
+ * `SEL-XXXXXXXX` in the browser and then accepted it, so anyone who loaded the
+ * page could approve themselves. The test now goes through the server, and the
+ * status only changes when `reviewSellerApplication` says an operator did it.
+ */
 async function approveSeller(user) {
   await waitForRegistry();
   await user.click(screen.getByRole('button', { name: /seller app manage your fleet/i }));
   await user.type(screen.getByRole('textbox', { name: /business name/i }), 'AquaFlow Tankers');
   await user.type(screen.getByRole('textbox', { name: /seller phone/i }), '0244000000');
+  await user.type(screen.getByRole('textbox', { name: /vehicle registration/i }), 'GT-4471-22');
   await user.click(screen.getByRole('button', { name: /submit signup for review/i }));
 
-  await screen.findByText(/pending manual review/i);
-  await user.click(screen.getByRole('button', { name: /generate approval code/i }));
-  const code = (await screen.findByTestId('seller-code')).textContent;
-  expect(code).toMatch(/^SEL-[0-9A-Z]{8}$/);
+  await screen.findByText(/pending operator review/i);
 
-  await user.type(screen.getByRole('textbox', { name: /seller approval code/i }), code);
-  await user.click(screen.getByRole('button', { name: /approve seller/i }));
+  // The workspace must still be locked: a status check with nobody having
+  // approved anything is what a self-approval exploit would look like.
+  await user.click(screen.getByRole('button', { name: /check approval status/i }));
+  await screen.findByText(/pending operator review/i);
+  expect(screen.queryByRole('heading', { name: /ready for the next job/i })).not.toBeInTheDocument();
+
+  reviewSellerApplication((await screen.findByTestId('seller-application-id')).textContent, 'approve');
+  await user.click(screen.getByRole('button', { name: /check approval status/i }));
   await screen.findByRole('heading', { name: /ready for the next job/i });
 }
 

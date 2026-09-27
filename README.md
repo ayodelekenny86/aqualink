@@ -102,6 +102,48 @@ curl -X POST https://<your-domain>/api/bootstrap/ops \
   -H "X-Ops-Token: <your-token>"
 ```
 
+`OPS_SESSION_SECRET` is separate and is **required** for the operator console to
+work at all. The bootstrap token creates the one ops account; the session secret
+signs the short-lived tokens that prove to the server who an operator is.
+
+```sh
+firebase functions:secrets:set OPS_SESSION_SECRET   # openssl rand -hex 32
+```
+
+Without it, `POST /api/ops/login` and every protected endpoint return `503
+auth_unconfigured` — they fail closed, so a misconfigured deployment exposes
+nothing rather than everything.
+
+### Operator sign-in and what it actually protects
+
+The ops console used to check a password against `localStorage`. The server had no
+idea who was calling it, so no admin action could be protected. Operators now sign
+in against `POST /api/ops/login`, which verifies the scrypt hash on the server and
+returns an expiring HMAC token (`functions/lib/session.js`). The token is required by:
+
+| Endpoint | What it controls |
+| --- | --- |
+| `POST /api/pricing/update` | The list price, discount and surge every order is charged at |
+| `POST /api/sellers/review` | Approving or rejecting a seller's application |
+
+`GET /api/pricing` stays public: a customer needs to see the price they are about
+to pay. The price that is actually *charged* is always computed server-side in
+`apiCreateOrder`, so a modified browser only ever changes what is displayed, never
+what is billed.
+
+### Seller approval
+
+Seller approval used to be self-service: the app generated an `SEL-XXXXXXXX` code
+in the browser, displayed it, and then accepted it. Anyone who loaded the page could
+generate a code and approve themselves, so the control was decorative.
+
+It is now server-side. A seller submits `POST /api/sellers/apply`, polls
+`GET /api/sellers/status` until it reports `approved`, and only then does the
+workspace unlock. The approval itself comes from a signed-in operator through
+`POST /api/sellers/review`, and every decision records who made it and when. A
+second decision on the same application is rejected rather than overwriting the
+first, so the audit trail keeps the original outcome.
+
 ### Honest figures
 
 Money shown in the app is summed from real orders by `src/lib/summary.js`. The
