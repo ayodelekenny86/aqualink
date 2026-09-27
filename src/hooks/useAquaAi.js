@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { translations } from '../data/translations';
 import { formatCedi } from '../lib/money';
+import { tierFor, computePoints, TIERS } from './useLoyalty';
 
 /**
  * The Aqua panel.
@@ -21,8 +22,8 @@ import { formatCedi } from '../lib/money';
 const greeting = { from: 'ai', text: 'I can explain your orders and what they cost. I read your real order data, so if I do not know something I will say so rather than guess.' };
 
 export const aiQuickActions = (role) => (role === 'ops'
-  ? ['Explain an order', 'Summarise revenue', 'List unpaid orders', 'Check revenue split']
-  : ['Explain my order', 'Check delivery price', 'Find my receipt', 'Request a refund']);
+  ? ['Explain an order', 'Summarise revenue', 'List unpaid orders', 'Check revenue split', 'Score sellers']
+  : ['Explain my order', 'Check delivery price', 'Find my receipt', 'Request a refund', 'My loyalty tier']);
 
 const FALLBACK_ANSWER = 'I can explain your orders, their cost, and how the revenue split works. I cannot forecast demand or track drivers, because that data is not available to me. Try asking about an order or its price.';
 
@@ -51,7 +52,7 @@ function supportAnswer() {
  * Answer from real order data. Kept pure and exported so the behaviour can be
  * tested without rendering the panel.
  */
-export function getAiAnswer(question, { language = 'en', orders = [], split } = {}) {
+export function getAiAnswer(question, { language = 'en', orders = [], split, sellerScores = [], buyerId = null } = {}) {
   const lower = String(question ?? '').toLowerCase();
   const latest = newestOrder(orders);
 
@@ -104,10 +105,37 @@ export function getAiAnswer(question, { language = 'en', orders = [], split } = 
       },
     },
     {
+      keywords: ['loyalty', 'tier', 'points', 'rewards', 'cashback', 'wallet'],
+      answer: () => {
+        if (!buyerId) return 'I do not know which buyer you are, so I cannot read your loyalty balance. Sign in and I will sum it from your paid orders.';
+        const points = computePoints(orders, buyerId);
+        const tier = tierFor(points);
+        const next = TIERS.find((t) => t.minPoints > points);
+        const cashback = Math.round(points * 0.02 * 100);
+        const base = `You are in the ${tier.name} tier with ${points} points, which is worth ${formatCedi(cashback)} in cashback.`;
+        return next ? `${base} ${next.minPoints - points} points away from ${next.name}.` : `${base} You are at the top of the ladder.`;
+      },
+    },
+    {
       keywords: ['forecast', 'demand', 'predict', 'truck', 'dispatch', 'driver', 'eta', 'position', 'track'],
       // The old answers invented tomorrow's demand and told ops to stage six
       // trucks in a named district. Nothing here can support that.
       answer: () => 'I cannot forecast demand or track drivers. That needs a forecasting model and live vehicle telemetry, and neither is connected to this app. I will not invent a number for it.',
+    },
+    {
+      keywords: ['seller', 'score', 'performance', 'rank', 'flagged'],
+      answer: () => {
+        if (!Array.isArray(sellerScores) || sellerScores.length === 0) {
+          return 'No seller has a completed order yet, so there is nothing to score. Every score here is summed from real orders and nothing is invented.';
+        }
+        const ranked = [...sellerScores].sort((a, b) => b.score - a.score);
+        const top = ranked[0];
+        const flagged = ranked.filter((s) => s.score < 60);
+        const head = `Top seller is ${top.sellerId} with a score of ${top.score} (${top.band.label}).`;
+        return flagged.length
+          ? `${head} ${flagged.length} seller(s) are below the watch threshold: ${flagged.map((s) => `${s.sellerId} (${s.score})`).join(', ')}.`
+          : `${head} No seller is below the watch threshold.`;
+      },
     },
     {
       keywords: ['support', 'agent', 'help', 'contact'],

@@ -156,7 +156,10 @@ test('renders the buyer booking workspace', async () => {
   // from the server, so the form says so rather than quoting a stale figure.
   expect(screen.getByText(/calculated on the server/i)).toBeInTheDocument();
   expect(screen.queryByText('GH₵300 · GH₵250')).not.toBeInTheDocument();
-  expect(screen.getByText(/silver tier/i)).toBeInTheDocument();
+  // The rewards panel now reads the tier from real paid orders. A fresh buyer
+  // with no orders is Bronze, so the panel says that rather than inventing a
+  // Silver balance.
+  expect(screen.getByText(/bronze tier/i)).toBeInTheDocument();
 });
 
 test('answers a buyer question with Aqua AI', async () => {
@@ -314,7 +317,7 @@ test('shows AI business health signals in ops', async () => {
   // buyers. There is no escrow and no dispute tracking, so it must not.
   expect(screen.queryByText(/in escrow/i)).not.toBeInTheDocument();
   expect(screen.getByText(/unpaid orders/i)).toBeInTheDocument();
-  expect(screen.getByText(/no risk model/i)).toBeInTheDocument();
+  expect(screen.getByText(/sellers at risk/i)).toBeInTheDocument();
 });
 
 test('refreshes a buyer live driver update', async () => {

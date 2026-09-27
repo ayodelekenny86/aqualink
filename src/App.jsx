@@ -7,6 +7,8 @@ import useAquaAi, { aiQuickActions } from './hooks/useAquaAi';
 import useReports from './hooks/useReports';
 import useNotifications from './hooks/useNotifications';
 import { usePushNotifications, useFCMTokenSync } from './hooks/usePushNotifications';
+import useLoyalty from './hooks/useLoyalty';
+import useSellerPerformance from './hooks/useSellerPerformance';
 import { formatPhoneForDisplay, normalizePhone } from './lib/accounts';
 import { seedProducts } from './lib/collections';
 import { formatCedi } from './lib/money';
@@ -121,17 +123,30 @@ function App() {
     updateOrderStatus, issueDeliveryCode, confirmDelivery, requestRefund,
   } = useBooking({ email, buyerPhone: session?.identifier ?? '', onNotice: showNotice, notify });
 
+  const { downloadReport } = useReports({ region, orders, onNotice: showNotice });
+
+  // Buyer loyalty is summed from this buyer's paid orders, so it only exists
+  // for an authenticated buyer. An unauthenticated buyer sees no tier.
+  const buyerIdentifier = session?.identifier || email;
+  const { summary: loyaltySummary, profile: loyaltyProfile } = useLoyalty({
+    orders,
+    buyerId: buyerIdentifier,
+    onNotice: showNotice,
+  });
+
+  // Seller performance is scored from real orders, so an empty workspace has
+  // no sellers rather than a table of plausible-looking ratings.
+  const { summary: sellerPerfSummary, ranked: sellerRanked } = useSellerPerformance({ orders });
+
   const { aiOpen, toggleAi, closeAi, aiInput, setAiInput, aiMessages, askAi } = useAquaAi({
     language,
     orders,
     split,
+    sellerScores: sellerRanked,
+    buyerId: buyerIdentifier,
   });
 
-  const { downloadReport } = useReports({ region, orders, onNotice: showNotice });
-
   const { requestPermission } = usePushNotifications();
-
-  // Sync FCM token for authenticated users
   const userIdentifier = session?.identifier || email;
   useFCMTokenSync(userIdentifier);
 
@@ -169,7 +184,7 @@ function App() {
         {notice && <div className="notice" role="status"><span>✓</span>{notice}<button type="button" aria-label="Dismiss notification" onClick={dismissNotice}>×</button></div>}
         {aiOpen && <AiPanel role={role} input={aiInput} setInput={setAiInput} messages={aiMessages} askAi={askAi} close={closeAi} />}
         {!ready && <section className="access-gate panel"><span className="access-lock">⌁</span><p className="eyebrow">Preparing secure workspace</p><h1>Setting up your accounts.</h1><p>AquaLink is generating the local account registry and its credentials on this device. This takes a moment and needs no network access.</p></section>}
-        {ready && role === 'buyer' && (buyerAuthenticated ? <><BuyerView booking={booking} updateBooking={updateBooking} requestDelivery={requestDelivery} orders={orders} showNotice={showNotice} authStep={authStep} email={email} setEmail={setEmail} emailCode={emailCode} sendOtp={sendOtp} confirmEmailCode={confirmEmailCode} confirmDelivery={confirmDelivery} requestRefund={requestRefund} savedAddresses={savedAddresses} repeatBooking={repeatBooking} setSavedAddresses={setSavedAddresses} t={t} driverUpdate={driverUpdate} refreshDriverUpdate={refreshDriverUpdate} /><BuyerFinance orders={orders} showNotice={showNotice} /></> : <BuyerAccessGate onSignedIn={() => {}} startSignIn={startPhoneSignIn} confirmCode={confirmPhoneCode} generatedCode={phoneCode} identifier={phoneIdentifier} error={signInError} onRegister={(value) => registerAccount({ identifier: value, role: 'buyer', displayName: 'Buyer' })} accountExists={accountExists} onGoogle={signInWithGoogleIdentity} showNotice={showNotice} />)}
+        {ready && role === 'buyer' && (buyerAuthenticated ? <><BuyerView booking={booking} updateBooking={updateBooking} requestDelivery={requestDelivery} orders={orders} showNotice={showNotice} authStep={authStep} email={email} setEmail={setEmail} emailCode={emailCode} sendOtp={sendOtp} confirmEmailCode={confirmEmailCode} confirmDelivery={confirmDelivery} requestRefund={requestRefund} savedAddresses={savedAddresses} repeatBooking={repeatBooking} setSavedAddresses={setSavedAddresses} t={t} driverUpdate={driverUpdate} refreshDriverUpdate={refreshDriverUpdate} loyalty={loyaltySummary} loyaltyProfile={loyaltyProfile} /><BuyerFinance orders={orders} showNotice={showNotice} /></> : <BuyerAccessGate onSignedIn={() => {}} startSignIn={startPhoneSignIn} confirmCode={confirmPhoneCode} generatedCode={phoneCode} identifier={phoneIdentifier} error={signInError} onRegister={(value) => registerAccount({ identifier: value, role: 'buyer', displayName: 'Buyer' })} accountExists={accountExists} onGoogle={signInWithGoogleIdentity} showNotice={showNotice} />)}
         {notificationsOpen && (
           <Suspense fallback={null}>
             <NotificationsPanel
@@ -230,9 +245,9 @@ function App() {
         {role === 'institution' && (
           <InstitutionDashboard orders={orders} showNotice={showNotice} />
         )}
-        {ready && role === 'ops' && (adminAuthenticated ? <Suspense fallback={null}><OpsView orders={orders} downloadReport={downloadReport} opsToken={opsToken} showNotice={showNotice} /></Suspense> : <AdminAccessGate onSignIn={signInWithPassword} error={signInError} onGoogle={signInWithGoogleIdentity} showNotice={showNotice} />)}
+        {ready && role === 'ops' && (adminAuthenticated ? <Suspense fallback={null}><OpsView orders={orders} downloadReport={downloadReport} opsToken={opsToken} showNotice={showNotice} sellerPerfSummary={sellerPerfSummary} sellerRanked={sellerRanked} /></Suspense> : <AdminAccessGate onSignIn={signInWithPassword} error={signInError} onGoogle={signInWithGoogleIdentity} showNotice={showNotice} />)}
         {ready && role === 'ops' && adminAuthenticated && <ReportActions downloadReport={downloadReport} />}
-        {ready && role === 'ops' && adminAuthenticated && <OperationalRiskPanel orders={orders} />}
+        {ready && role === 'ops' && adminAuthenticated && <OperationalRiskPanel orders={orders} sellerPerfSummary={sellerPerfSummary} sellerRanked={sellerRanked} />}
         {ready && role === 'ops' && adminAuthenticated && <RevenueFinance orders={orders} showNotice={showNotice} />}
         {ready && role === 'ops' && adminAuthenticated && <Suspense fallback={null}><AdminPricingConsole onNotice={showNotice} onPricingChange={(nextPricing, nextSplit) => publish(nextPricing, nextSplit)} opsToken={opsToken} /></Suspense>}
         </main>
@@ -321,9 +336,17 @@ function PageHeader({ eyebrow, title, copy, action }) {
   return <div className="page-header"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p className="page-copy">{copy}</p></div>{action}</div>;
 }
 
-function BuyerView({ booking, updateBooking, requestDelivery, orders, showNotice, authStep, email, setEmail, emailCode, sendOtp, confirmEmailCode, confirmDelivery, requestRefund, savedAddresses, repeatBooking, setSavedAddresses, t, driverUpdate, refreshDriverUpdate }) {
+function BuyerView({ booking, updateBooking, requestDelivery, orders, showNotice, authStep, email, setEmail, emailCode, sendOtp, confirmEmailCode, confirmDelivery, requestRefund, savedAddresses, repeatBooking, setSavedAddresses, t, driverUpdate, refreshDriverUpdate, loyalty, loyaltyProfile }) {
   const [emailOtp, setEmailOtp] = useState('');
   const [deliveryCodes, setDeliveryCodes] = useState({});
+
+  const tier = loyalty?.tier ?? 'Bronze';
+  const points = loyalty?.points ?? 0;
+  const nextTier = loyalty?.nextTier ?? null;
+  const pointsToNext = loyalty?.pointsToNextTier ?? 0;
+  const progress = loyalty?.progressToNext ?? 0;
+  const cashback = loyalty?.cashback ?? formatCedi(0);
+  const walletBalance = loyalty?.walletBalance ?? formatCedi(0);
 
   return <>
     <PageHeader eyebrow="Tuesday, 21 August 2026" title="Good morning, Alex." copy="Get your next delivery sorted in a few taps." action={<button className="outline-button" type="button" onClick={() => showNotice('Referral link copied to your clipboard.')}>↗ Invite a friend <span>+GH₵20</span></button>} />
@@ -331,7 +354,7 @@ function BuyerView({ booking, updateBooking, requestDelivery, orders, showNotice
     <section className="saved-addresses panel"><div><span className="section-kicker">FAST REBOOK</span><strong>Saved addresses</strong><small>Repeat a trusted delivery without typing it again.</small></div><div className="saved-address-list">{savedAddresses.map((address) => <button type="button" key={address} onClick={() => repeatBooking(address)}>⌖ {address}</button>)}<button type="button" onClick={() => { const typed = booking.location.trim(); if (!typed) { showNotice('Type a delivery location first, then save it here.'); return; } if (savedAddresses.includes(typed)) { showNotice('That address is already saved.'); return; } setSavedAddresses([...savedAddresses, typed]); showNotice(`Saved ${typed} for quick rebooking.`); }}>+ Save this address</button></div></section>
     <div className="buyer-grid">
       <section className="panel booking-panel"><div className="panel-title"><div><span className="section-kicker">NEW BOOKING · {t.book}</span><h2>{t.location}</h2></div><span className="verified-pill">✓ Verified sellers</span></div><form onSubmit={requestDelivery}><label>Delivery location<div className="input-wrap"><span>⌖</span><input name="location" value={booking.location} onChange={updateBooking} placeholder="Enter an address or landmark" /></div></label><label>WhatsApp number <small className="field-hint">(optional, if different from your phone)</small><div className="input-wrap"><span>✆</span><input name="whatsapp" value={booking.whatsapp} onChange={updateBooking} placeholder="e.g. 0551234567" inputMode="tel" /></div></label><div className="form-row"><label>Water volume<select name="volume" value={booking.volume} onChange={updateBooking}><option>1,000 gallons</option><option>2,000 gallons</option><option>5,000 gallons</option></select></label><label>Delivery window<select name="window" value={booking.window} onChange={updateBooking}><option>As soon as possible</option><option>Today, 12:00–14:00</option><option>Tomorrow morning</option></select></label></div><div className="quote"><span><small>YOUR PRICE</small><strong>Calculated on the server</strong></span><span className="quote-note">The exact amount, including the service charge, is calculated when you book and shown before you pay. It is not quoted here because the server is the only place that sets it.</span></div><label className="payment-label">Payment method<select name="payment" value={booking.payment} onChange={updateBooking}><option>Mobile money or card via Paystack</option><option>Cash on delivery (pay the driver)</option></select></label><p className="escrow-note">Card and mobile money payments are taken by Paystack and confirmed before your order counts as paid. Cash on delivery is settled with the driver.</p><button className="primary-button full" type="submit">{t.book} <span>→</span></button></form></section>
-      <div className="side-stack"><section className="panel rewards-panel"><div className="panel-title"><div><span className="section-kicker">YOUR REWARDS</span><h2>Silver tier</h2></div><span className="tier-badge">✦</span></div><div className="reward-progress"><strong>340</strong><span>/ 500 points to Gold</span><div><i /></div></div><div className="reward-foot"><span>2% cashback available</span><button type="button" onClick={() => showNotice('Your wallet balance is GH₵24.50.')}>View wallet →</button></div></section><LiveAgentCard role="buyer" driverUpdate={driverUpdate} refreshDriverUpdate={refreshDriverUpdate} showNotice={showNotice} /></div>
+      <div className="side-stack"><section className="panel rewards-panel"><div className="panel-title"><div><span className="section-kicker">YOUR REWARDS</span><h2>{tier} tier</h2></div><span className="tier-badge">✦</span></div><div className="reward-progress"><strong>{points}</strong>{nextTier ? <span>{points} / {points + pointsToNext} to {nextTier}</span> : <span>Top of the ladder</span>}<div><i style={{ width: `${Math.round(progress * 100)}%` }} /></div></div><div className="reward-foot"><span>{loyaltyProfile ? `2% cashback available · ${cashback}` : 'No paid orders yet, so no cashback has been earned.'}</span><button type="button" onClick={() => showNotice(loyaltyProfile ? `Your wallet balance is ${walletBalance}.` : 'Your wallet balance is GH₵0.00 — pay for one order to start earning.')}>View wallet →</button></div></section><LiveAgentCard role="buyer" driverUpdate={driverUpdate} refreshDriverUpdate={refreshDriverUpdate} showNotice={showNotice} /></div>
     </div>
     <section className="orders-section"><div className="section-heading"><div><span className="section-kicker">ACTIVITY</span><h2>{t.recent}</h2></div><button className="text-button" type="button" onClick={() => showNotice('Showing all delivery history.')}>View all →</button></div><div className="orders-table"><div className="table-head"><span>ORDER</span><span>LOCATION</span><span>VOLUME</span><span>STATUS</span><span>PAYMENT</span></div>{orders.map((order) => <div className="order-row" key={order.id}><strong>{order.id}<small>{order.date}</small></strong><span>{order.location}</span><span>{order.volume}</span><span><i className={`status ${order.status.toLowerCase()}`}>{order.status}</i>{order.status === 'En Route' && <button className="confirm-button" type="button" onClick={() => showNotice('Driver Kojo is 12 minutes away. Position updated from the seller app.')}>Driver position</button>}{order.status === 'Delivered' && order.payment !== 'Released' && <span className="confirm-row"><input aria-label={`Delivery code for ${order.id}`} value={deliveryCodes[order.id] ?? ''} onChange={(event) => setDeliveryCodes({ ...deliveryCodes, [order.id]: event.target.value })} placeholder="Delivery code" /><button className="confirm-button" type="button" onClick={() => confirmDelivery(order.id, deliveryCodes[order.id])}>Confirm receipt</button></span>}{order.status === 'Delivered' && <button className="confirm-button" type="button" onClick={() => showNotice(`Receipt for ${order.id} is ready to download or email.`)}>Receipt</button>}{order.status === 'Delivered' && <button className="confirm-button" type="button" onClick={() => requestRefund(order.id)}>Request refund</button>}</span><b>{order.payment}<small>{order.price}</small></b></div>)}</div></section><section className="support-card panel"><div><span className="section-kicker">HUMAN SUPPORT</span><h2>{t.support}</h2><p>Accra support: phone, email, WhatsApp, or a ticket for late deliveries, refunds, quality concerns, or payment receipts.</p></div><div className="support-actions"><a href="tel:+233302000123">☎ Call +233 30 200 0123</a><a href="mailto:support@aqualink.gh">✉ support@aqualink.gh</a><a href="https://wa.me/233545009046" target="_blank" rel="noreferrer">◌ WhatsApp 0545009046</a><button type="button" onClick={() => showNotice('Support ticket created. Reference: SUP-2048.')}>Open support ticket</button></div></section>
   </>;
@@ -406,7 +429,7 @@ function InstitutionView({ orders = [], showNotice }) {
   </>;
 }
 
-function OpsView({ orders = [], downloadReport, opsToken, showNotice }) {
+function OpsView({ orders = [], downloadReport, opsToken, showNotice, sellerPerfSummary, sellerRanked }) {
   // Real orders that are not yet paid. The old list was three hardcoded
   // references with "Payment held in escrow" against them.
   const pendingOrders = orders.filter((order) => order.status !== 'Paid' && order.status !== 'Delivered');
@@ -414,7 +437,7 @@ function OpsView({ orders = [], downloadReport, opsToken, showNotice }) {
   // computed rather than hardcoded so that if a `disputed` status is ever added,
   // the inbox starts listing real cases instead of still showing nothing.
   const disputeOrders = orders.filter((order) => order.disputed === true);
-  return <><PageHeader eyebrow="Admin dashboard · All regions" title="The network is moving." copy="Approve sellers and review orders. Assignment is automatic, and this app does not yet track disputes or quality certification." action={<span className="live-console"><i /> Manual ops mode</span>} /><OpsStats orders={orders} /><section className="ai-insights panel"><div><span className="ai-label">✦ AQUA AI INTELLIGENCE</span><h2>What this deployment can and cannot say</h2><p>No demand forecasting model and no live vehicle telemetry are connected here, so this panel does not predict demand or suggest truck counts. The order figures above are summed from real orders and nothing on this page is a forecast.</p></div><div className="insight-metrics"><strong>{formatCedi(summarise(orders).chargedMinor)}</strong><span>collected on paid orders</span></div></section><div className="admin-grid"><section className="panel admin-panel"><div className="section-heading"><div><span className="section-kicker">DISPATCH VIEW</span><h2>Orders awaiting assignment</h2></div><span className="queue-count">Automatic matching</span></div>{pendingOrders.length === 0 ? <p className="empty-feed">No orders are waiting on assignment. Assignment is automatic, so this fills only if auto-dispatch failed.</p> : pendingOrders.map((order) => <div className="admin-row" key={order.id}><span>{order.code} · {order.location}<small>Awaiting payment · {formatCedi(order.chargedMinor ?? 0)}</small></span></div>)}</section><SellerApprovalQueue opsToken={opsToken} onNotice={showNotice} /></div><div className="admin-grid"><section className="panel admin-panel"><div className="section-heading"><div><span className="section-kicker">DISPUTE INBOX</span><h2>Manual resolution</h2></div></div>{disputeOrders.length === 0 ? <p className="empty-feed">No disputes are open. This app does not yet record delivery complaints, so there is nothing here to resolve and no refund has been issued.</p> : disputeOrders.map((order) => <div className="admin-row" key={order.id}><span>{order.code} · {order.location}<small>Flagged by the buyer</small></span><button className="outline-button" type="button">Resolve</button></div>)}</section><section className="panel admin-panel"><div className="section-heading"><div><span className="section-kicker">QUALITY CERTIFICATION</span><h2>Review documents</h2></div></div><p className="empty-feed">No certifications have been submitted. This app does not accept or store water-quality documents, so there is nothing to approve and no verified-water badge can be issued yet. Do not publish a quality claim until a seller has supplied test results.</p></section></div></>;
+  return <><PageHeader eyebrow="Admin dashboard · All regions" title="The network is moving." copy="Approve sellers and review orders. Assignment is automatic, and this app does not yet track disputes or quality certification." action={<span className="live-console"><i /> Manual ops mode</span>} /><OpsStats orders={orders} /><section className="ai-insights panel"><div><span className="ai-label">✦ AQUA AI INTELLIGENCE</span><h2>What this deployment can and cannot say</h2><p>No demand forecasting model and no live vehicle telemetry are connected here, so this panel does not predict demand or suggest truck counts. The order figures above are summed from real orders and nothing on this page is a forecast.</p></div><div className="insight-metrics"><strong>{formatCedi(summarise(orders).chargedMinor)}</strong><span>collected on paid orders</span></div></section><div className="admin-grid"><section className="panel admin-panel"><div className="section-heading"><div><span className="section-kicker">DISPATCH VIEW</span><h2>Orders awaiting assignment</h2></div><span className="queue-count">Automatic matching</span></div>{pendingOrders.length === 0 ? <p className="empty-feed">No orders are waiting on assignment. Assignment is automatic, so this fills only if auto-dispatch failed.</p> : pendingOrders.map((order) => <div className="admin-row" key={order.id}><span>{order.code} · {order.location}<small>Awaiting payment · {formatCedi(order.chargedMinor ?? 0)}</small></span></div>)}</section><SellerApprovalQueue opsToken={opsToken} onNotice={showNotice} /></div><div className="admin-grid"><section className="panel admin-panel"><div className="section-heading"><div><span className="section-kicker">SELLER PERFORMANCE</span><h2>Scored from real orders</h2></div><span className="queue-count">{sellerPerfSummary ? `${sellerPerfSummary.totalSellers} sellers` : 'No orders'}</span></div>{sellerRanked.length === 0 ? <p className="empty-feed">No seller has a completed order yet, so there is nothing to score. Every figure here is summed from real orders and nothing is invented.</p> : <div className="admin-list">{sellerRanked.map((s) => <div className="admin-row" key={s.sellerId}><span>{s.sellerId}<small>#{s.rank} · {s.band.label} · {s.completed} completed of {s.orders} · {s.cancellationRate}% cancelled</small></span><strong>{s.score}</strong></div>)}</div>}{disputeOrders.length === 0 ? <p className="empty-feed">No disputes are open. This app does not yet record delivery complaints, so there is nothing here to resolve and no refund has been issued.</p> : disputeOrders.map((order) => <div className="admin-row" key={order.id}><span>{order.code} · {order.location}<small>Flagged by the buyer</small></span><button className="outline-button" type="button">Resolve</button></div>)}</section><section className="panel admin-panel"><div className="section-heading"><div><span className="section-kicker">QUALITY CERTIFICATION</span><h2>Review documents</h2></div></div><p className="empty-feed">No certifications have been submitted. This app does not accept or store water-quality documents, so there is nothing to approve and no verified-water badge can be issued yet. Do not publish a quality claim until a seller has supplied test results.</p></section></div></>;
 }
 
 function AiPanel({ role, input, setInput, messages, askAi, close }) {
@@ -422,13 +445,14 @@ function AiPanel({ role, input, setInput, messages, askAi, close }) {
   return <section className="ai-panel" aria-label="Aqua AI assistant"><div className="ai-panel-head"><div><span className="ai-label">✦ AQUA AI</span><strong>{role === 'ops' ? 'Operations copilot' : 'Your water-delivery copilot'}</strong></div><button type="button" aria-label="Close Aqua AI" onClick={close}>×</button></div><div className="ai-messages">{messages.slice(-4).map((message, index) => <p className={message.from} key={`${message.from}-${index}`}>{message.text}</p>)}</div><div className="ai-quick-actions">{quickActions.map((action) => <button type="button" key={action} onClick={() => setInput(action)}>{action}</button>)}</div><form className="ai-form" onSubmit={askAi}><input aria-label="Ask Aqua AI" value={input} onChange={(event) => setInput(event.target.value)} placeholder="Ask about orders, pricing, or demand..." /><button type="submit">Ask <span>→</span></button></form><small className="ai-disclaimer">AI suggestions are decision support. Confirm payment, quality, and dispatch actions in the workspace.</small></section>;
 }
 
-function OperationalRiskPanel({ orders = [] }) {
+function OperationalRiskPanel({ orders = [], sellerPerfSummary, sellerRanked }) {
   const summary = summarise(orders);
   // This panel reported invented incidents: a seller who declined six jobs, three
   // buyers complaining, and a GH¢4,820 escrow balance. There is no dispute table, no
   // job-decline tracking and no escrow, so every one of those figures was
   // fabricated. What is left is what the order list can actually support.
-  return <section className="operational-risk panel"><div className="section-heading"><div><span className="ai-label">✦ OPERATIONS</span><h2>Business health signals</h2></div></div><div className="risk-grid"><article><span className="risk-icon warning">!</span><div><strong>Unpaid orders</strong><p>{summary.unpaidCount} order(s) awaiting payment, totalling {formatCedi(summary.unpaidMinor)}.</p></div></article><article><span className="risk-icon good">v</span><div><strong>Collected</strong><p>{formatCedi(summary.chargedMinor)} confirmed by Paystack across {summary.paidCount} paid order(s).</p></div></article><article><span className="risk-icon alert">?</span><div><strong>No risk model</strong><p>No dispute, churn or seller-performance tracking is connected to this deployment, so no risk is reported here.</p></div></article></div></section>;
+  const flagged = sellerRanked ? sellerRanked.filter(s => s.score < 60) : [];
+  return <section className="operational-risk panel"><div className="section-heading"><div><span className="ai-label">✦ OPERATIONS</span><h2>Business health signals</h2></div></div><div className="risk-grid"><article><span className="risk-icon warning">!</span><div><strong>Unpaid orders</strong><p>{summary.unpaidCount} order(s) awaiting payment, totalling {formatCedi(summary.unpaidMinor)}.</p></div></article><article><span className="risk-icon good">v</span><div><strong>Collected</strong><p>{formatCedi(summary.chargedMinor)} confirmed by Paystack across {summary.paidCount} paid order(s).</p></div></article><article><span className="risk-icon alert">!</span><div><strong>Sellers at risk</strong><p>{sellerPerfSummary ? `${sellerPerfSummary.flaggedCount} of ${sellerPerfSummary.totalSellers} sellers scored below the watch threshold.` : 'No seller performance data is available yet.'}</p></div></article></div></section>;
 }
 
 function FinanceEmpty({ title, copy }) {
