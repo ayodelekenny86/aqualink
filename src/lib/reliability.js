@@ -132,6 +132,21 @@ export function rankReliability(orders) {
     .map((s, i) => ({ ...s, rank: i + 1 }));
 }
 
+/**
+ * Estimated delivery window for one order, from the assigned seller's history.
+ *
+ * Returns null when the order has no seller or the seller has no timed
+ * deliveries, so a caller can show "not enough history" instead of a number.
+ */
+export function estimateForOrder(orders, order) {
+  if (!order) return null;
+  const sellerId = sellerIdOf(order);
+  if (!sellerId) return null;
+  const reliability = scoreReliability(orders, sellerId);
+  if (!reliability || !reliability.slaMeasured) return null;
+  return reliability;
+}
+
 export function reliabilitySummary(orders) {
   const ranked = rankReliability(orders);
   if (!ranked.length) return null;
