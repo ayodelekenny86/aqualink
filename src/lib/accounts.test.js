@@ -344,7 +344,7 @@ describe('provider-backed accounts', () => {
   test('an unknown provider is rejected', async () => {
     await expect(createAccount({ identifier: 'kwame@gmail.com', provider: 'facebook' }))
       .rejects.toThrow(/unknown sign-in provider/i);
-    expect(ACCOUNT_PROVIDERS).toEqual(['local', 'google']);
+    expect(ACCOUNT_PROVIDERS).toEqual(['local', 'google', 'facebook']);
   });
 
   test('a local account still owns a hashed password', async () => {

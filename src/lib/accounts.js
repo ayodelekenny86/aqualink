@@ -24,7 +24,7 @@ import { readValue, writeValue } from './storage';
 const ACCOUNTS_KEY = 'accounts.list';
 export const ACCOUNT_ROLES = ['buyer', 'seller', 'institution', 'ops'];
 /** How an account proves its identity. 'local' owns a password; the rest delegate. */
-export const ACCOUNT_PROVIDERS = ['local', 'google'];
+export const ACCOUNT_PROVIDERS = ['local', 'google', 'facebook'];
 export const MAX_FAILED_ATTEMPTS = 5;
 export const LOCKOUT_MS = 5 * 60 * 1000;
 
