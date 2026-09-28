@@ -461,6 +461,44 @@ export function useAuth() {
     }
   }, [startSession, showNotice]);
 
+  /**
+    * Create (or sign in to) an account from a Meta identity whose SDK login and
+    * Graph-API verification metaAuth has already performed.
+    *
+    * No password is generated or stored. A Meta account is authenticated by
+    * Facebook and by nothing else, so minting a random secret for it would add
+    * a credential nobody can use and that a later "reset password" flow could
+    * wrongly overwrite. The provider subject is stored instead, so the same
+    * person can later link a password to the account deliberately.
+    */
+  const signInWithMetaIdentity = useCallback(async (identity) => {
+    setSignInError('');
+    try {
+      if (!identity?.identifier) throw new Error('Meta did not return a usable email address.');
+
+      const existing = findAccount(identity.identifier);
+      const account = existing ?? await createAccount({
+        identifier: identity.identifier,
+        role: identity.role,
+        displayName: identity.displayName,
+        provider: 'facebook',
+        providerSubject: identity.subject,
+      });
+
+      if (existing && existing.role !== identity.role) {
+        showNotice(`Signed in as ${account.identifier}. That account is registered as a ${existing.role}.`);
+      } else {
+        showNotice(`Signed in as ${account.displayName || account.identifier}.`);
+      }
+      syncUsers(listAccounts());
+      startSession(account);
+      return { ok: true, account };
+    } catch (error) {
+      setSignInError(error.message);
+      return { ok: false, error: error.message };
+    }
+  }, [startSession, showNotice]);
+
   return {
     ready,
     role,
@@ -479,6 +517,7 @@ export function useAuth() {
     confirmPhoneCode,
     signInWithPassword,
     signInWithGoogleIdentity,
+    signInWithMetaIdentity,
     registerAccount,
     phoneCode,
     phoneIdentifier,

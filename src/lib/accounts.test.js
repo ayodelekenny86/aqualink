@@ -342,7 +342,12 @@ describe('provider-backed accounts', () => {
   });
 
   test('an unknown provider is rejected', async () => {
-    await expect(createAccount({ identifier: 'kwame@gmail.com', provider: 'facebook' }))
+    // Deliberately not a member of ACCOUNT_PROVIDERS. This used to name
+    // 'facebook', which stopped being an unknown provider when Meta sign-in
+    // landed, so the call started succeeding and the test began failing for the
+    // wrong reason. The point of the test is that a provider outside the list is
+    // refused, so it must use a name that stays outside the list.
+    await expect(createAccount({ identifier: 'kwame@gmail.com', provider: 'myspace' }))
       .rejects.toThrow(/unknown sign-in provider/i);
     expect(ACCOUNT_PROVIDERS).toEqual(['local', 'google', 'facebook']);
   });
@@ -352,5 +357,35 @@ describe('provider-backed accounts', () => {
     expect(account.passwordHash).toBeTruthy();
     expect(account.passwordSalt).toBeTruthy();
     expect(account.passwordHash).not.toContain('correct horse battery');
+  });
+
+  test('a Facebook account stores no password at all', async () => {
+    const account = await createAccount({
+      identifier: 'kwame.asante@gmail.com',
+      role: 'buyer',
+      displayName: 'Kwame Asante',
+      provider: 'facebook',
+      providerSubject: '10215478901234567',
+    });
+
+    expect(account.passwordHash).toBeNull();
+    expect(account.passwordSalt).toBeNull();
+    expect(account.provider).toBe('facebook');
+    expect(account.providerSubject).toBe('10215478901234567');
+  });
+
+  test('a Facebook email is normalized so sign-in finds the same account', async () => {
+    await createAccount({ identifier: 'Kwame.Asante@Gmail.com', provider: 'facebook', providerSubject: '1' });
+    const found = findAccount('kwame.asante@gmail.com');
+    expect(found).not.toBeNull();
+    expect(found.identifier).toBe('kwame.asante@gmail.com');
+  });
+
+  test('a Facebook account cannot be given a password', async () => {
+    await expect(createAccount({
+      identifier: 'kwame@gmail.com',
+      provider: 'facebook',
+      password: 'correct horse battery',
+    })).rejects.toThrow(/local accounts may store a password/i);
   });
 });

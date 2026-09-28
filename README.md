@@ -4,8 +4,8 @@ A water-delivery marketplace for Ghana: buyers book, sellers deliver, drivers
 transport, and operators manage the network.
 
 A single-page React app (Vite) front end backed by a Firebase Functions server.
-Payments go through Paystack. Accounts are local, with Google sign-in as an
-optional extra.
+Payments go through Paystack. Accounts are local, with Google and Meta (Facebook)
+sign-in as optional extras.
 
 ## What it does
 
@@ -87,7 +87,7 @@ Assigned and then Delivered, so a fresh workspace has no window to report.
 | Summary | `src/lib/summary.js` | Single source of truth for money figures |
 | Reliability | `src/lib/reliability.js` | Delivery-window estimates from real timing |
 | Booking | `src/hooks/useBooking.js` | Orders, saved addresses, live driver card |
-| Auth | `src/hooks/useAuth.js` | Local accounts, phone OTP, password, Google |
+| Auth | `src/hooks/useAuth.js` | Local accounts, phone OTP, password, Google, Meta (Facebook) |
 | Ops | `src/hooks/useSellerPerformance.js` | Seller scoring from real orders |
 
 ## License
