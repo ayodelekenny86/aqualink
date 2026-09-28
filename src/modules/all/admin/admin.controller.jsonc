@@ -1,0 +1,148 @@
+// Admin controller for 'all' module
+// Handles CRUD operations for 'all' resources
+
+import { supabase } from '../../../lib/supabase';
+
+// GET /admin/alls - List with search/filter/sort/pagination
+export const listAlls = async (req, res) => {
+  try {
+    const {
+      search = '',
+      filter = {},
+      sort = 'created_at',
+      order = 'desc',
+      page = 1,
+      limit = 10,
+    } = req.query;
+
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    let query = supabase
+      .from('alls')
+      .select('*', { count: 'exact' })
+      .range(from, to)
+      .order(sort, { ascending: order === 'asc' });
+
+    // Apply search if provided (assuming searchable fields: name, description)
+    if (search) {
+      query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
+    }
+
+    // Apply filters dynamically
+    Object.entries(filter).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        query = query.eq(key, value);
+      }
+    });
+
+    const { data, error, count } = await query;
+
+    if (error) throw error;
+
+    res.json({
+      data,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total: count,
+        totalPages: Math.ceil(count / limit),
+      },
+    });
+  } catch (error) {
+    console.error('Error listing alls:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// GET /admin/alls/:id - Detail view
+export const getAllById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { data, error } = await supabase
+      .from('alls')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: 'All not found' });
+
+    res.json(data);
+  } catch (error) {
+    console.error('Error fetching all:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// POST /admin/alls - Create
+export const createAll = async (req, res) => {
+  try {
+    const { name, description, ...rest } = req.body;
+
+    // Basic validation
+    if (!name) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+
+    const { data, error } = await supabase
+      .from('alls')
+      .insert([{ name, description, ...rest }])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(201).json(data);
+  } catch (error) {
+    console.error('Error creating all:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// PUT /admin/alls/:id - Update
+export const updateAll = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+
+    // Prevent updating id or created_at
+    delete updates.id;
+    delete updates.created_at;
+
+    const { data, error } = await supabase
+      .from('alls')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: 'All not found' });
+
+    res.json(data);
+  } catch (error) {
+    console.error('Error updating all:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// DELETE /admin/alls/:id - Hard delete
+export const deleteAll = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { error } = await supabase
+      .from('alls')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting all:', error);
+    res.status(500).json({ error: error.message });
+  }
+};

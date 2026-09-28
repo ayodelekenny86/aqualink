@@ -1,0 +1,17 @@
+// src/modules/all/auth/auth.controller.jsonc
+// Controller for auth module (JSONC)
+
+{
+  "login": {
+    "method": "POST",
+    "path": "/auth/login",
+    "handler": "async (req, res) => { /* verify credentials, return JWT */ }",
+    "description": "Authenticate user and return JWT"
+  },
+  "register": {
+    "method": "POST",
+    "path": "/auth/register",
+    "handler": "async (req, res) => { /* create user, hash password, return JWT */ }",
+    "description": "Register new user and return JWT"
+  }
+}

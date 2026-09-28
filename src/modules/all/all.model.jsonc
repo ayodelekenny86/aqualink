@@ -1,0 +1,17 @@
+// src/modules/all/all.model.jsonc
+// Model for 'All' entity
+
+{
+  "name": "All",
+  "fields": {
+    "id": { "type": "string", "required": true, "unique": true },
+    "name": { "type": "string", "required": true },
+    "description": { "type": "string", "required": false },
+    "createdAt": { "type": "string", "format": "date-time", "required": true },
+    "updatedAt": { "type": "string", "format": "date-time", "required": true }
+  },
+  "validation": {
+    "name": { "minLength": 1, "maxLength": 100 },
+    "description": { "maxLength": 500 }
+  }
+}

@@ -1,0 +1,34 @@
+// Admin routes for 'all' module
+// All routes are protected by isAdmin middleware
+
+import express from 'express';
+import { isAdmin } from './admin.middleware';
+import {
+  listAlls,
+  getAllById,
+  createAll,
+  updateAll,
+  deleteAll,
+} from './admin.controller';
+
+const router = express.Router();
+
+// Apply admin middleware to all routes
+router.use(isAdmin);
+
+// GET /admin/alls - List with search/filter/sort/pagination
+router.get('/', listAlls);
+
+// GET /admin/alls/:id - Detail view
+router.get('/:id', getAllById);
+
+// POST /admin/alls - Create
+router.post('/', createAll);
+
+// PUT /admin/alls/:id - Update
+router.put('/:id', updateAll);
+
+// DELETE /admin/alls/:id - Delete (hard)
+router.delete('/:id', deleteAll);
+
+export default router;

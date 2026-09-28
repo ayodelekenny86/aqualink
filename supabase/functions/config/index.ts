@@ -1,11 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2/dist/esm/index.js';
-import { DEFAULT_PRICING, DEFAULT_SPLIT, priceOrder } from '../_lib/pricing.ts';
+import { DEFAULT_PRICING, DEFAULT_SPLIT, validateSplit } from '../_lib/pricing.ts';
 import { validatePricingInput, bearerToken, verifyOpsToken } from '../_lib/session.ts';
 import { applyCors, fail, json, readJson } from '../_lib/utils.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-
 const OPS_SESSION_SECRET = Deno.env.get('OPS_SESSION_SECRET') ?? '';
 
 function supabase(req: Request) {
@@ -35,8 +34,8 @@ Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
     const path = url.pathname.split('/').pop() ?? '';
 
-    if (path === 'price') {
-      // GET /price?volume=100
+    if (path === 'get') {
+      // GET /config/get - public read of pricing config
       if (req.method !== 'GET') return fail(405, 'method_not_allowed', 'Use GET.');
 
       const db = supabase(req);
@@ -47,18 +46,17 @@ Deno.serve(async (req: Request) => {
         .single();
 
       if (error) {
-        // Fall back to compiled defaults if no config row exists.
-        return json({ pricing: DEFAULT_PRICING, split: DEFAULT_SPLIT, quote: priceOrder({ volumeLitres: 0 }) });
+        return json({ pricing: DEFAULT_PRICING, split: DEFAULT_SPLIT });
       }
 
       const pricing = { ...DEFAULT_PRICING, ...(config.pricing ?? {}) };
       const split = { ...DEFAULT_SPLIT, ...(config.split ?? {}) };
-      const volumeLitres = Number(url.searchParams.get('volume') ?? 0);
 
-      return json({ pricing, split, quote: priceOrder({ pricing, split, volumeLitres }) });
+      return json({ pricing, split });
     }
 
-if (path === 'update') {
+    if (path === 'update') {
+      // POST /config/update - operator-only pricing update
       if (req.method !== 'POST') return fail(405, 'method_not_allowed', 'Use POST.');
 
       const { operator, error: authError } = requireOps(req);
@@ -66,14 +64,21 @@ if (path === 'update') {
 
       const body = await readJson(req);
       const { pricing, split } = body;
+
       const db = supabase(req);
-      const current = (await db.from('config').select('pricing,split').eq('key', 'pricing').single()).data;
+      const { data: current } = await db
+        .from('config')
+        .select('pricing,split')
+        .eq('key', 'pricing')
+        .single();
 
       const mergedPricing = { ...(current?.pricing ?? DEFAULT_PRICING), ...(pricing ?? {}) };
       const mergedSplit = split ? { ...(current?.split ?? DEFAULT_SPLIT), ...split } : (current?.split ?? DEFAULT_SPLIT);
 
       const check = validatePricingInput(mergedPricing, mergedSplit);
       if (!check.valid) return fail(400, 'invalid_pricing', check.problems.join(' '));
+
+      validateSplit(mergedSplit);
 
       await db.from('config').update({
         pricing: {
@@ -90,9 +95,9 @@ if (path === 'update') {
       return json({ pricing: mergedPricing, split: mergedSplit, updatedBy: operator.sub });
     }
 
-    return fail(404, 'not_found', 'No such pricing endpoint.');
+    return fail(404, 'not_found', 'No such config endpoint.');
   } catch (error) {
-    console.error('pricing function error', error);
+    console.error('config function error', error);
     return fail(500, 'internal_error', 'Something went wrong.');
   }
 });

@@ -1,0 +1,6 @@
+// Admin module entry point for 'all'
+// Exports the admin router
+
+import adminRoutes from './admin.routes';
+
+export default adminRoutes;

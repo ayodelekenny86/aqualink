@@ -1,0 +1,17 @@
+// src/modules/all/auth/auth.routes.jsonc
+// Routes for auth module (JSONC)
+
+{
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/auth/login",
+      "controller": "login"
+    },
+    {
+      "method": "POST",
+      "path": "/auth/register",
+      "controller": "register"
+    }
+  ]
+}

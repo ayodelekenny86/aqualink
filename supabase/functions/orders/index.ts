@@ -1,9 +1,11 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2/dist/esm/index.js';
-import { priceOrder } from '../_lib/pricing.ts';
+import { DEFAULT_PRICING, DEFAULT_SPLIT, priceOrder } from '../_lib/pricing.ts';
+import { checkSettlement } from '../_lib/session.ts';
 import { generateId, applyCors, fail, json, readJson } from '../_lib/utils.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY') ?? '';
 
 function supabase(req: Request) {
   return createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
@@ -46,9 +48,6 @@ Deno.serve(async (req: Request) => {
       .eq('key', 'pricing')
       .single();
 
-    // Import pricing defaults — the server recomputes the price from its own
-    // config, never trusting anything the client sent.
-    const { DEFAULT_PRICING, DEFAULT_SPLIT } = await import('../_lib/pricing.ts');
     const pricing = configError ? DEFAULT_PRICING : { ...DEFAULT_PRICING, ...(config?.pricing ?? {}) };
     const split = configError ? DEFAULT_SPLIT : { ...DEFAULT_SPLIT, ...(config?.split ?? {}) };
 
@@ -90,37 +89,35 @@ Deno.serve(async (req: Request) => {
   }
 
   if (path === 'verify') {
-    if (req.method !== 'GET') return fail(405, 'method_not_allowed', 'Use GET.');
+      if (req.method !== 'GET') return fail(405, 'method_not_allowed', 'Use GET.');
 
-    const reference = String(url.searchParams.get('reference') ?? '').trim();
-    if (!reference) return fail(400, 'invalid_reference', 'A payment reference is required.');
+      const reference = String(url.searchParams.get('reference') ?? '').trim();
+      if (!reference) return fail(400, 'invalid_reference', 'A payment reference is required.');
 
-    const secret = Deno.env.get('PAYSTACK_SECRET_KEY') ?? '';
-    if (!secret) return fail(503, 'payments_unconfigured', 'Payments are not configured.');
+      if (!PAYSTACK_SECRET_KEY) return fail(503, 'payments_unconfigured', 'Payments are not configured.');
 
-    const paystackRes = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
-      headers: { Authorization: `Bearer ${secret}` },
-    });
-    const paystack = await paystackRes.json();
-    if (!paystackRes.ok || !paystack.status) {
-      return fail(502, 'provider_rejected', paystack.message ?? 'Payment provider could not be reached.');
-    }
+      const paystackRes = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
+        headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
+      });
+      const paystack = await paystackRes.json();
+      if (!paystackRes.ok || !paystack.status) {
+        return fail(502, 'provider_rejected', paystack.message ?? 'Payment provider could not be reached.');
+      }
 
-    const transaction = paystack.data ?? {};
-    const db = supabase(req);
-    const { data: orders, error: orderError } = await db
-      .from('orders')
-      .select('*')
-      .eq('paystack_reference', reference)
-      .limit(1)
-      .maybeSingle();
+      const transaction = paystack.data ?? {};
+      const db = supabase(req);
+      const { data: orders, error: orderError } = await db
+        .from('orders')
+        .select('*')
+        .eq('paystack_reference', reference)
+        .limit(1)
+        .maybeSingle();
 
-    if (orderError || !orders) {
-      return json({ status: 'unknown', settled: false, reason: 'no_matching_order' });
-    }
+      if (orderError || !orders) {
+        return json({ status: 'unknown', settled: false, reason: 'no_matching_order' });
+      }
 
-    const { checkSettlement } = await import('../_lib/session.ts');
-    const verdict = checkSettlement({
+      const verdict = checkSettlement({
       transaction: {
         status: transaction.status ?? 'success',
         reference,

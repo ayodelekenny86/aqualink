@@ -1,0 +1,10 @@
+// src/modules/all/auth/auth.middleware.jsonc
+// Middleware for auth module (JSONC)
+
+{
+  "authGuard": {
+    "name": "authGuard",
+    "handler": "(req, res, next) => { /* verify JWT, attach user to req */ }",
+    "description": "Middleware to protect routes"
+  }
+}

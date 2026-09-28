@@ -1,0 +1,29 @@
+// src/modules/all/all.controller.jsonc
+// Controller for 'All' CRUD operations
+
+{
+  "list": {
+    "method": "GET",
+    "path": "/alls",
+    "handler": "listAlls",
+    "description": "List all All entities"
+  },
+  "getById": {
+    "method": "GET",
+    "path": "/alls/:id",
+    "handler": "getAllById",
+    "description": "Get a single All by ID"
+  },
+  "create": {
+    "method": "POST",
+    "path": "/alls",
+    "handler": "createAll",
+    "description": "Create a new All"
+  },
+  "update": {
+    "method": "PUT",
+    "path": "/alls/:id",
+    "handler": "updateAll",
+    "description": "Update an existing All"
+  }
+}

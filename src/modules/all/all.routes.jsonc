@@ -1,0 +1,32 @@
+// src/modules/all/all.routes.jsonc
+// Routes for 'All' module
+
+{
+  "basePath": "/alls",
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/",
+      "handler": "listAlls",
+      "description": "List all All entities"
+    },
+    {
+      "method": "GET",
+      "path": "/:id",
+      "handler": "getAllById",
+      "description": "Get a single All by ID"
+    },
+    {
+      "method": "POST",
+      "path": "/",
+      "handler": "createAll",
+      "description": "Create a new All"
+    },
+    {
+      "method": "PUT",
+      "path": "/:id",
+      "handler": "updateAll",
+      "description": "Update an existing All"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+// src/modules/all/auth/auth.model.jsonc
+// Minimal model for auth module (JSONC)
+
+{
+  "user": {
+    "id": "string",
+    "email": "string",
+    "passwordHash": "string",
+    "createdAt": "string"
+  },
+  "session": {
+    "token": "string",
+    "userId": "string",
+    "expiresAt": "string"
+  }
+}
