@@ -288,20 +288,16 @@ describe('secret handling', () => {
   test('the client authenticates to its own API and never to a payment provider', async () => {
     const source = await readFile('src/lib/payments.js', 'utf8');
 
-    // The client now sends a bearer token for operator calls, which is correct:
-    // the server is what decides what an operator may do. What it must never do
-    // is send credentials anywhere but first-party /api.
+    // The client sends a bearer token for operator calls, which is correct: the
+    // server is what decides what an operator may do. What it must never do is
+    // send credentials anywhere but first-party /api.
     //
     // Asserted structurally rather than by counting strings, so the guarantee
-    // survives edits: there is exactly one `fetch` in the module, it lives in
-    // `apiRequest`, and it builds its URL from `apiBase()`, which is the only
-    // place a host could be introduced.
-    expect((source.match(/\bfetch\(/g) ?? [])).toHaveLength(1);
-    expect((source.match(/\bapiBase\(/g) ?? []).length).toBeGreaterThan(0);
-
-    // No absolute URL is hardcoded anywhere, so an Authorization header has
-    // nowhere else to be sent. Paths are built from the relative API root.
-    expect(source).toMatch(/const API_ROOT = '\/api'/);
-    expect(source.match(/https?:\/\/[a-z0-9.-]+/gi) ?? []).toEqual([]);
+    // survives edits: this module holds no `fetch` of its own at all. The single
+    // request path now lives in ./api, which the companion api.test.js checks for
+    // a provider host and a hardcoded origin. What remains here is the import,
+    // which is the only way this module can reach the network.
+    expect(source).not.toMatch(/\bfetch\(/);
+    expect(source).toMatch(/from '\.\/api'/);
   });
 });

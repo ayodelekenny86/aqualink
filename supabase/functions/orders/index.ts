@@ -7,7 +7,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY') ?? '';
 
-function supabase(req: Request) {
+function supabase() {
   return createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
@@ -41,13 +41,15 @@ Deno.serve(async (req: Request) => {
     }
 
     // Read pricing config from the database (same as pricing function).
-    const db = supabase(req);
+    const db = supabase();
     const { data: config, error: configError } = await db
       .from('config')
       .select('pricing,split')
       .eq('key', 'pricing')
       .single();
 
+    // The server recomputes the price from its own config, never trusting
+    // anything the client sent.
     const pricing = configError ? DEFAULT_PRICING : { ...DEFAULT_PRICING, ...(config?.pricing ?? {}) };
     const split = configError ? DEFAULT_SPLIT : { ...DEFAULT_SPLIT, ...(config?.split ?? {}) };
 
@@ -105,19 +107,19 @@ Deno.serve(async (req: Request) => {
       }
 
       const transaction = paystack.data ?? {};
-      const db = supabase(req);
-      const { data: orders, error: orderError } = await db
-        .from('orders')
-        .select('*')
-        .eq('paystack_reference', reference)
-        .limit(1)
-        .maybeSingle();
+    const db = supabase();
+    const { data: orders, error: orderError } = await db
+      .from('orders')
+      .select('*')
+      .eq('paystack_reference', reference)
+      .limit(1)
+      .maybeSingle();
 
-      if (orderError || !orders) {
-        return json({ status: 'unknown', settled: false, reason: 'no_matching_order' });
-      }
+    if (orderError || !orders) {
+      return json({ status: 'unknown', settled: false, reason: 'no_matching_order' });
+    }
 
-      const verdict = checkSettlement({
+    const verdict = checkSettlement({
       transaction: {
         status: transaction.status ?? 'success',
         reference,

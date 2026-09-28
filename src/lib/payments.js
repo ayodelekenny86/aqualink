@@ -1,5 +1,6 @@
 import { readValue, writeValue } from './storage';
 import { formatCedi, toMinor } from './money';
+import { apiRequest, apiTarget } from './api';
 
 /**
  * Payment client.
@@ -23,7 +24,6 @@ import { formatCedi, toMinor } from './money';
  */
 
 const RECEIPTS_KEY = 'payments.receipts';
-const API_ROOT = '/api';
 
 /**
  * Whether the deployment can take payments at all.
@@ -33,51 +33,10 @@ const API_ROOT = '/api';
  * authoritative check is the server refusing to charge.
  */
 export function paymentsConfigured() {
+  if (apiTarget() === 'supabase') return true;
   return typeof import.meta.env?.VITE_API_BASE === 'string'
     ? import.meta.env.VITE_API_BASE.length > 0
     : true;
-}
-
-function apiBase() {
-  const configured = import.meta.env?.VITE_API_BASE;
-  if (typeof configured === 'string' && configured.trim()) {
-    return configured.trim().replace(/\/$/, '');
-  }
-  // Same origin by default: Firebase Hosting proxies /api/* to the functions in
-  // firebase.json, which keeps the functions domain out of the client entirely.
-  return API_ROOT;
-}
-
-async function apiRequest(path, { method = 'GET', body, signal, auth = null } = {}) {
-  const response = await fetch(`${apiBase()}${path}`, {
-    method,
-    signal,
-    headers: {
-      'Content-Type': 'application/json',
-      // Only sent when there is a token, so unauthenticated calls carry no
-      // Authorization header at all rather than an empty one.
-      ...(auth ? { Authorization: `Bearer ${auth}` } : {}),
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-
-  const text = await response.text();
-  let payload = {};
-  try {
-    payload = text ? JSON.parse(text) : {};
-  } catch {
-    throw new Error('The payments service returned an unreadable response.');
-  }
-
-  if (!response.ok) {
-    // The server's message is written for a customer, so prefer it over anything
-    // generic. Fall back only when there is none.
-    const error = new Error(payload.message || `The payments service is unavailable (${response.status}).`);
-    error.code = payload.code ?? null;
-    error.status = response.status;
-    throw error;
-  }
-  return payload;
 }
 
 /**
@@ -90,7 +49,6 @@ export async function fetchQuote({ volumeLitres = 0, signal } = {}) {
   const query = new URLSearchParams({ volume: String(volumeLitres) });
   return apiRequest(`/pricing?${query}`, { signal });
 }
-
 /**
  * Create an order. The server decides the price and returns it; any amount the
  * browser might have wanted to send is not accepted.
