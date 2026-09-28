@@ -71,6 +71,16 @@ typings/
 # dotenv environment variables file
 .env
 .env.test
+# Firebase Functions v2 env files, e.g. functions/.env.my-project-id. These hold
+# the Paystack secret key and must never be committed; only the .example is.
+**/.env.*
+!**/.env.example
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+**/firebase-debug.*.log
+**/firestore-debug.*.log
+**/ui-debug.*.log
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache

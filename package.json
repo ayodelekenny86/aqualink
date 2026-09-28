@@ -27,6 +27,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "demo": "npm run dev",
+    "emulators": "firebase emulators:start --only functions,hosting,firestore,auth",
     "deploy": "firebase deploy --only functions,hosting"
   },
   "eslintConfig": {
