@@ -353,6 +353,23 @@ test('shows the honest driver state for a buyer with no assignment', async () =>
   expect(screen.queryByText(/driver kojo/i)).not.toBeInTheDocument();
 });
 
+test('shows an honest delivery estimate for a buyer with no timed history', async () => {
+  const user = userEvent.setup();
+  render(<App />);
+
+  await verifyBuyer(user);
+  await user.type(screen.getByPlaceholderText(/enter an address/i), 'Labone, Accra');
+  await user.click(screen.getByRole('button', { name: /confirm booking/i }));
+  await screen.findByRole('status');
+
+  // The estimate panel exists and does not invent a window. A freshly booked
+  // order is not yet assigned, so the card says so plainly rather than quoting
+  // a delivery window nobody measured.
+  expect(screen.getByText(/when will my water arrive/i)).toBeInTheDocument();
+  expect(screen.getByText(/no order is on the way yet/i)).toBeInTheDocument();
+  expect(screen.queryByText(/estimated window/i)).not.toBeInTheDocument();
+});
+
 test('buyer finance shows real aggregates and an honest empty state', async () => {
   const user = userEvent.setup();
   render(<App />);
