@@ -170,7 +170,7 @@ Deno.serve(async (req: Request) => {
         grossMinor: orders.gross_minor,
         buyerPays: orders.charged_minor,
         buyerServiceCharge: orders.buyer_service_charge,
-        sellerReives: orders.seller_receives,
+        sellerReceives: orders.seller_receives,
         driverReceives: orders.driver_receives,
         platformCommission: orders.platform_commission,
       },
