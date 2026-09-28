@@ -4,7 +4,7 @@ import { list, replaceAll } from '../lib/collections';
 import { assignDriver, assignSeller } from '../lib/dispatch';
 import { getFleet, recordAssignment, seedFleet } from '../lib/fleet';
 import { createOrder } from '../lib/payments';
-import { allocate, formatCedi, DEFAULT_PRICING, DEFAULT_SPLIT } from '../lib/money';
+import { allocate, formatCedi, DEFAULT_PRICING, DEFAULT_SPLIT, quotePrice } from '../lib/money';
 import { db } from '../lib/firebase';
 import {
   collection,
@@ -33,6 +33,41 @@ const USE_FIRESTORE = typeof window !== 'undefined' && !!import.meta.env.VITE_FI
 
 function getOrdersCollection() {
   return collection(db, 'orders');
+}
+
+/**
+ * Build a server-shaped order from the client's own pricing, for the offline
+ * fallback.
+ *
+ * This exists so the app is demoable without a deployed server. It deliberately
+ * mirrors `functions/lib/pricing.js`'s `priceOrder` field-for-field — the same
+ * list price, discount and split — so a booking made offline and one made
+ * against the server carry identical figures. The client copy is display-only
+ * by design; here it is used only because there is no server to ask.
+ *
+ * It is not a settlement path. An order built this way is `Awaiting payment`
+ * and stays that way: there is no money behind it, and nothing in this function
+ * can mark it paid.
+ */
+function localPriceOrder(volumeLitres, pricing = DEFAULT_PRICING, split = DEFAULT_SPLIT) {
+  const quote = quotePrice(pricing);
+  const breakdown = allocate(quote.totalMinor, split);
+  return {
+    volumeLitres,
+    pricing: { ...pricing },
+    split: { ...split },
+    listMinor: quote.listMinor,
+    discountMinor: quote.listMinor - quote.discounted,
+    surgeMinor: quote.surgeMinor,
+    grossMinor: breakdown.gross,
+    chargedMinor: breakdown.buyerPays,
+    buyerPays: breakdown.buyerPays,
+    buyerServiceCharge: breakdown.buyerServiceCharge,
+    sellerReceives: breakdown.sellerReceives,
+    driverReceives: breakdown.driverReceives,
+    platformCommission: breakdown.platformCommission,
+    companyTake: breakdown.companyTake,
+  };
 }
 
 /**
@@ -124,8 +159,20 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
     try {
       serverOrder = await createOrder({ email, phone: buyerPhone, location, volumeLitres });
     } catch (caught) {
-      onNotice(caught.message || 'Could not reach the booking service. Please try again.');
-      return;
+      // No server reachable — e.g. running locally without Firebase. Fall back
+      // to the client's own pricing so the booking flow still works end to end.
+      // The order is still `Awaiting payment`: nothing here can settle it, and
+      // the payment flow will refuse without a server.
+      if (caught.status === 0 || /fetch|network|failed to fetch/i.test(caught.message || '')) {
+        serverOrder = localPriceOrder(volumeLitres, pricing, split);
+        serverOrder.id = `AQ-${generateBookingCode().toUpperCase()}`;
+        serverOrder.code = serverOrder.id;
+        serverOrder.location = location;
+        onNotice('Booking service is not reachable, so this order was priced locally. It is awaiting payment and cannot be settled without the server.');
+      } else {
+        onNotice(caught.message || 'Could not reach the booking service. Please try again.');
+        return;
+      }
     }
 
     const reference = serverOrder.id ?? serverOrder.code;
