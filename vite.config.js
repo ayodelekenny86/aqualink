@@ -2,10 +2,16 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from 'vite-plugin-pwa';
 
-// The Firebase Hosting emulator, which is what serves the `/api/*` rewrites in
-// firebase.json. Point the dev server at it and the client talks to the same
-// first-party `/api` paths it uses in production, so there is nothing to
-// reconfigure between local and deployed.
+// Where the server is reachable from the dev box. Two backends are supported:
+//
+//   - Supabase Edge Functions, when VITE_SUPABASE_PROJECT_REF (or
+//     VITE_SUPABASE_URL) and VITE_SUPABASE_ANON_KEY are set. The client talks
+//     to them directly on the absolute URL built by src/lib/api.js, so the proxy
+//     below is not used and the app is identical to production.
+//   - the Firebase Hosting emulator, which is what serves the `/api/*` rewrites
+//     in firebase.json. Point the dev server at it and the client talks to the
+//     same first-party `/api` paths it uses in production, so there is nothing to
+//     reconfigure between local and deployed.
 const DEFAULT_API_TARGET = "http://127.0.0.1:5000";
 
 // https://vitejs.dev/config/
@@ -105,6 +111,17 @@ export default defineConfig(({ mode }) => {
     strictPort: true,
     open: false,
     proxy: {
+      // Supabase Edge Functions, when running locally (`supabase start` serves
+      // them at http://127.0.0.1:54321/functions/v1/<fn>/<action>). The client
+      // builds these absolute URLs itself when VITE_SUPABASE_* is set, so this
+      // entry only matters for a developer who has the local stack up but has
+      // not set the env vars — it keeps the same `/functions/v1/...` paths
+      // reachable from the dev server's origin.
+      '/functions': {
+        target: loadEnv(mode, process.cwd(), '').AQUALINK_SUPABASE_TARGET || 'http://127.0.0.1:54321',
+        changeOrigin: true,
+        secure: false,
+      },
       // Without this, `fetch('/api/orders')` in dev hits the Vite dev server
       // itself, which answers with the SPA fallback: an HTML document where the
       // client expected JSON. Booking then failed with "returned an unreadable
@@ -125,6 +142,11 @@ export default defineConfig(({ mode }) => {
     port: 3000,
     strictPort: true,
     proxy: {
+      '/functions': {
+        target: process.env.AQUALINK_SUPABASE_TARGET || 'http://127.0.0.1:54321',
+        changeOrigin: true,
+        secure: false,
+      },
       '/api': {
         target: process.env.AQUALINK_API_TARGET || DEFAULT_API_TARGET,
         changeOrigin: true,
