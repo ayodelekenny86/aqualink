@@ -21,26 +21,17 @@ optional extra.
 
 ```sh
 npm install
-npm run dev        # http://localhost:3000
+npm run demo        # http://localhost:3000
 ```
 
-Without Firebase configured the app runs in offline mode against localStorage,
-so the buyer, seller and operator flows all work locally. Add Firebase to turn
-on real-time sync and push notifications:
+Without Firebase configured the app runs fully offline against localStorage, so
+the buyer, seller and operator flows all work locally. Add Firebase to turn on
+real-time sync and push notifications:
 
 ```sh
 cp .env.example .env
 # fill in VITE_FIREBASE_* from the Firebase console
 ```
-
-## Tests
-
-```sh
-npm test -- --run
-```
-
-305 tests across 19 files, including a 22-assertion honesty suite that pins
-the figures the app refuses to invent.
 
 ## Deploy
 
@@ -51,6 +42,15 @@ firebase deploy --only functions,hosting
 
 Then set the Paystack webhook URL in the Paystack dashboard to
 `https://<your-domain>/api/webhooks/paystack`.
+
+## Tests
+
+```sh
+npm run test:run
+```
+
+305 tests across 19 files, including a 22-assertion honesty suite that pins
+the figures the app refuses to invent.
 
 ## Honest figures
 

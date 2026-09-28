@@ -58,6 +58,17 @@ export default function PaymentPanel({ order, onPaid, showNotice }) {
           setNotice(`Payment not completed (${result.reason ?? 'no confirmation'}). Nothing was taken.`);
           return;
         }
+        // The server names the order it settled. The panel can be showing a
+        // different one — the workspace picks whichever order is still
+        // outstanding — and a receipt built from the wrong order would name
+        // the wrong reference, location and amount on a document the customer
+        // keeps. The money is genuinely paid either way; only the paperwork
+        // would be false.
+        const settledId = result.orderId ?? order.id ?? order.code;
+        if (settledId && (order.id ?? order.code) !== settledId) {
+          setNotice(`Payment of ${formatCedi(result.amountMinor ?? 0)} was received for order ${settledId}. Open that order to download its receipt.`);
+          return;
+        }
         const built = buildReceipt({ order, payment: result, breakdown: result.breakdown });
         saveReceipt(built);
         setReceipt(built);

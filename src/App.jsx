@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect } from 'react';
+import { lazy, Suspense, useState, useEffect, useMemo } from 'react';
 import './App.css';
 import { languages, translations } from './data/translations';
 import useAuth from './hooks/useAuth';
@@ -13,6 +13,7 @@ import { formatPhoneForDisplay, normalizePhone } from './lib/accounts';
 import { seedProducts } from './lib/collections';
 import { formatCedi } from './lib/money';
 import { summarise } from './lib/summary';
+import { referenceFromLocation } from './lib/payments';
 import { rankReliability, reliabilitySummary, estimateForOrder } from './lib/reliability';
 import ContactButtons from './components/ContactButtons';
 import useAdminPricing from './hooks/useAdminPricing';
@@ -170,6 +171,22 @@ function App() {
   const roleUnread = unreadCount(role);
   const detailOrder = orders.find((order) => order.id === detailOrderId) ?? null;
 
+  // Which order the checkout panel acts on.
+  //
+  // After a Paystack redirect the URL carries the reference that was just paid,
+  // so that order is the one to show — otherwise the panel opened whatever
+  // happened to be outstanding first, and the customer saw a receipt for an
+  // order they had not just paid for. Away from the return leg this is simply
+  // the oldest unpaid order, so the buyer can finish an abandoned checkout.
+  const returnReference = useMemo(() => referenceFromLocation(), []);
+  const payableOrder = useMemo(() => {
+    if (returnReference) {
+      const matched = orders.find((order) => order.paystackReference === returnReference);
+      if (matched) return matched;
+    }
+    return orders.find((order) => order.status !== 'Paid') ?? orders[0] ?? null;
+  }, [orders, returnReference]);
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -221,7 +238,7 @@ function App() {
         {ready && role === 'buyer' && buyerAuthenticated && (
           <Suspense fallback={<div className="panel lazy-fallback" aria-hidden="true" />}>
             <PaymentPanel
-              order={orders.find((order) => order.status !== 'Paid') ?? orders[0]}
+              order={payableOrder}
               onPaid={(orderId) => { updateOrderStatus(orderId, 'Paid', notify); }}
               showNotice={showNotice}
             />

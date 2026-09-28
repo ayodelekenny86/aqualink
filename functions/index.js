@@ -41,6 +41,19 @@ const OPS_ADMIN_PASSWORD = defineSecret('OPS_ADMIN_PASSWORD');
 const OPS_SESSION_SECRET = defineSecret('OPS_SESSION_SECRET');
 const ALLOWED_ORIGINS = defineString('ALLOWED_ORIGINS', { default: '' });
 
+// Where Paystack should send the customer back to once they have authorised (or
+// abandoned) the charge. Declared as a param rather than read from
+// `process.env`: on the v2 runtime `process.env` is not populated with the
+// function's own configuration, so a `process.env.APP_ORIGIN` read is always
+// undefined in production. That made `callback_url` undefined, Paystack fell
+// back to redirecting to its own dashboard, and the return leg of the redirect
+// — the only thing that verifies the payment and issues the receipt — never
+// happened. This is a v2 param, so it is set in functions/.env, which the CLI
+// deploys along with the code:
+//
+//   APP_ORIGIN=https://your-app.web.app
+const APP_ORIGIN = defineString('APP_ORIGIN', { default: '' });
+
 const CURRENCY = 'GHS';
 const COLLECTIONS = { orders: 'orders', config: 'config', ops: 'ops' };
 
@@ -133,9 +146,22 @@ async function paystackRequest(secret, path, init = {}) {
   return { ok: response.ok, status: response.status, body };
 }
 
+/**
+ * The URL Paystack redirects to after checkout.
+ *
+ * Returns `undefined` when the deployment has not declared an origin. Callers
+ * must treat that as a misconfiguration rather than silently falling back to
+ * something that would leave the customer stranded.
+ */
 function callbackUrl() {
-  const configured = process.env.APP_ORIGIN;
-  if (!configured) return undefined;
+  const configured = String(APP_ORIGIN.value() ?? '').trim();
+  if (!configured) {
+    logger.error(
+      'APP_ORIGIN is not set, so the payment return URL is undefined and Paystack will not redirect back to the app. ' +
+      'Set APP_ORIGIN in functions/.env and redeploy.',
+    );
+    return undefined;
+  }
   return `${configured.replace(/\/$/, '')}/#/payment/return`;
 }
 

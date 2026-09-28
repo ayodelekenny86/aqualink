@@ -13,6 +13,7 @@ import {
   orderBy,
   onSnapshot,
   addDoc,
+  setDoc,
   updateDoc,
   doc,
   serverTimestamp,
@@ -156,8 +157,12 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
     }
 
     let serverOrder;
+    // Whether the server already wrote this order to Firestore. It does, under
+    // the id it chose, and that document is the one the payment endpoints read.
+    let writtenByServer = false;
     try {
       serverOrder = await createOrder({ email, phone: buyerPhone, location, volumeLitres });
+      writtenByServer = true;
     } catch (caught) {
       // No server reachable — e.g. running locally without Firebase. Fall back
       // to the client's own pricing so the booking flow still works end to end.
@@ -187,6 +192,12 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
       status: 'Awaiting payment',
       payment: 'Not yet paid',
       date: new Date().toISOString(),
+      // The account email is the server's proof that the caller owns this
+      // order: `/api/payments/initialize` refuses a mismatch. Without it on the
+      // order, the checkout panel had no email to prefill, the buyer retyped it
+      // by hand, and any typo produced a 403 with no way to recover in-app.
+      email,
+      paystackReference: serverOrder.paystackReference ?? null,
       price: formatCedi(serverOrder.chargedMinor),
       listPrice: formatCedi(serverOrder.listMinor ?? serverOrder.grossMinor),
       discountPercent: serverOrder.pricing?.discountPercent ?? DEFAULT_PRICING.discountPercent,
@@ -203,12 +214,24 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
       confirmCode: '',
       buyerName: email || 'Buyer',
       buyerPhone,
-      createdAt: serverTimestamp(),
+      // The server stamps `createdAt` itself, and re-stamping it here would
+      // push the order's start time forward by however long the write took.
+      ...(writtenByServer ? {} : { createdAt: serverTimestamp() }),
     };
 
     if (USE_FIRESTORE && db) {
       try {
-        await addDoc(getOrdersCollection(), newOrder);
+        if (writtenByServer) {
+          // Write to the document the server created, merging into it. Using
+          // `addDoc` here added a *second*, auto-id order for the same booking:
+          // the panel, the ops queue and `summary.js` all read the collection
+          // directly, so one booking counted twice, and the duplicate carried a
+          // different id, so marking it paid never reached the order the
+          // Paystack reference was actually attached to.
+          await setDoc(doc(db, 'orders', reference), newOrder, { merge: true });
+        } else {
+          await addDoc(getOrdersCollection(), newOrder);
+        }
       } catch (err) {
         console.error('Failed to write order to Firestore:', err);
         onNotice('Order created but failed to sync. Will retry on next load.');

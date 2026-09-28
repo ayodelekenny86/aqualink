@@ -1,9 +1,16 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from 'vite-plugin-pwa';
 
+// The Firebase Hosting emulator, which is what serves the `/api/*` rewrites in
+// firebase.json. Point the dev server at it and the client talks to the same
+// first-party `/api` paths it uses in production, so there is nothing to
+// reconfigure between local and deployed.
+const DEFAULT_API_TARGET = "http://127.0.0.1:5000";
+
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  return {
   plugins: [
     react(),
     VitePWA({
@@ -38,18 +45,6 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/api\.paystack\.co\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'paystack-api',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24,
-              },
-              networkTimeoutSeconds: 10,
-            },
-          },
           {
             urlPattern: /^https:\/\/accounts\.google\.com\/.*/i,
             handler: 'NetworkFirst',
@@ -97,11 +92,33 @@ export default defineConfig({
     port: 3000,
     strictPort: true,
     open: false,
+    proxy: {
+      // Without this, `fetch('/api/orders')` in dev hits the Vite dev server
+      // itself, which answers with the SPA fallback: an HTML document where the
+      // client expected JSON. Booking then failed with "returned an unreadable
+      // response" and the Paystack redirect could never be initialised, so
+      // payments were impossible to exercise locally.
+      '/api': {
+        target: loadEnv(mode, process.cwd(), '').AQUALINK_API_TARGET || DEFAULT_API_TARGET,
+        changeOrigin: true,
+        // Never buffer or rewrite the body. The Paystack webhook is validated
+        // against the exact bytes received, and the emulator's own routing
+        // already handles the path.
+        secure: false,
+      },
+    },
   },
   preview: {
     host: '127.0.0.1',
     port: 3000,
     strictPort: true,
+    proxy: {
+      '/api': {
+        target: process.env.AQUALINK_API_TARGET || DEFAULT_API_TARGET,
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
   test: {
     globals: true,
@@ -115,4 +132,5 @@ export default defineConfig({
       },
     },
   },
+  };
 })
