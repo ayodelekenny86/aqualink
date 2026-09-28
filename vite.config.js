@@ -58,6 +58,18 @@ export default defineConfig(({ mode }) => {
             },
           },
           {
+            urlPattern: /^https:\/\/connect\.facebook\.net\/.*/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'facebook-sdk',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 60 * 60 * 24,
+              },
+              networkTimeoutSeconds: 10,
+            },
+          },
+          {
             urlPattern: /^https:\/\/www\.googleapis\.com\/.*/i,
             handler: 'StaleWhileRevalidate',
             options: {
