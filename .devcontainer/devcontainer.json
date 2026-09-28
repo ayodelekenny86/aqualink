@@ -14,6 +14,11 @@
       "openFiles": [
         "src/App.jsx"
       ]
+    },
+    "vscode": {
+      "extensions": [
+        "Supabase.vscode-supabase-extension"
+      ]
     }
   },
   "portsAttributes": {

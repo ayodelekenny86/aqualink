@@ -1,5 +1,6 @@
 {
     "recommendations": [
-        "amanblaze.auth-wizard"
+        "amanblaze.auth-wizard",
+        "supabase.vscode-supabase-extension"
     ]
 }

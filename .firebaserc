@@ -1,1 +1,7 @@
-{}
+{
+  "projects": {
+    "default": "viviluxy-assistant"
+  },
+  "targets": {},
+  "etags": {}
+}
