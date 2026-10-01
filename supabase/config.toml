@@ -54,3 +54,6 @@ verify_jwt = false
 
 [functions.fcm]
 verify_jwt = false
+
+[functions.test]
+verify_jwt = false

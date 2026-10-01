@@ -66,9 +66,11 @@ export function fail(status: number, code: string, message: string): Response {
 }
 
 export async function readJson(req: Request): Promise<Record<string, unknown>> {
-  const raw = await req.text();
-  if (!raw) return {};
-  try { return JSON.parse(raw); } catch { return {}; }
+  try {
+    const raw = await req.text();
+    if (!raw) return {};
+    return JSON.parse(raw);
+  } catch { return {}; }
 }
 
 export function generateId(prefix = 'AQ'): string {
