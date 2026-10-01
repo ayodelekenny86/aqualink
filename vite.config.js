@@ -16,6 +16,12 @@ const DEFAULT_API_TARGET = "http://127.0.0.1:5000";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
+  // loadEnv reads .env + .env.<mode> so the same values reach dev, build and
+  // test. Vitest does not run Vite's env loading itself, so the test block
+  // below injects them into import.meta.env — without that, the client thinks
+  // no server is configured and the fetch mock is bypassed.
+  const env = loadEnv(mode, process.cwd(), '');
+
   return {
   plugins: [
     react(),
@@ -164,6 +170,16 @@ export default defineConfig(({ mode }) => {
       forks: {
         singleFork: true,
       },
+    },
+    // Vitest does not load .env files, so `import.meta.env` is empty in tests
+    // and the client thinks no server is configured. Inject the configured
+    // values so tests exercise the same code path as production — the fetch
+    // mock then intercepts the absolute Supabase URLs instead of hitting the
+    // real backend.
+    define: {
+      'import.meta.env.VITE_SUPABASE_PROJECT_REF': JSON.stringify(env.VITE_SUPABASE_PROJECT_REF || ''),
+      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL || ''),
+      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY || ''),
     },
   },
   };

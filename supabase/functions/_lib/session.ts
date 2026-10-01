@@ -2,9 +2,28 @@
  * Ops session tokens and Paystack verification.
  * Mirrors functions/lib/session.js and functions/lib/verify.js.
  */
-import { createHmac, timingSafeEqual, randomBytes } from 'node:crypto';
+import { Buffer } from 'node:buffer';
+import { createHmac, randomBytes } from 'node:crypto';
 
 export const DEFAULT_TTL_SECONDS = 60 * 60 * 8;
+
+/**
+ * Deno has no global `Buffer` and its `node:crypto` shim rejects the
+ * `'base64url'` digest encoding, so `Buffer` is imported explicitly and the
+ * base64url encoding is applied by hand. Without both, every ops sign-in and
+ * Paystack signature check 500s.
+ */
+function digestBase64url(hash: { digest(): Uint8Array }): string {
+  return Buffer.from(hash.digest()).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+export function constantTimeEquals(a: string, b: string): boolean {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
 
 function base64url(value: string): string {
   return Buffer.from(value).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -47,7 +66,7 @@ export function signOpsToken({
   };
 
   const body = base64url(JSON.stringify(payload));
-  const signature = createHmac('sha256', secret).update(body).digest('base64url');
+  const signature = digestBase64url(createHmac('sha256', secret).update(body));
   return `${body}.${signature}`;
 }
 
@@ -62,11 +81,8 @@ export function verifyOpsToken(
   const [body, providedSignature] = token.split('.', 2);
   if (!body || !providedSignature) return { valid: false, reason: 'malformed_token' };
 
-  const expected = createHmac('sha256', secret).update(body).digest('base64url');
-  const a = Buffer.from(providedSignature, 'utf8');
-  const b = Buffer.from(expected, 'utf8');
-  if (a.length !== b.length) return { valid: false, reason: 'invalid_signature' };
-  if (!timingSafeEqual(a, b)) return { valid: false, reason: 'invalid_signature' };
+  const expected = digestBase64url(createHmac('sha256', secret).update(body));
+  if (!constantTimeEquals(providedSignature, expected)) return { valid: false, reason: 'invalid_signature' };
 
   let payload: OpsPayload;
   try {
@@ -132,10 +148,8 @@ export function verifyPaystackSignature(rawBody: string | Buffer, signature: str
     .update(Buffer.isBuffer(rawBody) ? rawBody : Buffer.from(String(rawBody), 'utf8'))
     .digest('hex');
 
-  const provided = Buffer.from(signature.trim(), 'utf8');
-  const computed = Buffer.from(expected, 'utf8');
-  if (provided.length !== computed.length) return false;
-  return timingSafeEqual(provided, computed);
+  const provided = String(signature).trim();
+  return constantTimeEquals(provided, expected);
 }
 
 export function checkSettlement({ transaction, order, currency = 'GHS' }: {

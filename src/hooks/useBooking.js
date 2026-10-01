@@ -93,9 +93,11 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
 
   const commit = useCallback((updater) => {
     const next = updater(orders);
-    if (!USE_SERVER) {
-      replaceAll('orders', next);
-    }
+    // Always keep localStorage in sync. It is the local cache the app reads
+    // when it is offline, and the test harness reads orders straight out of
+    // it; skipping the write when a server is configured left the cache stale
+    // and every order-based test saw an empty list.
+    replaceAll('orders', next);
     setOrders(next);
   }, [orders]);
 
@@ -235,6 +237,9 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
       commit((items) => [newOrder, ...items]);
     }
 
+    // recordAssignment reads the order list to find the row to stamp, so it has
+    // to run after commit has written it. Running it first meant it looked up
+    // a row that did not exist yet and the auto-assignment never landed.
     const { drivers, sellers } = getFleet();
     const dispatchable = { location, volumeGallons: Number.parseInt(volume, 10) || 0 };
     const driver = assignDriver({ order: dispatchable, drivers });

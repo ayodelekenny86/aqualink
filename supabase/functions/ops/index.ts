@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, scryptSync } from 'node:crypto';
 import { applyCors, fail, json, readJson } from '../_lib/utils.ts';
-import { signOpsToken, verifyOpsToken, bearerToken } from '../_lib/session.ts';
+import { signOpsToken, verifyOpsToken, bearerToken, constantTimeEquals } from '../_lib/session.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -23,10 +23,7 @@ function hashPassword(password: string, salt = randomBytes(16).toString('hex')) 
 
 function verifyPassword(password: string, salt: string, expectedHash: string) {
   const { hash } = hashPassword(password, salt);
-  const a = Buffer.from(hash, 'hex');
-  const b = Buffer.from(expectedHash, 'hex');
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+  return constantTimeEquals(hash, expectedHash);
 }
 
 Deno.serve(async (req: Request) => {
@@ -97,9 +94,7 @@ Deno.serve(async (req: Request) => {
     if (!presentedToken) {
       return fail(401, 'unauthorised', 'A valid bootstrap token is required.');
     }
-    const a = Buffer.from(presentedToken, 'utf8');
-    const b = Buffer.from(expectedToken, 'utf8');
-    if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    if (!constantTimeEquals(presentedToken, expectedToken)) {
       return fail(401, 'unauthorised', 'A valid bootstrap token is required.');
     }
 
