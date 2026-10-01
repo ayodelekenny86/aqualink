@@ -115,7 +115,7 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
           const next = exists
             ? current.map((o) => (o.id === row.id ? { ...o, ...row } : o))
             : [row, ...current];
-          if (!USE_SERVER) replaceAll('orders', next);
+          replaceAll('orders', next);
           return next;
         });
         setLoading(false);
@@ -179,7 +179,6 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
     }
 
     const reference = serverOrder.id ?? serverOrder.code;
-    const money = allocate(serverOrder.grossMinor, serverOrder.split);
     setBooking((current) => ({ ...current, location: '' }));
 
     const newOrder = {

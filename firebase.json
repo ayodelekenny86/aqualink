@@ -27,54 +27,6 @@
     ],
     "rewrites": [
       {
-        "source": "/api/pricing",
-        "function": { "functionId": "apiPricing", "region": "europe-west1" }
-      },
-      {
-        "source": "/api/pricing/update",
-        "function": { "functionId": "apiUpdatePricing", "region": "europe-west1" }
-      },
-      {
-        "source": "/api/ops/login",
-        "function": { "functionId": "apiOpsLogin", "region": "europe-west1" }
-      },
-      {
-        "source": "/api/sellers/apply",
-        "function": { "functionId": "apiApplySeller", "region": "europe-west1" }
-      },
-      {
-        "source": "/api/sellers/review",
-        "function": { "functionId": "apiReviewSeller", "region": "europe-west1" }
-      },
-      {
-        "source": "/api/sellers/applications",
-        "function": { "functionId": "apiSellerApplications", "region": "europe-west1" }
-      },
-      {
-        "source": "/api/sellers/status",
-        "function": { "functionId": "apiSellerStatus", "region": "europe-west1" }
-      },
-      {
-        "source": "/api/orders",
-        "function": { "functionId": "apiCreateOrder", "region": "europe-west1" }
-      },
-      {
-        "source": "/api/payments/initialize",
-        "function": { "functionId": "apiInitializePayment", "region": "europe-west1" }
-      },
-      {
-        "source": "/api/payments/verify",
-        "function": { "functionId": "apiVerifyPayment", "region": "europe-west1" }
-      },
-      {
-        "source": "/api/webhooks/paystack",
-        "function": { "functionId": "apiPaystackWebhook", "region": "europe-west1" }
-      },
-      {
-        "source": "/api/bootstrap/ops",
-        "function": { "functionId": "apiBootstrapOps", "region": "europe-west1" }
-      },
-      {
         "source": "**",
         "destination": "/index.html"
       }

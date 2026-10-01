@@ -8,7 +8,6 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.117.2",
     "@supabase/supabase-js": "^2.45.0",
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^13.4.0",
@@ -28,8 +27,8 @@
     "test": "vitest",
     "test:run": "vitest run",
     "demo": "npm run dev",
-    "emulators": "firebase emulators:start --only functions,hosting,firestore,auth",
-    "deploy": "firebase deploy --only functions,hosting"
+    "deploy": "npm run build",
+    "supabase:deploy": "supabase functions deploy fcm pricing orders payments sellers ops config"
   },
   "eslintConfig": {
     "extends": [

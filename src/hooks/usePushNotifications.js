@@ -4,16 +4,11 @@ import { apiRequest } from '../lib/api';
 /**
  * Push notifications via the AquaLink server.
  *
- * Firebase Cloud Messaging was the only push channel here, and it needs a
- * Firebase project, a VAPID key and a service worker that imports the Firebase
- * SDK. The Supabase backend has no FCM project, so this hook no longer depends
- * on Firebase at all: it asks the server to store or revoke a token, and the
- * server is what actually talks to the provider. When no server is configured
- * the hook reports "not supported" and does nothing, so the app still runs.
+ * The push channel is whatever the operator configures on the server; this
+ * hook only asks the server to store or revoke a token. When no server is
+ * configured the hook reports "not supported" and does nothing, so the app
+ * still runs.
  */
-
-const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
-const API_BASE = '/api';
 
 async function syncTokenToServer(userId, token, platform = 'web') {
   try {
