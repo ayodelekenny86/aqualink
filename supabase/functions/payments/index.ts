@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2/dist/esm/index.js';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { checkSettlement, verifyPaystackSignature } from '../_lib/session.ts';
 import { applyCors, fail, json } from '../_lib/utils.ts';
 

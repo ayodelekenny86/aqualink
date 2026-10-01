@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2/dist/esm/index.js';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { createHash } from 'node:crypto';
 import { applyCors, fail, json, readJson } from '../_lib/utils.ts';
 import { bearerToken, verifyOpsToken } from '../_lib/session.ts';

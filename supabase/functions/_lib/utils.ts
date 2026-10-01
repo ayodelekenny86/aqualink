@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2/dist/esm/index.js';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 export const CURRENCY = 'GHS';
 export const ALLOWED_ORIGINS = (Deno.env.get('ALLOWED_ORIGINS') ?? '')

@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2/dist/esm/index.js';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { DEFAULT_PRICING, DEFAULT_SPLIT, validateSplit } from '../_lib/pricing.ts';
 import { validatePricingInput, bearerToken, verifyOpsToken } from '../_lib/session.ts';
 import { applyCors, fail, json, readJson } from '../_lib/utils.ts';
