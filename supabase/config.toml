@@ -7,7 +7,7 @@ extra_search_path = ["public", "extensions"]
 [db]
 port = 54322
 shadow_port = 54323
-major_version = 16
+major_version = 17
 
 [studio]
 enabled = true
@@ -24,27 +24,12 @@ pop_port = 54326
 # Enable Edge Functions for local development
 enabled = true
 
-# Function-specific configuration
-[edge_functions.config]
-import_map = "./functions/config/import_map.json"
-
-[edge_functions.orders]
-import_map = "./functions/orders/import_map.json"
-
-[edge_functions.pricing]
-import_map = "./functions/pricing/import_map.json"
-
-[edge_functions.ops]
-import_map = "./functions/ops/import_map.json"
-
-[edge_functions.payments]
-import_map = "./functions/payments/import_map.json"
-
-[edge_functions.sellers]
-import_map = "./functions/sellers/import_map.json"
-
-[edge_functions.fcm]
-import_map = "./functions/fcm/import_map.json"
+# Each function directory carries its own deno.json with the import map, which
+# bypasses the CLI's import-map injection. The previous import_map.json entries
+# made the CLI pin @supabase/supabase-js@2.117.2, a URL esm.sh no longer serves,
+# so every deploy failed to bundle with "Module not found". deno.json uses the
+# unpinned https://esm.sh/@supabase/supabase-js@2/dist/esm/index.js, which
+# resolves. This also clears the CLI's deprecated-import-map warning.
 
 [functions]
 # Function-specific environment variables (for local development)
