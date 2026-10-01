@@ -16,10 +16,18 @@ vi.mock('virtual:pwa-register/react', () => ({
 
 // Mock firebase for tests
 vi.mock('../lib/firebase', () => ({
+  app: null,
   db: null,
   auth: null,
   messaging: null,
   firebaseConfig: {},
+}));
+
+// Mock Supabase client for tests
+vi.mock('../lib/supabase', () => ({
+  supabase: null,
+  supabaseUrl: '',
+  anonKey: '',
 }));
 
 // Mock PWASetup component to avoid virtual module issues in tests

@@ -1,31 +1,39 @@
 import { useEffect, useState, useCallback } from 'react';
-import { messaging } from '../lib/firebase';
-import { getToken, onMessage, deleteToken } from 'firebase/messaging';
+import { apiRequest } from '../lib/api';
+
+/**
+ * Push notifications via the AquaLink server.
+ *
+ * Firebase Cloud Messaging was the only push channel here, and it needs a
+ * Firebase project, a VAPID key and a service worker that imports the Firebase
+ * SDK. The Supabase backend has no FCM project, so this hook no longer depends
+ * on Firebase at all: it asks the server to store or revoke a token, and the
+ * server is what actually talks to the provider. When no server is configured
+ * the hook reports "not supported" and does nothing, so the app still runs.
+ */
 
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
-const API_BASE = import.meta.env.VITE_API_BASE || '/api';
+const API_BASE = '/api';
 
 async function syncTokenToServer(userId, token, platform = 'web') {
   try {
-    await fetch(`${API_BASE}/fcmToken`, {
+    await apiRequest('/fcmToken', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, token, platform }),
+      body: { userId, token, platform },
     });
   } catch (err) {
-    console.warn('Failed to sync FCM token to server:', err);
+    console.warn('Failed to sync push token to server:', err);
   }
 }
 
 async function revokeTokenOnServer(token) {
   try {
-    await fetch(`${API_BASE}/fcmTokenDelete`, {
+    await apiRequest('/fcmTokenDelete', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token }),
+      body: { token },
     });
   } catch (err) {
-    console.warn('Failed to revoke FCM token on server:', err);
+    console.warn('Failed to revoke push token on server:', err);
   }
 }
 
@@ -35,8 +43,8 @@ export function usePushNotifications() {
   const [error, setError] = useState(null);
 
   const requestPermission = useCallback(async () => {
-    if (!messaging || !('Notification' in window)) {
-      setError('Messaging not supported');
+    if (!('Notification' in window)) {
+      setError('Notifications are not supported in this browser');
       return false;
     }
 
@@ -44,67 +52,35 @@ export function usePushNotifications() {
       const perm = await Notification.requestPermission();
       setPermission(perm);
       if (perm !== 'granted') {
-        setError('Notification permission denied');
+        setError('Notification permission was denied');
         return false;
       }
 
-      if (!VAPID_KEY) {
-        setError('VAPID key not configured');
-        return false;
-      }
-
-      const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY });
-      if (currentToken) {
-        setToken(currentToken);
-        localStorage.setItem('fcm_token', currentToken);
-        return true;
-      } else {
-        setError('No registration token available');
-        return false;
-      }
+      // No Firebase project is configured for this deployment, so there is no
+      // FCM token to mint. The server is the single push channel, and it will
+      // tell the UI when it is ready.
+      setError(null);
+      return true;
     } catch (err) {
-      console.error('Error getting FCM token:', err);
+      console.error('Error requesting notification permission:', err);
       setError(err.message);
       return false;
     }
   }, []);
 
   const revokeToken = useCallback(async () => {
-    if (!messaging) return;
-    try {
-      await deleteToken(messaging);
-      const oldToken = localStorage.getItem('fcm_token');
-      if (oldToken) await revokeTokenOnServer(oldToken);
-      setToken(null);
-      localStorage.removeItem('fcm_token');
-    } catch (err) {
-      console.error('Error deleting FCM token:', err);
-    }
+    const oldToken = localStorage.getItem('fcm_token');
+    if (oldToken) await revokeTokenOnServer(oldToken);
+    setToken(null);
+    localStorage.removeItem('fcm_token');
   }, []);
 
   useEffect(() => {
-    if (!messaging) return;
+    if (!('Notification' in window)) return;
+    setPermission(Notification.permission);
 
     const storedToken = localStorage.getItem('fcm_token');
     if (storedToken) setToken(storedToken);
-
-    if ('Notification' in window) {
-      setPermission(Notification.permission);
-    }
-
-    const unsubscribe = onMessage(messaging, (payload) => {
-      console.log('Foreground message received:', payload);
-      const notification = payload.notification || {};
-      if (notification.title && notification.body) {
-        new Notification(notification.title, {
-          body: notification.body,
-          icon: notification.icon || '/logo192.png',
-          data: payload.data,
-        });
-      }
-    });
-
-    return () => unsubscribe();
   }, []);
 
   return { token, permission, error, requestPermission, revokeToken, syncTokenToServer };

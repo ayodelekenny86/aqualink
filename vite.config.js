@@ -21,7 +21,7 @@ export default defineConfig(({ mode }) => {
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'robots.txt', 'Octocat.png', 'firebase-messaging-sw.js'],
+      includeAssets: ['favicon.ico', 'robots.txt', 'Octocat.png'],
       manifest: {
         name: 'AquaLink',
         short_name: 'AquaLink',

@@ -5,19 +5,7 @@ import { assignDriver, assignSeller } from '../lib/dispatch';
 import { getFleet, recordAssignment, seedFleet } from '../lib/fleet';
 import { createOrder } from '../lib/payments';
 import { allocate, formatCedi, DEFAULT_PRICING, DEFAULT_SPLIT, quotePrice } from '../lib/money';
-import { db } from '../lib/firebase';
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  onSnapshot,
-  addDoc,
-  setDoc,
-  updateDoc,
-  doc,
-  serverTimestamp,
-} from 'firebase/firestore';
+import { supabase, supabaseUrl, anonKey } from '../lib/supabase';
 
 const LITRES_PER_GALLON = 3.785411784;
 
@@ -30,11 +18,12 @@ function toLitres(volumeLabel) {
 const initialBooking = { location: '', volume: '2,000 gallons', window: 'As soon as possible', payment: 'Mobile money', whatsapp: '' };
 const initialSavedAddresses = [];
 
-const USE_FIRESTORE = typeof window !== 'undefined' && !!import.meta.env.VITE_FIREBASE_API_KEY && !!db;
-
-function getOrdersCollection() {
-  return collection(db, 'orders');
-}
+/**
+ * Whether the app can talk to a live server. Supabase is preferred when its
+ * project ref and anon key are set; otherwise the app runs against localStorage
+ * and the booking flow falls back to local pricing.
+ */
+const USE_SERVER = typeof window !== 'undefined' && !!supabaseUrl && !!anonKey;
 
 /**
  * Build a server-shaped order from the client's own pricing, for the offline
@@ -75,8 +64,8 @@ function localPriceOrder(volumeLitres, pricing = DEFAULT_PRICING, split = DEFAUL
  * Owns booking form state, the order list, saved addresses and the driver
  * position update shown on the buyer and seller workspaces.
  *
- * When Firebase is configured, orders sync in real-time via Firestore.
- * Otherwise, orders persist to localStorage (offline/demo mode).
+ * When Supabase is configured, orders sync in real-time via Supabase
+ * Realtime. Otherwise, orders persist to localStorage (offline/demo mode).
  */
 export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing = DEFAULT_PRICING, split = DEFAULT_SPLIT }) {
   const [orders, setOrders] = useState(() => {
@@ -85,7 +74,7 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
   });
   const [booking, setBooking] = useState(initialBooking);
   const [savedAddresses, setSavedAddresses] = useState(initialSavedAddresses);
-  const [loading, setLoading] = useState(USE_FIRESTORE);
+  const [loading, setLoading] = useState(USE_SERVER);
   const [error, setError] = useState(null);
 
   // The buyer's live driver update is derived from the most recent order that
@@ -95,7 +84,7 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
   const driverUpdate = useMemo(() => {
     const mine = orders
       .filter(o => (email && (o.buyerEmail === email || o.email === email)) || (buyerPhone && o.buyerPhone === buyerPhone))
-      .sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
+      .sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || b.date));
     const active = mine.find(o => o.driverName && ['Assigned', 'En Route'].includes(o.status));
     if (!active) return 'No driver is assigned to your orders yet. One will appear here once a seller accepts.';
     const base = `${active.driverName} · ${active.status.toLowerCase()}`;
@@ -104,33 +93,42 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
 
   const commit = useCallback((updater) => {
     const next = updater(orders);
-    if (!USE_FIRESTORE) {
+    if (!USE_SERVER) {
       replaceAll('orders', next);
     }
     setOrders(next);
   }, [orders]);
 
   useEffect(() => {
-    if (!USE_FIRESTORE || !db) {
+    if (!USE_SERVER || !supabase) {
       setLoading(false);
       return;
     }
 
-    const ordersQuery = query(getOrdersCollection(), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(ordersQuery, (snapshot) => {
-      const firestoreOrders = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      if (!USE_FIRESTORE) {
-        replaceAll('orders', firestoreOrders);
-      }
-      setOrders(firestoreOrders);
-      setLoading(false);
-    }, (err) => {
-      console.error('Firestore orders listener error:', err);
-      setError(err.message);
-      setLoading(false);
-    });
+    const channel = supabase
+      .channel('orders:all')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+        const row = payload.new || payload.old;
+        if (!row) return;
+        setOrders((current) => {
+          const exists = current.some((o) => o.id === row.id);
+          const next = exists
+            ? current.map((o) => (o.id === row.id ? { ...o, ...row } : o))
+            : [row, ...current];
+          if (!USE_SERVER) replaceAll('orders', next);
+          return next;
+        });
+        setLoading(false);
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') setLoading(false);
+        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          setError('Could not sync orders in real time.');
+          setLoading(false);
+        }
+      });
 
-    return () => unsubscribe();
+    return () => { try { supabase.removeChannel(channel); } catch {} };
   }, []);
 
   const updateBooking = useCallback((event) => {
@@ -157,14 +155,14 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
     }
 
     let serverOrder;
-    // Whether the server already wrote this order to Firestore. It does, under
+    // Whether the server already wrote this order to the database. It does, under
     // the id it chose, and that document is the one the payment endpoints read.
     let writtenByServer = false;
     try {
       serverOrder = await createOrder({ email, phone: buyerPhone, location, volumeLitres });
       writtenByServer = true;
     } catch (caught) {
-      // No server reachable — e.g. running locally without Firebase. Fall back
+      // No server reachable — e.g. running locally without Supabase. Fall back
       // to the client's own pricing so the booking flow still works end to end.
       // The order is still `Awaiting payment`: nothing here can settle it, and
       // the payment flow will refuse without a server.
@@ -214,26 +212,23 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
       confirmCode: '',
       buyerName: email || 'Buyer',
       buyerPhone,
-      // The server stamps `createdAt` itself, and re-stamping it here would
-      // push the order's start time forward by however long the write took.
-      ...(writtenByServer ? {} : { createdAt: serverTimestamp() }),
+      createdAt: new Date().toISOString(),
     };
 
-    if (USE_FIRESTORE && db) {
+    if (USE_SERVER && supabase) {
       try {
         if (writtenByServer) {
-          // Write to the document the server created, merging into it. Using
-          // `addDoc` here added a *second*, auto-id order for the same booking:
-          // the panel, the ops queue and `summary.js` all read the collection
-          // directly, so one booking counted twice, and the duplicate carried a
-          // different id, so marking it paid never reached the order the
-          // Paystack reference was actually attached to.
-          await setDoc(doc(db, 'orders', reference), newOrder, { merge: true });
+          // Write to the row the server created, merging into it. Inserting a
+          // second row for the same booking would make the panel, the ops queue
+          // and summary.js all read the collection directly, so one booking
+          // counted twice, and the duplicate carried a different id, so marking
+          // it paid never reached the order the Paystack reference was on.
+          await supabase.from('orders').update(newOrder).eq('id', reference);
         } else {
-          await addDoc(getOrdersCollection(), newOrder);
+          await supabase.from('orders').insert(newOrder);
         }
       } catch (err) {
-        console.error('Failed to write order to Firestore:', err);
+        console.error('Failed to write order to Supabase:', err);
         onNotice('Order created but failed to sync. Will retry on next load.');
         commit((items) => [newOrder, ...items]);
       }
@@ -276,12 +271,13 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
     // Stamp the timing the reliability engine reads. An order that was never
     // assigned has no delivery window to measure, and that is reported as
     // unmeasured rather than given an invented one.
-    const updates = { status, updatedAt: serverTimestamp() };
-    if (status === 'Assigned') updates.assignedAt = serverTimestamp();
-    if (status === 'Delivered') updates.deliveredAt = serverTimestamp();
-    if (USE_FIRESTORE && db) {
+    const now = new Date().toISOString();
+    const updates = { status, updatedAt: now };
+    if (status === 'Assigned') updates.assignedAt = now;
+    if (status === 'Delivered') updates.deliveredAt = now;
+    if (USE_SERVER && supabase) {
       try {
-        await updateDoc(doc(getOrdersCollection(), orderId), updates);
+        await supabase.from('orders').update(updates).eq('id', orderId);
       } catch (err) {
         console.error('Failed to update order status:', err);
         commit((items) => items.map((item) => (item.id === orderId ? { ...item, ...updates } : item)));
@@ -302,10 +298,10 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
 
   const issueDeliveryCode = useCallback(async (orderId) => {
     const code = generateConfirmationCode('delivery');
-    const updates = { confirmCode: code, updatedAt: serverTimestamp() };
-    if (USE_FIRESTORE && db) {
+    const updates = { confirmCode: code, updatedAt: new Date().toISOString() };
+    if (USE_SERVER && supabase) {
       try {
-        await updateDoc(doc(getOrdersCollection(), orderId), updates);
+        await supabase.from('orders').update(updates).eq('id', orderId);
       } catch (err) {
         console.error('Failed to issue delivery code:', err);
         commit((items) => items.map((item) => (item.id === orderId ? { ...item, confirmCode: code } : item)));
@@ -329,11 +325,11 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
       status: 'Delivered',
       payment: 'Delivered · awaiting seller payout',
       confirmCode: '',
-      updatedAt: serverTimestamp(),
+      updatedAt: new Date().toISOString(),
     };
-    if (USE_FIRESTORE && db) {
+    if (USE_SERVER && supabase) {
       try {
-        await updateDoc(doc(getOrdersCollection(), orderId), updates);
+        await supabase.from('orders').update(updates).eq('id', orderId);
       } catch (err) {
         console.error('Failed to confirm delivery:', err);
         commit((items) => items.map((item) => (item.id === orderId

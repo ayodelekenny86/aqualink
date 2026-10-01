@@ -44,6 +44,8 @@ const ROUTES = {
   '/sellers/review': { fn: 'sellers', action: 'review' },
   '/config/get': { fn: 'config', action: 'get' },
   '/config/update': { fn: 'config', action: 'update' },
+  '/fcmToken': { fn: 'fcm', action: 'fcmToken' },
+  '/fcmTokenDelete': { fn: 'fcm', action: 'fcmTokenDelete' },
 };
 
 /**

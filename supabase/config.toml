@@ -43,6 +43,9 @@ import_map = "./functions/payments/import_map.json"
 [edge_functions.sellers]
 import_map = "./functions/sellers/import_map.json"
 
+[edge_functions.fcm]
+import_map = "./functions/fcm/import_map.json"
+
 [functions]
 # Function-specific environment variables (for local development)
 # These are overridden by Supabase Dashboard secrets in production
@@ -62,4 +65,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.sellers]
+verify_jwt = false
+
+[functions.fcm]
 verify_jwt = false
