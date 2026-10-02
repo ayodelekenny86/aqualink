@@ -15,6 +15,7 @@ const DEFAULT_SUPPORT = { name: 'AquaLink Support', phone: '0545009046' };
 /** Digits-only international form that wa.me and tel: both need. */
 export function internationalPhone(phone) {
   const normalized = normalizePhone(phone);
+  if (!normalized) return '';
   if (normalized.startsWith('+')) return normalized.slice(1);
   if (normalized.startsWith('0')) return `233${normalized.slice(1)}`;
   return normalized;
