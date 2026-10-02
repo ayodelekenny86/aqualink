@@ -120,8 +120,26 @@ describe('starting a payment', () => {
     await initialisePayment({ orderId: ORDER.id, email: ORDER.email });
 
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    // The client has no business naming a price; the server computes it.
-    expect(Object.keys(body).sort()).toEqual(['email', 'orderId']);
+    // The client has no business naming a price; the server computes it. The
+    // check is on the absence of money fields specifically, because the client
+    // may legitimately carry other non-financial fields (a chosen provider, for
+    // instance) — what must never be true is that it names an amount.
+    for (const forbidden of ['amount', 'amountMinor', 'price', 'chargedMinor', 'grossMinor', 'totalMinor']) {
+      expect(body[forbidden]).toBeUndefined();
+    }
+    expect(body.orderId).toBe(ORDER.id);
+    expect(body.email).toBe(ORDER.email);
+  });
+
+  test('does not send a price even when a provider is chosen', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ reference: 'r1', authorizationUrl: 'u', status: 'pending' }));
+    await initialisePayment({ orderId: ORDER.id, email: ORDER.email, provider: 'flutterwave' });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.provider).toBe('flutterwave');
+    for (const forbidden of ['amount', 'amountMinor', 'price', 'chargedMinor', 'grossMinor', 'totalMinor']) {
+      expect(body[forbidden]).toBeUndefined();
+    }
   });
 });
 
