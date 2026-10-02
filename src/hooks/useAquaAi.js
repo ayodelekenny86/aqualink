@@ -190,19 +190,26 @@ export function useAquaAi({ language, orders = [], split, sellerScores = [], rel
     setAiMessages((messages) => [...messages, { from: 'user', text: question }]);
     setAiInput('');
 
-    const { answer, source } = await askAiQuestion({
-      question,
-      role,
-      orders,
-      split,
-      sellerScores,
-      reliabilityScores,
-      buyerId,
-      language,
-    });
-
-    setAiSource(source);
-    setAiMessages((messages) => [...messages, { from: 'ai', text: answer }]);
+    try {
+      const { answer, source } = await askAiQuestion({
+        question,
+        role,
+        orders,
+        split,
+        sellerScores,
+        reliabilityScores,
+        buyerId,
+        language,
+      });
+      setAiSource(source);
+      setAiMessages((messages) => [...messages, { from: 'ai', text: answer }]);
+    } catch {
+      // Server unreachable (offline, dev mode, etc.) — fall back to the local
+      // keyword matcher so the panel still answers from real order data.
+      const answer = getAiAnswer(question, { language, orders, split, sellerScores, reliabilityScores, buyerId });
+      setAiSource('fallback');
+      setAiMessages((messages) => [...messages, { from: 'ai', text: answer }]);
+    }
     setAiLoading(false);
   }, [aiInput, language, orders, split, sellerScores, reliabilityScores, buyerId, role]);
 
