@@ -1,11 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
   checkSettlement,
+  newReference,
   verifyPaystackSignature,
   verifyFlutterwaveSignature,
   checkFlutterwaveSettlement,
 } from '../_lib/session.ts';
-import { applyCors, fail, json } from '../_lib/utils.ts';
+import { applyCors, fail, json, isPlausibleReference } from '../_lib/utils.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -121,7 +122,7 @@ Deno.serve(async (req: Request) => {
       if (provider === 'flutterwave') {
         if (!FLUTTERWAVE_SECRET_KEY) return fail(503, 'payments_unconfigured', 'Flutterwave is not configured.');
 
-        const txRef = `aq-${orderId.toLowerCase().replace(/[^a-z0-9]/g, '')}-${crypto.randomUUID().slice(0, 8)}`;
+        const txRef = newReference(orderId);
 
         const { ok, body: fw } = await flutterwaveRequest('/payments', {
           method: 'POST',
@@ -141,10 +142,19 @@ Deno.serve(async (req: Request) => {
           return fail(502, 'provider_rejected', fw?.message ?? 'The payment provider rejected this request.');
         }
 
-        await db.from('orders').update({
+        const { error: storeError } = await db.from('orders').update({
           flutterwave_reference: txRef,
           status: 'Awaiting payment',
         }).eq('id', orderId);
+
+        // The reference has to be stored before the customer is redirected. If
+        // the write failed and the redirect happened anyway, the buyer paid
+        // against a reference no order knows about, so the webhook found no
+        // order and the payment could never be applied.
+        if (storeError) {
+          console.error('flutterwave reference store failed', storeError);
+          return fail(500, 'reference_store_failed', 'Could not start this payment. Please try again.');
+        }
 
         return json({
           reference: txRef,
@@ -159,7 +169,7 @@ Deno.serve(async (req: Request) => {
       // Paystack path
       if (!PAYSTACK_SECRET_KEY) return fail(503, 'payments_unconfigured', 'Paystack is not configured.');
 
-      const paystackReference = `aq-${orderId.toLowerCase().replace(/[^a-z0-9]/g, '')}-${crypto.randomUUID().slice(0, 8)}`;
+      const paystackReference = newReference(orderId);
 
       const { ok, body: paystack } = await paystackRequest('/transaction/initialize', {
         method: 'POST',
@@ -177,11 +187,19 @@ Deno.serve(async (req: Request) => {
         return fail(502, 'provider_rejected', paystack?.message ?? 'The payment provider rejected this request.');
       }
 
-      await db.from('orders').update({
+      const { error: storeError } = await db.from('orders').update({
         paystack_reference: paystackReference,
         paystack_access_code: paystack.data?.access_code ?? null,
         status: 'Awaiting payment',
       }).eq('id', orderId);
+
+      // Same reasoning as the Flutterwave leg: the reference must be stored
+      // before the buyer is redirected to Paystack, or the payment arrives
+      // against an order that has no record of it.
+      if (storeError) {
+        console.error('paystack reference store failed', storeError);
+        return fail(500, 'reference_store_failed', 'Could not start this payment. Please try again.');
+      }
 
       return json({
         reference: paystackReference,
@@ -199,6 +217,13 @@ Deno.serve(async (req: Request) => {
 
       const reference = String(url.searchParams.get('reference') ?? '').trim();
       if (!reference) return fail(400, 'invalid_reference', 'A payment reference is required.');
+      // This value is interpolated into a PostgREST `.or()` filter below. An
+      // allowlist is the only thing standing between a caller and a crafted
+      // filter, so it is checked before the query is built rather than trusted
+      // because it "came from the URL".
+      if (!isPlausibleReference(reference)) {
+        return fail(400, 'invalid_reference', 'That payment reference is not valid.');
+      }
 
       const db = supabase();
       const { data: order, error: orderError } = await db
@@ -211,7 +236,16 @@ Deno.serve(async (req: Request) => {
         return json({ status: 'unknown', settled: false, reason: 'no_matching_order' });
       }
 
-      const provider: Provider = order.flutterwave_reference ? 'flutterwave' : 'paystack';
+      // Which provider to ask is decided by *which reference was presented*, not by
+      // whether the order happens to hold a Flutterwave reference at all.
+      //
+      // A customer can start a Flutterwave payment, abandon it, and then pay
+      // through Paystack. The order still carries the abandoned Flutterwave
+      // reference, so the old `order.flutterwave_reference ? ...` test sent the
+      // Paystack reference to Flutterwave's API, which rejected it — and a
+      // genuinely paid order showed the customer "not completed".
+      const matchedFlutterwave = String(order.flutterwave_reference ?? '') === reference;
+      const provider: Provider = matchedFlutterwave ? 'flutterwave' : 'paystack';
       const secret = provider === 'flutterwave' ? FLUTTERWAVE_SECRET_KEY : PAYSTACK_SECRET_KEY;
       if (!secret) return fail(503, 'payments_unconfigured', `${provider} is not configured.`);
 
@@ -234,8 +268,17 @@ Deno.serve(async (req: Request) => {
         ? checkFlutterwaveSettlement({ transaction, order, currency: order.currency ?? 'GHS' })
         : checkSettlement({
             transaction: {
-              status: transaction.status ?? 'success',
-              reference,
+              // No `?? 'success'` here. When Paystack returned a record with no
+              // `status` field, the old default read as a successful charge and
+              // marked the order paid on the strength of an absent field. The
+              // provider's own status is the only thing that can say 'success';
+              // when it is missing the answer has to be 'not yet'.
+              status: transaction.status,
+              // The provider's reference, not the one from the query string.
+              // `checkSettlement` exists to prove the charge belongs to this
+              // order, and it cannot prove that if it is handed the caller's own
+              // value to agree with.
+              reference: transaction.reference,
               amount: transaction.amount,
               currency: transaction.currency,
               paid_at: transaction.paid_at,
@@ -246,12 +289,25 @@ Deno.serve(async (req: Request) => {
 
       const alreadyPaid = order.status === 'Paid';
       if (verdict.settled && !alreadyPaid) {
-        await db.from('orders').update({
+        const { error: writeError } = await db.from('orders').update({
           status: 'Paid',
           paid_at: verdict.paidAt ?? transaction.paid_at ?? new Date().toISOString(),
-          paystack_channel: transaction.channel ?? null,
-          flutterwave_channel: transaction.channel ?? null,
+          // Only the column for the provider that actually took the money. Both
+          // were previously written with the same value, so every Paystack
+          // charge also recorded a Flutterwave channel and vice versa.
+          ...(provider === 'flutterwave'
+            ? { flutterwave_channel: transaction.channel ?? null }
+            : { paystack_channel: transaction.channel ?? null }),
         }).eq('id', order.id);
+
+        // Refuse to confirm a settlement the database did not accept. Reporting
+        // `settled: true` after a failed write issues a receipt for a state that
+        // was never stored, and the next verification reads the order as unpaid
+        // again.
+        if (writeError) {
+          console.error('settlement record failed', { orderId: order.id, writeError });
+          return fail(500, 'settlement_record_failed', 'The payment arrived but could not be recorded. Support has been notified.');
+        }
 
         return json({
           settled: true,
@@ -273,10 +329,17 @@ Deno.serve(async (req: Request) => {
         });
       }
 
+      // An order already marked `Paid` is settled regardless of what this call
+      // observes, because the earlier write is the durable record. The old
+      // `verdict.settled && alreadyPaid` meant a repeat verification of a paid
+      // order returned `settled: false` — the customer had paid, the webhook
+      // had confirmed it, and the app still told them nothing was taken.
+      const settledNow = alreadyPaid || verdict.settled;
+
       return json({
-        settled: verdict.settled && alreadyPaid,
-        status: verdict.settled ? 'settled' : 'pending',
-        reason: verdict.reason,
+        settled: settledNow,
+        status: settledNow ? 'settled' : 'pending',
+        reason: alreadyPaid ? 'already_paid' : verdict.reason,
         reference,
         orderId: order.id,
         amountMinor: order.charged_minor,
@@ -336,6 +399,14 @@ Deno.serve(async (req: Request) => {
         ? event?.data?.tx_ref
         : event?.data?.reference;
       if (!reference) return json({ received: true, ignored: 'no_reference' });
+      // Same allowlist as the verify leg, and for the same reason: the reference
+      // is interpolated into a PostgREST `.or()` filter. The signature check
+      // above proves the body came from the provider, but a provider will relay
+      // whatever reference it was given, so the value still has to be shaped
+      // like one we issued.
+      if (!isPlausibleReference(String(reference))) {
+        return fail(400, 'invalid_reference', 'That payment reference is not valid.');
+      }
 
       try {
         const db = supabase();
@@ -354,8 +425,12 @@ Deno.serve(async (req: Request) => {
           ? checkFlutterwaveSettlement({ transaction, order, currency: order.currency ?? 'GHS' })
           : checkSettlement({
               transaction: {
-                status: event.data?.status ?? 'success',
-                reference,
+                // Same rule as the verify leg: a webhook that omits `status` has
+                // not reported success, and must not be read as though it had.
+                status: event.data?.status,
+                // The reference Paystack put in the signed body, which is the
+                // one the signature covers.
+                reference: event.data?.reference,
                 amount: event.data?.amount,
                 currency: event.data?.currency,
                 paid_at: event.data?.paid_at,
@@ -365,12 +440,22 @@ Deno.serve(async (req: Request) => {
             });
 
         if (verdict.settled && order.status !== 'Paid') {
-          await db.from('orders').update({
+          const { error: writeError } = await db.from('orders').update({
             status: 'Paid',
             paid_at: verdict.paidAt ?? event.data?.paid_at ?? null,
-            paystack_channel: event.data?.channel ?? null,
-            flutterwave_channel: event.data?.channel ?? null,
+            // Provider-scoped, for the same reason as the verify leg.
+            ...(provider === 'flutterwave'
+              ? { flutterwave_channel: event.data?.channel ?? null }
+              : { paystack_channel: event.data?.channel ?? null }),
           }).eq('id', order.id);
+
+          // The webhook still answers 200 either way: the provider must not
+          // retry a payment it already took. The failure is logged loudly and
+          // surfaced to the operator rather than hidden behind a cheerful 200.
+          if (writeError) {
+            console.error('webhook settlement record failed', { orderId: order.id, reference, writeError });
+            return fail(500, 'settlement_record_failed', 'Could not record this settlement.');
+          }
 
           console.info('order marked paid from webhook', { orderId: order.id, reference, provider });
         } else {

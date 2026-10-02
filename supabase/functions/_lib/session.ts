@@ -93,7 +93,9 @@ export function verifyOpsToken(
 
   const seconds = Math.floor(now / 1000);
   if (!Number.isFinite(payload?.exp)) return { valid: false, reason: 'missing_expiry' };
-  if (seconds > payload.exp) return { valid: false, reason: 'expired' };
+  // `>=`, not `>`: `exp` is the first second the token is *no longer* valid, so
+  // `>` let it survive one extra second past its stated lifetime.
+  if (seconds >= payload.exp) return { valid: false, reason: 'expired' };
   if (Number.isFinite(payload.iat) && payload.iat - seconds > 60) return { valid: false, reason: 'issued_in_future' };
   if (requiredRole && payload.role !== requiredRole) return { valid: false, reason: 'wrong_role' };
   if (!payload.sub) return { valid: false, reason: 'missing_subject' };
@@ -140,6 +142,28 @@ export function validatePricingInput(pricing: any, split?: any) {
 
 export const TERMINAL_STATUSES = new Set(['success', 'failed', 'abandoned', 'reversed']);
 
+/**
+ * Convert a Flutterwave major-unit amount into integer minor units.
+ *
+ * Flutterwave's `amount` is in the currency's major unit (300.00), while an
+ * order stores integer pesewas (30000), so the two are never directly
+ * comparable. `/payments/initialize` already divides by 100 for exactly this
+ * reason; this is the matching conversion on the way back.
+ *
+ * Deliberately strict about scale. Accepting an amount that "looks right"
+ * whether it arrived in cedi or pesewas would mean 30,000.00 also satisfies a
+ * GH¢30,000.00 order, so a large payment could settle a small one. A value with
+ * precision finer than a pesewa is a different charge, not a rounding artefact,
+ * and is refused rather than rounded into agreement.
+ */
+function toMinorUnits(value: unknown): number | null {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount < 0) return null;
+  const minor = Math.round(amount * 100);
+  if (Math.abs(amount * 100 - minor) > 1e-6) return null;
+  return minor;
+}
+
 export function verifyPaystackSignature(rawBody: string | Buffer, signature: string | null, secret: string): boolean {
   if (!secret) return false;
   if (typeof signature !== 'string' || signature.length === 0) return false;
@@ -163,6 +187,15 @@ export function checkSettlement({ transaction, order, currency = 'GHS' }: {
   const status = String(transaction.status ?? '').toLowerCase();
   if (status !== 'success') return { settled: false, reason: `provider_status_${status || 'unknown'}` };
 
+  // The reference must be the one we issued for this order, *and* it must be the
+  // one the provider says it received. Both halves matter.
+  //
+  // Both callers used to pass the reference straight from the request URL into
+  // `transaction.reference`, which made this comparison a tautology: the value
+  // was already the one that selected the order, so it agreed by construction
+  // and a successful charge of the right amount settled the order regardless of
+  // which reference it actually belonged to. The reference the *provider*
+  // returned is the only independent witness, so that is what is compared now.
   if (String(transaction.reference ?? '') !== String(order.paystack_reference ?? '')) {
     return { settled: false, reason: 'reference_mismatch' };
   }
@@ -235,8 +268,13 @@ export function checkFlutterwaveSettlement({ transaction, order, currency = 'GHS
   }
 
   if (!Number.isInteger(order.charged_minor) || order.charged_minor <= 0) return { settled: false, reason: 'order_amount_invalid' };
-  const amount = Number(data?.amount);
-  if (!Number.isFinite(amount) || Math.round(amount) !== order.charged_minor) {
+  // Flutterwave reports `amount` in major units (300.00), while the order stores
+  // integer pesewas (30000). Comparing the raw value against `charged_minor`
+  // made every Flutterwave settlement fail `amount_mismatch`, so money arrived
+  // and the order stayed unpaid forever. The initialise call already divides by
+  // 100 for exactly this reason; this is the matching conversion on the way back.
+  const amountMinor = toMinorUnits(data?.amount);
+  if (amountMinor === null || amountMinor !== order.charged_minor) {
     return { settled: false, reason: 'amount_mismatch' };
   }
 

@@ -89,7 +89,13 @@ export function useAuth() {
 
   const signedInAs = (roleName) => session?.role === roleName;
   const buyerAuthenticated = signedInAs('buyer');
-  const adminAuthenticated = signedInAs('ops');
+  const driverAuthenticated = signedInAs('driver');
+  // The operations console requires the *server's* token, not just a local
+  // account record. An ops row in local storage is something anyone can write,
+  // so treating it as authorisation rendered an admin console that could only
+  // fail every action against the API. Both halves are required, and the token
+  // is the part the server issued.
+  const adminAuthenticated = signedInAs('ops') && Boolean(opsToken);
   const sellerAuthenticated = signedInAs('seller') && sellerApproved;
 
   const startSession = useCallback((account) => {

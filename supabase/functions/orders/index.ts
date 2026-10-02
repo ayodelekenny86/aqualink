@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { DEFAULT_PRICING, DEFAULT_SPLIT, priceOrder } from '../_lib/pricing.ts';
 import { checkSettlement } from '../_lib/session.ts';
-import { generateId, applyCors, fail, json, readJson } from '../_lib/utils.ts';
+import { generateId, applyCors, fail, json, readJson, isPlausibleReference } from '../_lib/utils.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -95,6 +95,10 @@ Deno.serve(async (req: Request) => {
 
       const reference = String(url.searchParams.get('reference') ?? '').trim();
       if (!reference) return fail(400, 'invalid_reference', 'A payment reference is required.');
+      // Interpolated into the query below, so it is shape-checked first.
+      if (!isPlausibleReference(reference)) {
+        return fail(400, 'invalid_reference', 'That payment reference is not valid.');
+      }
 
       if (!PAYSTACK_SECRET_KEY) return fail(503, 'payments_unconfigured', 'Payments are not configured.');
 
@@ -121,8 +125,14 @@ Deno.serve(async (req: Request) => {
 
     const verdict = checkSettlement({
       transaction: {
-        status: transaction.status ?? 'success',
-        reference,
+        // Not `?? 'success'`: a Paystack record with no status field is an
+        // absent answer, and reading it as a successful charge marks an unpaid
+        // order paid. The provider's status is the only authority here.
+        status: transaction.status,
+        // The reference Paystack returned, not the one from the query string.
+        // Passing the caller's value made the reference check agree with itself
+        // and prove nothing about which order the charge belonged to.
+        reference: transaction.reference,
         amount: transaction.amount,
         currency: transaction.currency,
         paid_at: transaction.paid_at,
@@ -132,11 +142,20 @@ Deno.serve(async (req: Request) => {
     });
 
     if (verdict.settled && orders.status !== 'Paid') {
-      await db.from('orders').update({
+      const { error: writeError } = await db.from('orders').update({
         status: 'Paid',
         paid_at: transaction.paid_at ?? new Date().toISOString(),
         paystack_channel: transaction.channel ?? null,
       }).eq('id', orders.id);
+
+      // The write result was discarded, so a failed update still answered
+      // `settled: true`. The customer got a receipt for a payment the order
+      // record did not reflect, and revenue reports reading the orders table
+      // disagreed with every receipt the app had issued.
+      if (writeError) {
+        console.error('order mark-paid failed', writeError);
+        return fail(500, 'settlement_record_failed', 'The payment arrived but could not be recorded. Support has been notified.');
+      }
 
       return json({
         settled: true,
@@ -157,10 +176,15 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    // An order already recorded as `Paid` is settled on the strength of that
+    // durable row. Requiring this call to re-derive it meant a repeat
+    // verification of a paid order answered `settled: false`.
+    const settledNow = orders.status === 'Paid' || verdict.settled;
+
     return json({
-      settled: verdict.settled && orders.status === 'Paid',
-      status: verdict.settled ? 'settled' : 'pending',
-      reason: verdict.reason,
+      settled: settledNow,
+      status: settledNow ? 'settled' : 'pending',
+      reason: orders.status === 'Paid' ? 'already_paid' : verdict.reason,
       reference,
       orderId: orders.id,
       amountMinor: orders.charged_minor,

@@ -22,7 +22,15 @@ import {
 import { readValue, writeValue } from './storage';
 
 const ACCOUNTS_KEY = 'accounts.list';
-export const ACCOUNT_ROLES = ['buyer', 'seller', 'institution', 'ops'];
+/**
+ * The roles an account may hold.
+ *
+ * `driver` is here because the driver app signs in through the same registry as
+ * every other role. Drivers are seeded in `fleet.js` with a phone number, and a
+ * driver account claims that number; the driver workspace then shows only the
+ * jobs assigned to them.
+ */
+export const ACCOUNT_ROLES = ['buyer', 'seller', 'driver', 'institution', 'ops'];
 /** How an account proves its identity. 'local' owns a password; the rest delegate. */
 export const ACCOUNT_PROVIDERS = ['local', 'google', 'facebook'];
 export const MAX_FAILED_ATTEMPTS = 5;

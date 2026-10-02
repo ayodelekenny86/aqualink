@@ -3,7 +3,24 @@
 // expect(element).toHaveTextContent(/react/i)
 // learn more: https://github.com/testing-library/jest-dom
 import '@testing-library/jest-dom';
+import { configure } from '@testing-library/react';
 import { vi } from 'vitest';
+
+/**
+ * Raise testing-library's default async timeout from 1s to 10s.
+ *
+ * Several flows hash a password with 210,000 PBKDF2 iterations on the main
+ * thread. That is instant in a browser on an idle machine and reliably slower
+ * than one second when the suite runs its files in parallel and the CPU is
+ * saturated, so any `findBy*`/`waitFor` waiting on a sign-in failed
+ * intermittently under full-suite load while passing in isolation.
+ *
+ * Set once here rather than per assertion: it is a property of how expensive
+ * this app's crypto is, not of any individual test. Individual tests can still
+ * pass a shorter timeout when they are asserting that something is *absent* and
+ * want to fail fast.
+ */
+configure({ asyncUtilTimeout: 10000 });
 
 // Mock virtual:pwa-register/react for tests
 vi.mock('virtual:pwa-register/react', () => ({

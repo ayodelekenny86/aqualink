@@ -165,6 +165,14 @@ export default defineConfig(({ mode }) => {
     environment: 'jsdom',
     setupFiles: ['./src/setupTests.js'],
     exclude: ['**/node_modules/**', '**/dist/**', '.kilo/**', '**/.kilo/**', 'functions/**'],
+    // Signing in hashes a password with 210k PBKDF2 iterations on the main
+    // thread, several times per test. That is comfortably inside vitest's 5s
+    // default when a file runs alone and well outside it when the suite runs
+    // every file in parallel and saturates the CPU, so sign-in tests failed
+    // intermittently as a group. The budget has to cover the crypto, not just
+    // the assertions.
+    testTimeout: 60000,
+    hookTimeout: 60000,
     pool: 'forks',
     poolOptions: {
       forks: {

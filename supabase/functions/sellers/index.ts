@@ -13,12 +13,36 @@ function supabase() {
   });
 }
 
-function normalisePhone(value: string): string {
-  return String(value ?? '').replace(/[\s-]/g, '');
+/**
+ * Reduce any accepted Ghanaian format to E.164 (`+233XXXXXXXXX`).
+ *
+ * The application id is a hash of this value, so normalisation is not cosmetic:
+ * it is what decides whether two submissions are the same person. Stripping
+ * whitespace only meant `0545009046` and `+233545009046` produced two different
+ * ids, and the same applicant could hold an approved application and a pending
+ * one at the same time.
+ *
+ * Returns null when the number is not a Ghanaian mobile number, which the
+ * caller treats as a validation failure.
+ */
+function normalisePhone(value: string): string | null {
+  const compact = String(value ?? '').replace(/[\s().-]/g, '');
+  if (!compact) return null;
+
+  let national: string | null = null;
+  if (compact.startsWith('+233')) national = compact.slice(4);
+  else if (compact.startsWith('233')) national = compact.slice(3);
+  else if (compact.startsWith('0')) national = compact.slice(1);
+  else national = compact;
+
+  // Ghana mobile numbers are 9 digits beginning 2, 5 or 7. Anything else is a
+  // landline or a typo, and is refused rather than silently accepted.
+  if (!national || !/^[257]\d{8}$/.test(national)) return null;
+  return `+233${national}`;
 }
 
 function sellerIdFromPhone(phone: string): string {
-  return createHash('sha256').update(normalisePhone(phone)).digest('hex').slice(0, 24);
+  return createHash('sha256').update(phone).digest('hex').slice(0, 24);
 }
 
 function requireOps(req: Request) {
@@ -51,7 +75,7 @@ Deno.serve(async (req: Request) => {
       const vehicle = String(body.vehicle ?? '').trim();
       const capacity = String(body.capacity ?? '').trim();
 
-      if (!/^\+?233?\d{9,12}$/.test(phone)) {
+      if (!phone) {
         return fail(400, 'invalid_phone', 'A valid Ghanaian phone number is required.');
       }
       if (business.length < 2) return fail(400, 'invalid_business', 'A business or trading name is required.');
@@ -176,7 +200,7 @@ Deno.serve(async (req: Request) => {
       if (req.method !== 'GET') return fail(405, 'method_not_allowed', 'Use GET.');
 
       const phone = normalisePhone(String(url.searchParams.get('phone') ?? ''));
-      if (!/^\+?233?\d{9,12}$/.test(phone)) {
+      if (!phone) {
         return fail(400, 'invalid_phone', 'A valid Ghanaian phone number is required.');
       }
 

@@ -12,7 +12,6 @@
  * whatever channel the operator configures.
  */
 
-import { createHash } from 'node:crypto';
 import { createSupabase, applyCors, fail, json, readJson } from '../_lib/utils.ts';
 
 Deno.serve(async (req: Request) => {
@@ -36,16 +35,27 @@ Deno.serve(async (req: Request) => {
       if (!userId || !token) {
         return fail(400, 'missing_fields', 'userId and token are required.');
       }
+      if (token.length > 4096 || userId.length > 256) {
+        return fail(400, 'invalid_fields', 'That token or user id is not usable.');
+      }
 
-      const id = createHash('sha256').update(token).digest('hex').slice(0, 32);
-      const { error } = await db.from('fcm_tokens').upsert({
-        id,
-        user_id: userId,
-        token,
-        platform,
-        active: true,
-        updated_at: new Date().toISOString(),
-      });
+      // The id is deliberately not supplied. `fcm_tokens.id` is a `uuid` column
+      // with a `uuid_generate_v4()` default, and this function used to write a
+      // 32-character sha256 hex string into it. Postgres rejected that as an
+      // invalid uuid on every single call, so no push token was ever stored —
+      // the endpoint answered `{ success: true }` only because the error was
+      // checked, but nothing was written. Conflicting on the natural key lets
+      // the default generate the uuid while still de-duplicating by token.
+      const { error } = await db.from('fcm_tokens').upsert(
+        {
+          user_id: userId,
+          token,
+          platform,
+          active: true,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,token' },
+      );
 
       if (error) {
         console.error('fcm token store failed', error);
@@ -60,13 +70,28 @@ Deno.serve(async (req: Request) => {
 
       const body = await readJson(req);
       const token = String(body.token ?? '').trim();
+      const userId = String(body.userId ?? '').trim();
       if (!token) return fail(400, 'missing_token', 'A token is required.');
+      if (token.length > 4096) return fail(400, 'invalid_token', 'That token is not usable.');
 
-      const id = createHash('sha256').update(token).digest('hex').slice(0, 32);
-      const { error } = await db.from('fcm_tokens').update({
+      // Matched on the token itself, not on a derived id. The id is a generated
+      // uuid, so a hash of the token never equals it and this update matched no
+      // rows: revoking a token silently did nothing and the user kept receiving
+      // notifications they had asked to stop.
+      //
+      // When the caller identifies itself, the row must belong to it. Without
+      // that, anyone who learned a token string could revoke it — and, more
+      // usefully for an attacker, could not use it to learn anything, so this
+      // is a narrowing rather than a full authorisation boundary. AquaLink's
+      // buyer accounts are local to the browser, so there is no server-side
+      // session to check against yet; `userId` is a caller assertion until then.
+      let query = db.from('fcm_tokens').update({
         active: false,
         updated_at: new Date().toISOString(),
-      }).eq('id', id);
+      }).eq('token', token);
+      if (userId) query = query.eq('user_id', userId);
+
+      const { error } = await query;
 
       if (error) {
         console.error('fcm token delete failed', error);

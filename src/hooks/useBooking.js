@@ -282,6 +282,8 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
     const now = new Date().toISOString();
     const updates = { status, updatedAt: now };
     if (status === 'Assigned') updates.assignedAt = now;
+    if (status === 'Picked Up') updates.pickedUpAt = now;
+    if (status === 'En Route') updates.enRouteAt = now;
     if (status === 'Delivered') updates.deliveredAt = now;
     if (USE_SERVER && supabase) {
       try {
@@ -302,7 +304,67 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
       orderId,
       kind: 'status',
     });
+    // The seller is the other party waiting on this order: they loaded the tank
+    // and need to know it is moving. Notifying only the buyer meant the seller's
+    // board stayed frozen at "Assigned" for the whole trip.
+    notify?.({
+      role: 'seller',
+      title: `${orderId} is now ${String(status).toLowerCase()}`,
+      body: order?.driverName ? `${order.driverName} has the order.` : '',
+      orderId,
+      kind: 'status',
+    });
   }, [onNotice, commit, orders]);
+
+  /**
+   * A driver claims a job.
+   *
+   * Only ever moves an order into `Assigned`, and only from `Awaiting payment`.
+   * The guard is in this function rather than the button so that no caller can
+   * skip an order straight to 'En Route' and mark water as delivered that was
+   * never paid for.
+   */
+  const acceptDriverJob = useCallback(async (orderId, notify) => {
+    const order = orders.find((item) => item.id === orderId);
+    if (!order) return { ok: false, reason: 'unknown-order' };
+    if (order.status !== 'Awaiting payment') {
+      onNotice(`${orderId} has already been claimed by another driver.`);
+      return { ok: false, reason: 'already-claimed' };
+    }
+    await updateOrderStatus(orderId, 'Assigned', notify);
+    return { ok: true };
+  }, [orders, onNotice, updateOrderStatus]);
+
+  /**
+   * A driver releases a job they claimed but cannot run.
+   *
+   * Returns the order to `Awaiting payment` so it goes back on the board for
+   * someone else. It clears the driver's stamp as well, because leaving
+   * `driverId` on the row would keep the released job in this driver's feed and
+   * out of everyone else's.
+   */
+  const releaseDriverJob = useCallback(async (orderId, notify) => {
+    const order = orders.find((item) => item.id === orderId);
+    if (!order) return { ok: false, reason: 'unknown-order' };
+    const updates = {
+      status: 'Awaiting payment',
+      driverId: '',
+      driverName: '',
+      driverPhone: '',
+      assignedAt: '',
+      updatedAt: new Date().toISOString(),
+    };
+    if (USE_SERVER && supabase) {
+      try {
+        await supabase.from('orders').update(updates).eq('id', orderId);
+      } catch (err) {
+        console.error('Failed to release driver job:', err);
+      }
+    }
+    commit((items) => items.map((item) => (item.id === orderId ? { ...item, ...updates } : item)));
+    onNotice(`${orderId} returned to the available feed.`);
+    return { ok: true };
+  }, [orders, onNotice, commit]);
 
   const issueDeliveryCode = useCallback(async (orderId) => {
     const code = generateConfirmationCode('delivery');

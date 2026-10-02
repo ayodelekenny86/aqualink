@@ -80,7 +80,7 @@ Deno.serve(async (req: Request) => {
 
       validateSplit(mergedSplit);
 
-      await db.from('config').update({
+      const { error: writeError } = await db.from('config').update({
         pricing: {
           listPrice: Number(mergedPricing.listPrice),
           discountPercent: Number(mergedPricing.discountPercent),
@@ -91,6 +91,13 @@ Deno.serve(async (req: Request) => {
         updated_at: new Date().toISOString(),
         updated_by: operator.sub,
       }).eq('key', 'pricing');
+
+      // A discarded write result means a failed save answers 200 with the
+      // requested figures, so the operator sees a price that is not in effect.
+      if (writeError) {
+        console.error('config update failed', writeError);
+        return fail(500, 'update_failed', 'Could not save the new configuration.');
+      }
 
       return json({ pricing: mergedPricing, split: mergedSplit, updatedBy: operator.sub });
     }

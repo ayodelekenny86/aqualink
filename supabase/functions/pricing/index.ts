@@ -75,7 +75,7 @@ if (path === 'update') {
       const check = validatePricingInput(mergedPricing, mergedSplit);
       if (!check.valid) return fail(400, 'invalid_pricing', check.problems.join(' '));
 
-      await db.from('config').update({
+      const { error: writeError } = await db.from('config').update({
         pricing: {
           listPrice: Number(mergedPricing.listPrice),
           discountPercent: Number(mergedPricing.discountPercent),
@@ -86,6 +86,15 @@ if (path === 'update') {
         updated_at: new Date().toISOString(),
         updated_by: operator.sub,
       }).eq('key', 'pricing');
+
+      // The write result was discarded, so a failed update answered 200 with the
+      // figures the operator had just typed. The console then showed a new price
+      // that no order was actually being charged, and nothing in the app would
+      // contradict it until a customer complained.
+      if (writeError) {
+        console.error('pricing update failed', writeError);
+        return fail(500, 'update_failed', 'Could not save the new price.');
+      }
 
       return json({ pricing: mergedPricing, split: mergedSplit, updatedBy: operator.sub });
     }

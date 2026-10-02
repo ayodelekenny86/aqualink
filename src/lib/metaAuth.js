@@ -33,7 +33,7 @@
 
 const SDK_SRC = 'https://connect.facebook.net/en_US/sdk.js';
 const GRAPH_BASE = 'https://graph.facebook.com/v18.0';
-const VALID_ROLES = ['buyer', 'seller', 'institution', 'ops'];
+const VALID_ROLES = ['buyer', 'seller', 'driver', 'institution', 'ops'];
 
 let scriptPromise = null;
 

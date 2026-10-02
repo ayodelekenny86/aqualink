@@ -90,6 +90,15 @@ export function apiUrl(path) {
 }
 
 /**
+ * How long a request may take before it is abandoned.
+ *
+ * A checkout is a redirect, so a request that never resolves leaves the buyer
+ * looking at a disabled button labelled "Working…" with no way forward and no
+ * explanation. Failing lets them retry, which is strictly better than hanging.
+ */
+const DEFAULT_TIMEOUT_MS = 30000;
+
+/**
  * Send a request to the AquaLink server and parse the JSON reply.
  *
  * A non-2xx reply throws with the server's own customer-facing message and its
@@ -97,21 +106,42 @@ export function apiUrl(path) {
  * failure. An unreadable body throws too: guessing at a gateway error page is how
  * a payment flow ends up believing it succeeded.
  */
-export async function apiRequest(path, { method = 'GET', body, signal, auth = null } = {}) {
-  const response = await fetch(apiUrl(path), {
-    method,
-    signal,
-    headers: {
-      'Content-Type': 'application/json',
-      // Only sent when there is a token, so unauthenticated calls carry no
-      // Authorization header at all rather than an empty one.
-      ...(auth ? { Authorization: `Bearer ${auth}` } : {}),
-      // The anon key is public by design and is what Supabase uses to identify
-      // the caller. It is not a secret and grants no privileged access.
-      ...(apiTarget() === 'supabase' && anonKey ? { apikey: anonKey } : {}),
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
+export async function apiRequest(path, { method = 'GET', body, signal, auth = null, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+  // Combined rather than replaced: a caller's own signal (an unmounted component,
+  // a superseded quote) must still cancel the request.
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), timeoutMs);
+  const forwardAbort = () => abort.abort();
+  signal?.addEventListener('abort', forwardAbort);
+
+  let response;
+  try {
+    response = await fetch(apiUrl(path), {
+      method,
+      signal: abort.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        // Only sent when there is a token, so unauthenticated calls carry no
+        // Authorization header at all rather than an empty one.
+        ...(auth ? { Authorization: `Bearer ${auth}` } : {}),
+        // The anon key is public by design and is what Supabase uses to identify
+        // the caller. It is not a secret and grants no privileged access.
+        ...(apiTarget() === 'supabase' && anonKey ? { apikey: anonKey } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+  } catch (error) {
+    // Distinguish our own timeout from a caller-initiated cancel. Without this,
+    // an expired quote and a 30-second gateway stall both read as "the network
+    // is down", which sends people to the wrong fix.
+    if (abort.signal.aborted && !signal?.aborted) {
+      throw new Error('The server took too long to answer. Please try again.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', forwardAbort);
+  }
 
   const text = await response.text();
   let payload = {};

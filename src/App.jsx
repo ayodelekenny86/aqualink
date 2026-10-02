@@ -21,8 +21,11 @@ import GoogleSignInButton from './components/GoogleSignInButton';
 import MetaSignInButton from './components/MetaSignInButton';
 import { PWASetup, PWADetectOffline } from './components/PWASetup';
 import SellerDashboard from './components/SellerDashboard';
+import DriverDashboard from './components/DriverDashboard';
+import DeliveryCodeDialog from './components/DeliveryCodeDialog';
 import InstitutionDashboard from './components/InstitutionDashboard';
 import DriverTrackingView from './components/DriverTrackingView';
+import { list } from './lib/collections';
 
 // Admin-only and overlay surfaces load on demand. A buyer who never opens the
 // admin console never downloads it, which keeps the initial bundle small.
@@ -35,11 +38,12 @@ const NotificationsPanel = lazy(() => import('./components/NotificationsPanel'))
 const roles = [
   ['buyer', 'Buyer app', 'Book reliable water'],
   ['seller', 'Seller app', 'Manage your fleet'],
+  ['driver', 'Driver app', 'Deliveries and earnings'],
   ['institution', 'Institution', 'Plan your supply'],
   ['ops', 'Admin', 'Authorized operations access'],
 ];
 
-const ROLE_ICONS = { buyer: '⌂', seller: '↗', institution: '▦', ops: '◈' };
+const ROLE_ICONS = { buyer: '⌂', seller: '↗', driver: '⇢', institution: '▦', ops: '◈' };
 
 const SUPPORT_PHONE = '0545009046';
 
@@ -124,6 +128,7 @@ function App() {
     orders, booking, updateBooking, requestDelivery, repeatBooking,
     savedAddresses, setSavedAddresses, driverUpdate, refreshDriverUpdate,
     updateOrderStatus, issueDeliveryCode, confirmDelivery, requestRefund,
+    acceptDriverJob, releaseDriverJob,
   } = useBooking({ email, buyerPhone: session?.identifier ?? '', onNotice: showNotice, notify });
 
   const { downloadReport } = useReports({ region, orders, onNotice: showNotice });
@@ -170,6 +175,46 @@ function App() {
 
   const roleNotifications = forRole(role);
   const roleUnread = unreadCount(role);
+
+  // The driver workspace resolves the signed-in account against the fleet
+  // roster by phone number, so the driver's jobs are the ones dispatch actually
+  // stamped with their number. `driverCodeOrder` is the order whose delivery is
+  // being closed, so the handover dialog has somewhere to point.
+  const fleetDrivers = useMemo(() => list('drivers'), []);
+  const [driverCodeOrderId, setDriverCodeOrderId] = useState(null);
+  const [busyDriverOrderId, setBusyDriverOrderId] = useState(null);
+  const driverCodeOrder = driverCodeOrderId
+    ? orders.find((order) => order.id === driverCodeOrderId) ?? null
+    : null;
+
+  // Push permission is asked for once any authenticated workspace is open. A
+  // driver on the road is the case that most needs it, so `driverAuthenticated`
+  // is included rather than leaving drivers on the 15s poll alone.
+  useEffect(() => {
+    if (ready && (buyerAuthenticated || sellerAuthenticated || driverAuthenticated || adminAuthenticated)) {
+      requestPermission();
+    }
+  }, [ready, buyerAuthenticated, sellerAuthenticated, driverAuthenticated, adminAuthenticated, requestPermission]);
+  // Driver actions. Each wraps the booking mutation so the card can show a
+  // spinner on the row being changed rather than disabling the whole screen.
+  const driverAccept = async (orderId) => {
+    setBusyDriverOrderId(orderId);
+    await acceptDriverJob(orderId, notify);
+    setBusyDriverOrderId(null);
+  };
+
+  const driverAdvance = async (orderId, status) => {
+    setBusyDriverOrderId(orderId);
+    await updateOrderStatus(orderId, status, notify);
+    setBusyDriverOrderId(null);
+  };
+
+  const driverRelease = async (orderId) => {
+    setBusyDriverOrderId(orderId);
+    await releaseDriverJob(orderId, notify);
+    setBusyDriverOrderId(null);
+  };
+
   const detailOrder = orders.find((order) => order.id === detailOrderId) ?? null;
 
   // Which order the checkout panel acts on.
@@ -231,8 +276,7 @@ function App() {
               order={detailOrder}
               onClose={() => setDetailOrderId(null)}
               onShowNotice={showNotice}
-              buyerPhone={detailOrder.buyerPhone}
-              onContactBuyer
+              viewerRole={role}
             />
           </Suspense>
         )}
@@ -264,6 +308,50 @@ function App() {
             onRefresh={refreshSellerApproval}
             applicationId={sellerApplicationId}
             onSignIn={completeSellerApproval}
+            onGoogle={signInWithGoogleIdentity}
+            onMeta={signInWithMetaIdentity}
+            showNotice={showNotice}
+          />
+        ))}
+        {driverCodeOrder && (
+          <DeliveryCodeDialog
+            order={driverCodeOrder}
+            onCancel={() => setDriverCodeOrderId(null)}
+            onSubmit={async (orderId, code) => {
+              const result = await confirmDelivery(orderId, code);
+              if (result?.ok) {
+                setDriverCodeOrderId(null);
+                setDetailOrderId(orderId);
+              }
+              return result;
+            }}
+          />
+        )}
+        {ready && role === 'driver' && (driverAuthenticated ? (
+          <DriverDashboard
+            orders={orders}
+            fleetDrivers={fleetDrivers}
+            driverIdentifier={session?.identifier ?? ''}
+            driverName={session?.displayName ?? ''}
+            onAccept={driverAccept}
+            onAdvance={driverAdvance}
+            onComplete={setDriverCodeOrderId}
+            onReject={driverRelease}
+            showNotice={showNotice}
+            busyOrderId={busyDriverOrderId}
+          />
+        ) : (
+          <DriverAccessGate
+            startSignIn={startPhoneSignIn}
+            confirmCode={confirmPhoneCode}
+            generatedCode={phoneCode}
+            identifier={phoneIdentifier}
+            error={signInError}
+            onRegister={(value) => registerAccount({ identifier: value, role: 'driver', displayName: 'Driver' })}
+            accountExists={accountExists}
+            onGoogle={signInWithGoogleIdentity}
+            onMeta={signInWithMetaIdentity}
+            showNotice={showNotice}
           />
         ))}
         {role === 'ops' && adminAuthenticated && (
@@ -280,6 +368,16 @@ function App() {
         </main>
     </div>
   );
+}
+
+/**
+ * The rule above a set of social sign-in buttons.
+ *
+ * Present so the phone form and the social buttons read as two ways into the
+ * same account rather than as unrelated controls stacked on one screen.
+ */
+function SocialSignInDivider() {
+  return <div className="social-divider" aria-hidden="true"><span>or continue with</span></div>;
 }
 
 function BuyerAccessGate({ onSignedIn, startSignIn, confirmCode, generatedCode, identifier, error, onRegister, accountExists, onGoogle, onMeta, showNotice }) {
@@ -309,10 +407,86 @@ function BuyerAccessGate({ onSignedIn, startSignIn, confirmCode, generatedCode, 
 
   const known = localPhone.trim() ? accountExists(localPhone) : null;
 
-  return <section className="access-gate panel"><span className="access-lock">⌁</span><p className="eyebrow">Verified buyer access</p><h1>Sign in to view your orders.</h1><p>Enter the phone number on your account. AquaLink checks it against the account registry, then generates a one-time code.</p>{registering ? <form onSubmit={handleRegister}><div className="otp-delivery"><span className="section-kicker">NEW ACCOUNT</span><strong>{formatPhoneForDisplay(normalizePhone(localPhone) ?? localPhone)}</strong><small>An account will be created for this number with a generated password.</small></div><input aria-label="New buyer phone" value={localPhone} onChange={(event) => setLocalPhone(event.target.value)} placeholder="Phone number" inputMode="tel" /><button className="primary-button" type="submit">Create account →</button><button className="text-button" type="button" onClick={() => setRegistering(false)}>Back to sign in</button></form> : step === 'phone' ? <form onSubmit={handleSend}><input aria-label="Buyer phone number" value={localPhone} onChange={(event) => setLocalPhone(event.target.value)} placeholder="Phone number" inputMode="tel" />{known === false && <p className="form-hint">No account uses that number yet.</p>}<button className="primary-button" type="submit">Send OTP →</button></form> : <form onSubmit={handleVerify}><div className="otp-delivery"><span className="section-kicker">GENERATED BY AQUALINK</span><strong data-testid="otp-code">{generatedCode || '···'}</strong><small>For {formatPhoneForDisplay(identifier)} · expires in 5 minutes</small></div><input aria-label="Buyer OTP" value={otp} onChange={(event) => setOtp(event.target.value)} placeholder="Enter the generated code" inputMode="numeric" />{error && <p className="form-error" role="alert">{error}</p>}<button className="primary-button" type="submit">Verify OTP →</button><button className="text-button" type="button" onClick={() => { setStep('phone'); setOtp(''); }}>Use a different number</button></form>}{!registering && step === 'phone' && <button className="text-button" type="button" onClick={() => setRegistering(true)}>Create an account →</button>}{error && step === 'phone' && <p className="form-error" role="alert">{error}</p>}<small>Create an account below to get started. Codes are generated on this device by the browser&apos;s Web Crypto API and verified locally against a real account. No SMS or email provider is involved, so the code is shown here instead of being sent.</small><GoogleSignInButton role="buyer" onVerified={onGoogle} showNotice={showNotice} /><MetaSignInButton role="buyer" onVerified={onMeta} showNotice={showNotice} /></section>;
+  return <section className="access-gate panel"><span className="access-lock">⌁</span><p className="eyebrow">Verified buyer access</p><h1>Sign in to view your orders.</h1><p>Enter the phone number on your account. AquaLink checks it against the account registry, then generates a one-time code.</p>{registering ? <form onSubmit={handleRegister}><div className="otp-delivery"><span className="section-kicker">NEW ACCOUNT</span><strong>{formatPhoneForDisplay(normalizePhone(localPhone) ?? localPhone)}</strong><small>An account will be created for this number with a generated password.</small></div><input aria-label="New buyer phone" value={localPhone} onChange={(event) => setLocalPhone(event.target.value)} placeholder="Phone number" inputMode="tel" /><button className="primary-button" type="submit">Create account →</button><button className="text-button" type="button" onClick={() => setRegistering(false)}>Back to sign in</button></form> : step === 'phone' ? <form onSubmit={handleSend}><input aria-label="Buyer phone number" value={localPhone} onChange={(event) => setLocalPhone(event.target.value)} placeholder="Phone number" inputMode="tel" />{known === false && <p className="form-hint">No account uses that number yet.</p>}<button className="primary-button" type="submit">Send OTP →</button></form> : <form onSubmit={handleVerify}><div className="otp-delivery"><span className="section-kicker">GENERATED BY AQUALINK</span><strong data-testid="otp-code">{generatedCode || '···'}</strong><small>For {formatPhoneForDisplay(identifier)} · expires in 5 minutes</small></div><input aria-label="Buyer OTP" value={otp} onChange={(event) => setOtp(event.target.value)} placeholder="Enter the generated code" inputMode="numeric" />{error && <p className="form-error" role="alert">{error}</p>}<button className="primary-button" type="submit">Verify OTP →</button><button className="text-button" type="button" onClick={() => { setStep('phone'); setOtp(''); }}>Use a different number</button></form>}{!registering && step === 'phone' && <button className="text-button" type="button" onClick={() => setRegistering(true)}>Create an account →</button>}{error && step === 'phone' && <p className="form-error" role="alert">{error}</p>}<small>Create an account below to get started. Codes are generated on this device by the browser&apos;s Web Crypto API and verified locally against a real account. No SMS or email provider is involved, so the code is shown here instead of being sent.</small><SocialSignInDivider /><GoogleSignInButton role="buyer" onVerified={onGoogle} showNotice={showNotice} /><MetaSignInButton role="buyer" onVerified={onMeta} showNotice={showNotice} /></section>;
 }
 
-function SellerAccessGate({ sellerProfile, setSellerProfile, onApply, onRefresh, applicationId, onSignIn }) {
+function DriverAccessGate({ startSignIn, confirmCode, generatedCode, identifier, error, onRegister, accountExists, onGoogle, onMeta, showNotice }) {
+  const [localPhone, setLocalPhone] = useState('');
+  const [step, setStep] = useState('phone');
+  const [otp, setOtp] = useState('');
+  const [registering, setRegistering] = useState(false);
+
+  async function handleSend(event) {
+    event.preventDefault();
+    const result = await startSignIn(localPhone);
+    if (result?.ok) setStep('otp');
+  }
+
+  async function handleVerify(event) {
+    event.preventDefault();
+    if (!otp.trim()) return;
+    const result = await confirmCode(otp);
+    if (result?.ok) setStep('phone');
+  }
+
+  async function handleRegister(event) {
+    event.preventDefault();
+    const result = await onRegister(localPhone);
+    if (result?.ok) setLocalPhone('');
+  }
+
+  const known = localPhone.trim() ? accountExists(localPhone) : null;
+
+  return (
+    <section className="access-gate panel">
+      <span className="access-lock">⇢</span>
+      <p className="eyebrow">Verified driver access</p>
+      <h1>Sign in to see your deliveries.</h1>
+      <p>
+        Enter the phone number on your driver record. AquaLink generates a one-time code, then shows
+        only the jobs assigned to you.
+      </p>
+
+      {registering ? (
+        <form onSubmit={handleRegister}>
+          <div className="otp-delivery">
+            <span className="section-kicker">NEW DRIVER ACCOUNT</span>
+            <strong>{formatPhoneForDisplay(normalizePhone(localPhone) ?? localPhone)}</strong>
+            <small>An account will be created for this number with a generated password.</small>
+          </div>
+          <input aria-label="New driver phone" value={localPhone} onChange={(event) => setLocalPhone(event.target.value)} placeholder="Phone number" inputMode="tel" />
+          <button className="primary-button" type="submit">Create account →</button>
+          <button className="text-button" type="button" onClick={() => setRegistering(false)}>Back to sign in</button>
+        </form>
+      ) : step === 'phone' ? (
+        <form onSubmit={handleSend}>
+          <input aria-label="Driver phone number" value={localPhone} onChange={(event) => setLocalPhone(event.target.value)} placeholder="Phone number" inputMode="tel" />
+          {known === false && <p className="form-hint">No account uses that number yet.</p>}
+          <button className="primary-button" type="submit">Send OTP →</button>
+          <button className="text-button" type="button" onClick={() => setRegistering(true)}>Create a driver account</button>
+        </form>
+      ) : (
+        <form onSubmit={handleVerify}>
+          <div className="otp-delivery">
+            <span className="section-kicker">GENERATED BY AQUALINK</span>
+            <strong data-testid="driver-otp-code">{generatedCode || '···'}</strong>
+            <small>For {formatPhoneForDisplay(identifier)} · expires in 5 minutes</small>
+          </div>
+          <input aria-label="Driver OTP" value={otp} onChange={(event) => setOtp(event.target.value)} placeholder="Enter the generated code" inputMode="numeric" />
+          {error && <p className="form-error" role="alert">{error}</p>}
+          <button className="primary-button" type="submit">Verify OTP →</button>
+          <button className="text-button" type="button" onClick={() => { setStep('phone'); setOtp(''); }}>Use a different number</button>
+        </form>
+      )}
+
+      <SocialSignInDivider />
+      <GoogleSignInButton role="driver" onVerified={onGoogle} showNotice={showNotice} />
+      <MetaSignInButton role="driver" onVerified={onMeta} showNotice={showNotice} />
+    </section>
+  );
+}
+
+function SellerAccessGate({ sellerProfile, setSellerProfile, onApply, onRefresh, applicationId, onSignIn, onGoogle, onMeta, showNotice }) {
   const [submitted, setSubmitted] = useState(Boolean(applicationId));
   const [busy, setBusy] = useState(false);
 
@@ -339,7 +513,7 @@ function SellerAccessGate({ sellerProfile, setSellerProfile, onApply, onRefresh,
     return <section className="access-gate panel seller-gate"><span className="access-lock">↗</span><p className="eyebrow">Seller signup & approval</p><h1>Application awaiting approval.</h1><p>AquaLink Ops must verify your identity, vehicle, and water-source documents before you can receive jobs.</p><div className="pending-approval"><strong>Pending operator review</strong><small>An operator has to approve this application on the server. There is no code to enter and no way to approve it from this screen, because the previous version generated its own approval code and anyone could have approved themselves.</small><small>Application reference: <span data-testid="seller-application-id">{applicationId || 'submitted'}</span></small><button className="primary-button" type="button" onClick={handleRefresh} disabled={busy}>{busy ? 'Checking…' : 'Check approval status'}</button></div></section>;
   }
 
-  return <section className="access-gate panel seller-gate"><span className="access-lock">↗</span><p className="eyebrow">Seller signup & approval</p><h1>Create your seller account.</h1><p>Complete your business and vehicle details. Your seller workspace stays locked until an operator approves the application.</p><form onSubmit={handleApply}><input aria-label="Business name" name="business" value={sellerProfile.business} onChange={update} placeholder="Business or trading name" /><input aria-label="Seller phone" name="phone" value={sellerProfile.phone} onChange={update} placeholder="Registered phone number" /><input aria-label="Vehicle registration" name="vehicle" value={sellerProfile.vehicle} onChange={update} placeholder="Vehicle registration" /><select aria-label="Tank capacity" name="capacity" value={sellerProfile.capacity} onChange={update}><option>1,000 gallons</option><option>2,000 gallons</option><option>5,000 gallons</option></select><button className="primary-button" type="submit" disabled={busy}>{busy ? 'Submitting…' : 'Submit signup for review →'}</button></form><small>Required controls: ID, vehicle registration, tank capacity, water-source evidence, approval audit trail, and payout verification.</small></section>;
+  return <section className="access-gate panel seller-gate"><span className="access-lock">↗</span><p className="eyebrow">Seller signup & approval</p><h1>Create your seller account.</h1><p>Complete your business and vehicle details. Your seller workspace stays locked until an operator approves the application.</p><form onSubmit={handleApply}><input aria-label="Business name" name="business" value={sellerProfile.business} onChange={update} placeholder="Business or trading name" /><input aria-label="Seller phone" name="phone" value={sellerProfile.phone} onChange={update} placeholder="Registered phone number" /><input aria-label="Vehicle registration" name="vehicle" value={sellerProfile.vehicle} onChange={update} placeholder="Vehicle registration" /><select aria-label="Tank capacity" name="capacity" value={sellerProfile.capacity} onChange={update}><option>1,000 gallons</option><option>2,000 gallons</option><option>5,000 gallons</option></select><button className="primary-button" type="submit" disabled={busy}>{busy ? 'Submitting…' : 'Submit signup for review →'}</button></form><SocialSignInDivider /><GoogleSignInButton role="seller" onVerified={onGoogle} showNotice={showNotice} /><MetaSignInButton role="seller" onVerified={onMeta} showNotice={showNotice} /><small>Required controls: ID, vehicle registration, tank capacity, water-source evidence, approval audit trail, and payout verification.</small></section>;
 }
 
 function AdminAccessGate({ onSignIn, error, onGoogle, onMeta, showNotice }) {

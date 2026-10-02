@@ -26,6 +26,50 @@ function verifyPassword(password: string, salt: string, expectedHash: string) {
   return constantTimeEquals(hash, expectedHash);
 }
 
+/**
+ * How long an operator account stays locked after repeated failures.
+ *
+ * The operator console is the only way to change pricing or approve a seller,
+ * and `scryptSync` makes guessing slow without making it impossible. Without a
+ * counter there is no limit on attempts at all. The client-side registry has
+ * always had one (`MAX_FAILED_ATTEMPTS` in src/lib/accounts.js); this is the
+ * server-side equivalent, and it is the one that matters, because the client
+ * can be bypassed.
+ */
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_MS = 5 * 60 * 1000;
+
+/**
+ * How long a failed attempt is remembered when no counter is stored.
+ *
+ * Set for accounts created before the lockout columns existed.
+ */
+function isLocked(operator: any, now: number): boolean {
+  return Boolean(operator?.locked_until) && new Date(operator.locked_until).getTime() > now;
+}
+
+function minutesRemaining(operator: any, now: number): number {
+  const until = new Date(operator?.locked_until ?? 0).getTime();
+  return Math.max(1, Math.ceil((until - now) / 60000));
+}
+
+async function recordFailure(db: ReturnType<typeof supabase>, operator: any, now: number) {
+  const failedAttempts = Number(operator.failed_attempts ?? 0) + 1;
+  const locked = failedAttempts >= MAX_FAILED_ATTEMPTS;
+
+  // `failed_attempts` and `locked_until` arrive as null on rows written before
+  // the migration, so the update is written as a coalesce rather than a plain
+  // assignment. Overwriting them with a bare number would reset a real counter
+  // on every attempt.
+  await db
+    .from('ops')
+    .update({
+      failed_attempts: failedAttempts,
+      locked_until: locked ? new Date(now + LOCKOUT_MS).toISOString() : null,
+    })
+    .eq('id', operator.id);
+}
+
 Deno.serve(async (req: Request) => {
   const init = applyCors(req);
   if (req.method === 'OPTIONS') return new Response('', init);
@@ -68,9 +112,28 @@ Deno.serve(async (req: Request) => {
       }
 
       const operator = operators[0];
-      if (!verifyPassword(password, operator.salt, operator.password_hash)) return invalid();
+      const now = Date.now();
 
-      await db.from('ops').update({ last_login_at: new Date().toISOString() }).eq('id', operator.id);
+      if (isLocked(operator, now)) {
+        // Deliberately the same message shape as a bad password would give, but
+        // a locked account is a different situation the operator needs told
+        // about, so this one is specific. It discloses that the account exists,
+        // which is acceptable: it is only reachable after five wrong passwords
+        // against that exact address.
+        return fail(429, 'account_locked', `Too many failed attempts. Try again in ${minutesRemaining(operator, now)} minute(s).`);
+      }
+
+      if (!verifyPassword(password, operator.salt, operator.password_hash)) {
+        await recordFailure(db, operator, now);
+        return invalid();
+      }
+
+      // Clear the counter on success so a legitimate operator who fumbled a few
+      // times is not left one mistake away from a lockout.
+      await db
+        .from('ops')
+        .update({ failed_attempts: 0, locked_until: null, last_login_at: new Date(now).toISOString() })
+        .eq('id', operator.id);
 
       return json({
         token: signOpsToken({ email, role: 'ops', secret }),
@@ -131,6 +194,14 @@ Deno.serve(async (req: Request) => {
       });
 
       if (error) {
+        // 23505 is a unique violation. The handler's own pre-check is a
+        // check-then-act and two concurrent bootstraps can both pass it; the
+        // partial unique index on `role` is what actually guarantees one
+        // operator, so the loser of that race gets the 409 the endpoint means
+        // rather than a 500 that reads like a server fault.
+        if (error.code === '23505') {
+          return fail(409, 'already_bootstrapped', 'An ops account already exists. This endpoint runs once only.');
+        }
         console.error('ops bootstrap insert failed', error);
         return fail(500, 'bootstrap_failed', 'Could not create the ops account.');
       }

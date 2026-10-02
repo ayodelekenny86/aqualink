@@ -36,7 +36,13 @@ const CERTS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
 const GSI_SRC = 'https://accounts.google.com/gsi/client';
 const VALID_ISSUERS = ['accounts.google.com', 'https://accounts.google.com'];
 
-const AUDIENCES = ['buyer', 'seller', 'institution', 'ops'];
+// The audiences a verified Google identity may sign in as.
+//
+// `driver` is included because a driver signs in through the same gate as a
+// buyer: a driver is someone with a verified phone number who delivers, and
+// excluding the role would leave Google working for buyers but silently
+// downgrading every driver to password or OTP sign-in.
+const AUDIENCES = ['buyer', 'seller', 'driver', 'institution', 'ops'];
 
 let scriptPromise = null;
 let cachedKeys = null;
