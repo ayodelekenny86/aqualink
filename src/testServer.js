@@ -133,9 +133,12 @@ const mock = vi.fn(async (url, init = {}) => {
     if (routeKey === 'orders' && init.method === 'POST') {
       return json({ order: serverOrder(JSON.parse(init.body), currentPricing, currentSplit) }, 201);
     }
-    if (path.endsWith('/api/pricing') || path.endsWith('/pricing')) {
+    if (routeKey === 'pricing' && init.method !== 'POST') {
       // Mirrors `apiPricing`: the stored config alongside the derived quote, so
-      // the console has to pick the config to edit it.
+      // the console has to pick the config to edit it. The client calls
+      // `/pricing` (key) and the server expands it to `/pricing/price`, so
+      // match on the key — matching the suffix only left this endpoint
+      // unstubbed and the console showed the default price.
       return json({
         currency: 'GHS',
         pricing: currentPricing,
@@ -143,7 +146,7 @@ const mock = vi.fn(async (url, init = {}) => {
         quote: priceOrder({ pricing: currentPricing, split: currentSplit }),
       });
     }
-    if (path.endsWith('/api/pricing/update') || path.endsWith('/pricing/update')) {
+    if (routeKey === 'pricing' && init.method === 'POST') {
       // Mirrors the real handler: a request without a valid operator token is
       // rejected, so a test cannot pass by skipping sign-in.
       if (!authorised(init)) {

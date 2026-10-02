@@ -231,11 +231,15 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
       } catch (err) {
         console.error('Failed to write order to Supabase:', err);
         onNotice('Order created but failed to sync. Will retry on next load.');
-        commit((items) => [newOrder, ...items]);
       }
-    } else {
-      commit((items) => [newOrder, ...items]);
     }
+
+    // localStorage is the local cache, not a fallback. It has to be written
+    // regardless of what the server said: the app reads it when offline, the
+    // test harness reads it directly, and the auto-dispatch step below reads it
+    // to find the row to stamp. A Supabase update that the client reads as
+    // "no rows matched" used to skip this entirely and the order vanished.
+    commit((items) => [newOrder, ...items]);
 
     // recordAssignment reads the order list to find the row to stamp, so it has
     // to run after commit has written it. Running it first meant it looked up

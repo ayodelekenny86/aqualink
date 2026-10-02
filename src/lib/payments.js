@@ -65,15 +65,19 @@ export async function createOrder({ email, phone, location, volumeLitres }, { si
 /**
  * Start a payment and hand back the URL to send the customer to.
  *
- * The result is `status: 'pending'` even on success. Creating a Paystack
- * transaction is not receiving money, and returning anything else here is how a
- * redirect flow ends up telling a customer they paid before they have.
+ * The result is `status: 'pending'` even on success. Creating a transaction is
+ * not receiving money, and returning anything else here is how a redirect flow
+ * ends up telling a customer they paid before they have.
+ *
+ * `provider` is optional and defaults to Paystack. Flutterwave is supported as
+ * well — both are live simultaneously, each behind its own secret, and the
+ * server rejects a request for a provider whose key is not set.
  */
-export async function initialisePayment({ orderId, email }, { signal } = {}) {
+export async function initialisePayment({ orderId, email, provider = 'paystack' }, { signal } = {}) {
   const payload = await apiRequest('/payments/initialize', {
     method: 'POST',
     signal,
-    body: { orderId, email },
+    body: { orderId, email, provider },
   });
 
   if (payload.alreadyPaid) {
@@ -101,17 +105,20 @@ export async function verifyPayment({ reference }, { signal } = {}) {
 }
 
 /**
- * Read a Paystack reference out of the return URL.
+ * Read a payment reference out of the return URL.
  *
- * Paystack appends `reference` (and `trxref`) to the callback URL, which is a
- * hash route here, so the query can arrive inside the fragment.
+ * Paystack appends `reference` (and `trxref`) to the callback URL, and
+ * Flutterwave appends `tx_ref`. The callback is a hash route here, so the
+ * query can arrive inside the fragment. Returns whichever the provider used,
+ * or '' when neither is present — the verify call below needs a reference and
+ * throws on an empty one, so this cannot hand back a guess.
  */
 export function referenceFromLocation(location = globalThis.location) {
   if (!location) return '';
   const hash = String(location.hash ?? '');
   const fromHash = hash.includes('?') ? hash.slice(hash.indexOf('?') + 1) : '';
   const params = new URLSearchParams(fromHash || String(location.search ?? ''));
-  return String(params.get('reference') ?? '').trim();
+  return String(params.get('reference') ?? params.get('tx_ref') ?? '').trim();
 }
 
 export function listReceipts() {

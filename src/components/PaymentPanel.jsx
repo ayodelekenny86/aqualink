@@ -29,6 +29,7 @@ import { formatCedi } from '../lib/money';
  */
 export default function PaymentPanel({ order, onPaid, showNotice }) {
   const [email, setEmail] = useState(order?.email ?? '');
+  const [provider, setProvider] = useState('paystack');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -94,14 +95,14 @@ export default function PaymentPanel({ order, onPaid, showNotice }) {
     setError('');
     setBusy(true);
     try {
-      const initiated = await initialisePayment({ orderId: order.id ?? order.code, email });
+      const initiated = await initialisePayment({ orderId: order.id ?? order.code, email, provider });
 
       if (initiated.alreadyPaid) {
         setNotice('This order is already paid.');
         return;
       }
-      // Hand the browser to Paystack. No further outcome is assumed here; the
-      // return leg above decides what happened.
+      // Hand the browser to the chosen provider. No further outcome is assumed
+      // here; the return leg above decides what happened.
       window.location.assign(initiated.authorizationUrl);
     } catch (caught) {
       setError(caught.message);
@@ -146,9 +147,23 @@ export default function PaymentPanel({ order, onPaid, showNotice }) {
               required
             />
           </label>
+          <label>
+            Payment method
+            <select
+              aria-label="Payment provider"
+              value={provider}
+              onChange={(event) => setProvider(event.target.value)}
+              disabled={busy}
+            >
+              <option value="paystack">Paystack — MTN, Telecel, ATMo, card</option>
+              <option value="flutterwave">Flutterwave — MTN Mobile Money, card, bank transfer</option>
+            </select>
+          </label>
           <p className="form-hint">
-            Paystack will email a receipt and the money goes to AquaLink. MTN, Telecel, ATMo and card are all
-            accepted on the next screen.
+            Both providers are live on this deployment and each needs its own key set in the
+            Supabase dashboard. The one you pick here is the gateway the money actually flows
+            through; the server asks that provider whether money arrived, and only that answer
+            can mark the order paid.
           </p>
           <button className="primary-button full" type="submit" disabled={busy}>
             {busy ? 'Working…' : `Pay ${formatCedi(chargedMinor)}`}

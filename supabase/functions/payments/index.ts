@@ -1,15 +1,58 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { checkSettlement, verifyPaystackSignature } from '../_lib/session.ts';
+import {
+  checkSettlement,
+  verifyPaystackSignature,
+  verifyFlutterwaveSignature,
+  checkFlutterwaveSettlement,
+} from '../_lib/session.ts';
 import { applyCors, fail, json } from '../_lib/utils.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY') ?? '';
+const FLUTTERWAVE_SECRET_KEY = Deno.env.get('FLUTTERWAVE_SECRET_KEY') ?? '';
 
 function supabase() {
   return createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+}
+
+/**
+ * Which provider answers a request. Both are supported at once — a buyer
+ * chooses at checkout and the server talks to whichever they picked — but
+ * each needs its own secret, and an unset one is a loud 503 rather than a
+ * silent fallback to the other.
+ */
+type Provider = 'paystack' | 'flutterwave';
+
+function providerFrom(body: any): Provider {
+  const provider = String(body?.provider ?? 'paystack').toLowerCase();
+  if (provider === 'flutterwave') return 'flutterwave';
+  return 'paystack';
+}
+
+async function flutterwaveRequest(path: string, init: RequestInit = {}) {
+  const secret = FLUTTERWAVE_SECRET_KEY;
+  if (!secret) throw new Error('FLUTTERWAVE_SECRET_KEY is not set');
+
+  const response = await fetch(`https://api.flutterwave.com/v3${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${secret}`,
+      'Content-Type': 'application/json',
+      ...(init.headers ?? {}),
+    },
+  });
+
+  const text = await response.text();
+  let body;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    throw new Error(`Flutterwave returned a non-JSON response (${response.status}).`);
+  }
+  return { ok: response.ok, status: response.status, body };
 }
 
 async function paystackRequest(path: string, init: RequestInit = {}) {
@@ -44,14 +87,12 @@ Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
     const path = url.pathname.split('/').pop() ?? '';
 
-    // POST /payments/initialize - create a Paystack transaction
+    // POST /payments/initialize - create a payment transaction
     if (path === 'initialize') {
       if (req.method !== 'POST') return fail(405, 'method_not_allowed', 'Use POST.');
 
-      const secret = PAYSTACK_SECRET_KEY;
-      if (!secret) return fail(503, 'payments_unconfigured', 'Payments are not configured.');
-
-      const body = await req.json();
+      const body = await req.json().catch(() => ({}));
+      const provider = providerFrom(body);
       const orderId = String(body.orderId ?? '').trim();
       const email = String(body.email ?? '').trim().toLowerCase();
 
@@ -70,14 +111,55 @@ Deno.serve(async (req: Request) => {
         return fail(403, 'order_email_mismatch', 'This order belongs to a different account.');
       }
       if (order.status === 'Paid') {
-        return json({ reference: order.paystack_reference, status: 'settled', alreadyPaid: true });
+        return json({ reference: order.paystack_reference ?? order.flutterwave_reference, status: 'settled', alreadyPaid: true });
       }
-
-      const paystackReference = `aq-${orderId.toLowerCase().replace(/[^a-z0-9]/g, '')}-${crypto.randomUUID().slice(0, 8)}`;
 
       const callbackUrl = Deno.env.get('APP_ORIGIN')
         ? `${Deno.env.get('APP_ORIGIN').replace(/\/$/, '')}/#/payment/return`
         : undefined;
+
+      if (provider === 'flutterwave') {
+        if (!FLUTTERWAVE_SECRET_KEY) return fail(503, 'payments_unconfigured', 'Flutterwave is not configured.');
+
+        const txRef = `aq-${orderId.toLowerCase().replace(/[^a-z0-9]/g, '')}-${crypto.randomUUID().slice(0, 8)}`;
+
+        const { ok, body: fw } = await flutterwaveRequest('/payments', {
+          method: 'POST',
+          body: JSON.stringify({
+            tx_ref: txRef,
+            amount: order.charged_minor / 100,
+            currency: order.currency ?? 'GHS',
+            payment_options: 'card,mobilemoney,banktransfer,ussd',
+            redirect_url: callbackUrl,
+            customer: { email: order.email, phone: order.phone ?? '' },
+            customizations: { title: 'AquaLink water delivery', description: `Order ${orderId}` },
+            metadata: { order_id: orderId, volume_litres: order.volume_litres },
+          }),
+        });
+
+        if (!ok || fw?.status !== 'success') {
+          return fail(502, 'provider_rejected', fw?.message ?? 'The payment provider rejected this request.');
+        }
+
+        await db.from('orders').update({
+          flutterwave_reference: txRef,
+          status: 'Awaiting payment',
+        }).eq('id', orderId);
+
+        return json({
+          reference: txRef,
+          authorizationUrl: fw.data?.link ?? null,
+          amountMinor: order.charged_minor,
+          currency: order.currency ?? 'GHS',
+          provider: 'flutterwave',
+          status: 'pending',
+        });
+      }
+
+      // Paystack path
+      if (!PAYSTACK_SECRET_KEY) return fail(503, 'payments_unconfigured', 'Paystack is not configured.');
+
+      const paystackReference = `aq-${orderId.toLowerCase().replace(/[^a-z0-9]/g, '')}-${crypto.randomUUID().slice(0, 8)}`;
 
       const { ok, body: paystack } = await paystackRequest('/transaction/initialize', {
         method: 'POST',
@@ -106,6 +188,7 @@ Deno.serve(async (req: Request) => {
         authorizationUrl: paystack.data?.authorization_url,
         amountMinor: order.charged_minor,
         currency: order.currency ?? 'GHS',
+        provider: 'paystack',
         status: 'pending',
       });
     }
@@ -114,46 +197,60 @@ Deno.serve(async (req: Request) => {
     if (path === 'verify') {
       if (req.method !== 'GET') return fail(405, 'method_not_allowed', 'Use GET.');
 
-      const secret = PAYSTACK_SECRET_KEY;
-      if (!secret) return fail(503, 'payments_unconfigured', 'Payments are not configured.');
-
       const reference = String(url.searchParams.get('reference') ?? '').trim();
       if (!reference) return fail(400, 'invalid_reference', 'A payment reference is required.');
-
-      const { ok, body: paystack } = await paystackRequest(`/transaction/verify/${encodeURIComponent(reference)}`);
-      if (!ok || !paystack?.status) {
-        return fail(502, 'provider_rejected', paystack?.message ?? 'The payment provider could not be reached.');
-      }
-      const transaction = paystack.data ?? {};
 
       const db = supabase();
       const { data: order, error: orderError } = await db
         .from('orders')
         .select('*')
-        .eq('paystack_reference', reference)
+        .or(`paystack_reference.eq.${reference},flutterwave_reference.eq.${reference}`)
         .single();
 
       if (orderError || !order) {
         return json({ status: 'unknown', settled: false, reason: 'no_matching_order' });
       }
 
-      const verdict = checkSettlement({
-        transaction: {
-          status: transaction.status ?? 'success',
-          reference,
-          amount: transaction.amount,
-          currency: transaction.currency,
-          paid_at: transaction.paid_at,
-        },
-        order,
-        currency: order.currency ?? 'GHS',
-      });
+      const provider: Provider = order.flutterwave_reference ? 'flutterwave' : 'paystack';
+      const secret = provider === 'flutterwave' ? FLUTTERWAVE_SECRET_KEY : PAYSTACK_SECRET_KEY;
+      if (!secret) return fail(503, 'payments_unconfigured', `${provider} is not configured.`);
 
-      if (verdict.settled && order.status !== 'Paid') {
+      let transaction: any = {};
+      if (provider === 'flutterwave') {
+        const { ok, body: fw } = await flutterwaveRequest(`/transactions/${encodeURIComponent(reference)}/verify`);
+        if (!ok || fw?.status !== 'success') {
+          return fail(502, 'provider_rejected', fw?.message ?? 'The payment provider could not be reached.');
+        }
+        transaction = fw.data ?? {};
+      } else {
+        const { ok, body: paystack } = await paystackRequest(`/transaction/verify/${encodeURIComponent(reference)}`);
+        if (!ok || !paystack?.status) {
+          return fail(502, 'provider_rejected', paystack?.message ?? 'The payment provider could not be reached.');
+        }
+        transaction = paystack.data ?? {};
+      }
+
+      const verdict = provider === 'flutterwave'
+        ? checkFlutterwaveSettlement({ transaction, order, currency: order.currency ?? 'GHS' })
+        : checkSettlement({
+            transaction: {
+              status: transaction.status ?? 'success',
+              reference,
+              amount: transaction.amount,
+              currency: transaction.currency,
+              paid_at: transaction.paid_at,
+            },
+            order,
+            currency: order.currency ?? 'GHS',
+          });
+
+      const alreadyPaid = order.status === 'Paid';
+      if (verdict.settled && !alreadyPaid) {
         await db.from('orders').update({
           status: 'Paid',
-          paid_at: transaction.paid_at ?? new Date().toISOString(),
+          paid_at: verdict.paidAt ?? transaction.paid_at ?? new Date().toISOString(),
           paystack_channel: transaction.channel ?? null,
+          flutterwave_channel: transaction.channel ?? null,
         }).eq('id', order.id);
 
         return json({
@@ -164,6 +261,7 @@ Deno.serve(async (req: Request) => {
           orderId: order.id,
           amountMinor: order.charged_minor,
           currency: order.currency ?? 'GHS',
+          provider,
           breakdown: {
             grossMinor: order.gross_minor,
             buyerPays: order.charged_minor,
@@ -176,13 +274,14 @@ Deno.serve(async (req: Request) => {
       }
 
       return json({
-        settled: verdict.settled && order.status === 'Paid',
+        settled: verdict.settled && alreadyPaid,
         status: verdict.settled ? 'settled' : 'pending',
         reason: verdict.reason,
         reference,
         orderId: order.id,
         amountMinor: order.charged_minor,
         currency: order.currency ?? 'GHS',
+        provider,
         breakdown: {
           grossMinor: order.gross_minor,
           buyerPays: order.charged_minor,
@@ -194,70 +293,88 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // POST /payments/webhook - Paystack webhook endpoint
+    // POST /payments/webhook - provider webhook endpoint
     if (path === 'webhook') {
       if (req.method !== 'POST') return fail(405, 'method_not_allowed', 'Use POST.');
 
-      const secret = PAYSTACK_SECRET_KEY;
+      // Flutterwave identifies itself with the `verifier` header; Paystack with
+      // `x-paystack-signature`. Verify against the provider that actually sent
+      // it — verifying a Paystack signature with the Flutterwave secret (or
+      // vice versa) would accept a forged request.
+      const signature = req.headers.get('x-paystack-signature');
+      const fwVerifier = req.headers.get('verifier');
+      const provider: Provider = fwVerifier ? 'flutterwave' : 'paystack';
+      const secret = provider === 'flutterwave' ? FLUTTERWAVE_SECRET_KEY : PAYSTACK_SECRET_KEY;
+
       if (!secret) {
-        console.error('PAYSTACK_SECRET_KEY is not set; refusing to process webhook.');
+        console.error(`${provider} secret is not set; refusing to process webhook.`);
         return fail(503, 'payments_unconfigured', 'Payments are not configured.');
       }
 
-      const signature = req.headers.get('x-paystack-signature');
       const rawBody = await req.arrayBuffer();
+      const bodyText = new TextDecoder().decode(rawBody);
 
-      if (!verifyPaystackSignature(new TextDecoder().decode(rawBody), signature, secret)) {
+      const valid = provider === 'flutterwave'
+        ? verifyFlutterwaveSignature(bodyText, fwVerifier, secret)
+        : verifyPaystackSignature(bodyText, signature, secret);
+
+      if (!valid) {
         console.warn('rejected webhook with an invalid signature');
         return fail(401, 'invalid_signature', 'Invalid signature.');
       }
 
       let event;
       try {
-        event = JSON.parse(new TextDecoder().decode(rawBody));
+        event = JSON.parse(bodyText);
       } catch {
         return fail(400, 'invalid_body', 'Malformed webhook body.');
       }
 
-      const reference = event?.data?.reference;
+      // Flutterwave nests the event under `data`; Paystack under `data` too, but
+      // Flutterwave's top-level `status` and `tx_ref` are the useful fields.
+      const reference = provider === 'flutterwave'
+        ? event?.data?.tx_ref
+        : event?.data?.reference;
       if (!reference) return json({ received: true, ignored: 'no_reference' });
 
       try {
-        if (event.event === 'charge.success') {
-          const db = supabase();
-          const { data: order, error: orderError } = await db
-            .from('orders')
-            .select('*')
-            .eq('paystack_reference', reference)
-            .single();
+        const db = supabase();
+        const { data: order, error: orderError } = await db
+          .from('orders')
+          .select('*')
+          .or(`paystack_reference.eq.${reference},flutterwave_reference.eq.${reference}`)
+          .single();
 
-          if (orderError || !order) {
-            return json({ received: true, ignored: 'order_not_found' });
-          }
+        if (orderError || !order) {
+          return json({ received: true, ignored: 'order_not_found' });
+        }
 
-          const verdict = checkSettlement({
-            transaction: {
-              status: event.data.status ?? 'success',
-              reference,
-              amount: event.data.amount,
-              currency: event.data.currency,
-              paid_at: event.data.paid_at,
-            },
-            order,
-            currency: order.currency ?? 'GHS',
-          });
+        const transaction = provider === 'flutterwave' ? (event.data ?? {}) : (event.data ?? {});
+        const verdict = provider === 'flutterwave'
+          ? checkFlutterwaveSettlement({ transaction, order, currency: order.currency ?? 'GHS' })
+          : checkSettlement({
+              transaction: {
+                status: event.data?.status ?? 'success',
+                reference,
+                amount: event.data?.amount,
+                currency: event.data?.currency,
+                paid_at: event.data?.paid_at,
+              },
+              order,
+              currency: order.currency ?? 'GHS',
+            });
 
-          if (verdict.settled && order.status !== 'Paid') {
-            await db.from('orders').update({
-              status: 'Paid',
-              paid_at: event.data.paid_at ?? null,
-              paystack_channel: event.data.channel ?? null,
-            }).eq('id', order.id);
+        if (verdict.settled && order.status !== 'Paid') {
+          await db.from('orders').update({
+            status: 'Paid',
+            paid_at: verdict.paidAt ?? event.data?.paid_at ?? null,
+            paystack_channel: event.data?.channel ?? null,
+            flutterwave_channel: event.data?.channel ?? null,
+          }).eq('id', order.id);
 
-            console.info('order marked paid from webhook', { orderId: order.id, reference });
-          } else {
-            console.warn('webhook did not settle the order', { orderId: order.id, reason: verdict.reason });
-          }
+          console.info('order marked paid from webhook', { orderId: order.id, reference, provider });
+        } else {
+          console.warn('webhook did not settle the order', { orderId: order.id, reason: verdict.reason });
         }
 
         return json({ received: true });

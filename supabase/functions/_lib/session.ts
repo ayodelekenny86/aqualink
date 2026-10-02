@@ -192,3 +192,58 @@ export function normaliseMsisdn(value: string): string | null {
   if (digits.length === 10 && digits.startsWith('0')) return `+233${digits.slice(1)}`;
   return null;
 }
+
+/**
+ * Verify a Flutterwave webhook signature.
+ *
+ * Flutterwave signs webhooks with HMAC-SHA256 using the secret key over the
+ * raw request body, and puts the digest in the `verifier` header. The check is
+ * the same shape as Paystack's: reject anything unsigned before touching the
+ * body, so a forged webhook can never settle an order.
+ */
+export function verifyFlutterwaveSignature(rawBody: string | Buffer, signature: string | null, secret: string): boolean {
+  if (!secret) return false;
+  if (typeof signature !== 'string' || signature.length === 0) return false;
+
+  const expected = createHmac('sha256', secret)
+    .update(Buffer.isBuffer(rawBody) ? rawBody : Buffer.from(String(rawBody), 'utf8'))
+    .digest('hex');
+
+  return constantTimeEquals(String(signature).trim(), expected);
+}
+
+/**
+ * Decide whether a Flutterwave transaction record settles the order.
+ *
+ * Flutterwave reports success as `status === 'successful'` and carries the
+ * charged amount in `data.amount` (integer minor units) with the currency in
+ * `data.currency`. This mirrors `checkSettlement` for Paystack so the caller
+ * can dispatch on provider without re-learning each one's field names.
+ */
+export function checkFlutterwaveSettlement({ transaction, order, currency = 'GHS' }: {
+  transaction?: any; order?: any; currency?: string;
+}): { settled: boolean; reason: string; paidAt?: string | null } {
+  if (!transaction || typeof transaction !== 'object') return { settled: false, reason: 'no_transaction_record' };
+  if (!order || typeof order !== 'object') return { settled: false, reason: 'no_matching_order' };
+
+  const data = transaction.data ?? transaction;
+  const status = String(data?.status ?? transaction.status ?? '').toLowerCase();
+  if (status !== 'successful') return { settled: false, reason: `provider_status_${status || 'unknown'}` };
+
+  if (String(data?.tx_ref ?? '') !== String(order.flutterwave_reference ?? '')) {
+    return { settled: false, reason: 'reference_mismatch' };
+  }
+
+  if (!Number.isInteger(order.charged_minor) || order.charged_minor <= 0) return { settled: false, reason: 'order_amount_invalid' };
+  const amount = Number(data?.amount);
+  if (!Number.isFinite(amount) || Math.round(amount) !== order.charged_minor) {
+    return { settled: false, reason: 'amount_mismatch' };
+  }
+
+  const paidCurrency = String(data?.currency ?? '').toUpperCase();
+  if (paidCurrency !== String(currency).toUpperCase()) return { settled: false, reason: 'currency_mismatch' };
+
+  if (order.status === 'refunded') return { settled: false, reason: 'already_refunded' };
+
+  return { settled: true, reason: 'settled', paidAt: data?.created_at ?? transaction.created_at ?? null };
+}

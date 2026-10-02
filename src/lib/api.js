@@ -37,6 +37,7 @@ const ROUTES = {
   '/payments/initialize': { fn: 'payments', action: 'initialize' },
   '/payments/verify': { fn: 'payments', action: 'verify' },
   '/webhooks/paystack': { fn: 'payments', action: 'webhook' },
+  '/webhooks/flutterwave': { fn: 'payments', action: 'webhook' },
   '/ops/login': { fn: 'ops', action: 'login' },
   '/sellers/apply': { fn: 'sellers', action: 'apply' },
   '/sellers/status': { fn: 'sellers', action: 'status' },
