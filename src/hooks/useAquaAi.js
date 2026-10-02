@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { translations } from '../data/translations';
 import { formatCedi } from '../lib/money';
 import { tierFor, computePoints, TIERS } from './useLoyalty';
+import { askAiQuestion } from '../lib/ai';
 
 /**
  * The Aqua panel.
@@ -173,24 +174,42 @@ export function getAiAnswer(question, { language = 'en', orders = [], split, sel
   return language !== 'en' && support ? `${support} · ${answer}` : answer;
 }
 
-export function useAquaAi({ language, orders = [], split, requestRefund } = {}) {
+export function useAquaAi({ language, orders = [], split, sellerScores = [], reliabilityScores = [], buyerId = null, role = 'buyer' } = {}) {
   const [aiOpen, setAiOpen] = useState(false);
   const [aiInput, setAiInput] = useState('');
   const [aiMessages, setAiMessages] = useState([greeting]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSource, setAiSource] = useState(null);
 
-  const askAi = useCallback((event) => {
+  const askAi = useCallback(async (event) => {
     event.preventDefault();
     const question = aiInput.trim();
     if (!question) return;
-    const answer = getAiAnswer(question, { language, orders, split });
-    setAiMessages((messages) => [...messages, { from: 'user', text: question }, { from: 'ai', text: answer }]);
+
+    setAiLoading(true);
+    setAiMessages((messages) => [...messages, { from: 'user', text: question }]);
     setAiInput('');
-  }, [aiInput, language, orders, split]);
+
+    const { answer, source } = await askAiQuestion({
+      question,
+      role,
+      orders,
+      split,
+      sellerScores,
+      reliabilityScores,
+      buyerId,
+      language,
+    });
+
+    setAiSource(source);
+    setAiMessages((messages) => [...messages, { from: 'ai', text: answer }]);
+    setAiLoading(false);
+  }, [aiInput, language, orders, split, sellerScores, reliabilityScores, buyerId, role]);
 
   const toggleAi = useCallback(() => setAiOpen((open) => !open), []);
   const closeAi = useCallback(() => setAiOpen(false), []);
 
-  return { aiOpen, toggleAi, closeAi, aiInput, setAiInput, aiMessages, askAi };
+  return { aiOpen, toggleAi, closeAi, aiInput, setAiInput, aiMessages, askAi, aiLoading, aiSource };
 }
 
 export default useAquaAi;

@@ -39,12 +39,15 @@ function Stepper({ status }) {
 
   return (
     <ol className="driver-stepper" aria-label={`Delivery progress, step ${current + 1} of ${DRIVER_STEPS.length}`}>
-      {DRIVER_STEPS.map((step, index) => (
-        <li key={step.status} className={index < current ? 'done' : index === current ? 'current' : ''}>
-          <span className="step-dot" aria-hidden="true">{index < current ? '✓' : index + 1}</span>
-          <span className="step-label">{step.label}</span>
-        </li>
-      ))}
+      {DRIVER_STEPS.map((step, index) => {
+        const isDone = index < current || (index === current && status === 'Delivered');
+        return (
+          <li key={step.status} className={isDone ? 'done' : index === current ? 'current' : ''}>
+            <span className="step-dot" aria-hidden="true">{isDone ? '✓' : index + 1}</span>
+            <span className="step-label">{step.label}</span>
+          </li>
+        );
+      })}
     </ol>
   );
 }

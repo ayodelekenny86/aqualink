@@ -115,7 +115,8 @@ function App() {
     authStep, email, setEmail, emailCode, sendOtp, confirmEmailCode,
     sellerProfile, setSellerProfile, sellerApproved, sellerApplicationId,
     applyForSellerApproval, refreshSellerApproval, completeSellerApproval,
-    available, setAvailable,
+     available, setAvailable,
+     ready,
   } = useAuth();
 
   const {
@@ -153,8 +154,9 @@ function App() {
   const reliabilityRanked = rankReliability(orders);
   const reliabilitySummaryData = reliabilitySummary(orders);
 
-  const { aiOpen, toggleAi, closeAi, aiInput, setAiInput, aiMessages, askAi } = useAquaAi({
+  const { aiOpen, toggleAi, closeAi, aiInput, setAiInput, aiMessages, askAi, aiLoading, aiSource } = useAquaAi({
     language,
+    role,
     orders,
     split,
     sellerScores: sellerRanked,
@@ -241,6 +243,15 @@ function App() {
     return orders.find((order) => order.status !== 'Paid') ?? orders[0] ?? null;
   }, [orders, returnReference]);
 
+  // The Driver workspace requires a phone on the fleet roster and is gated
+  // separately from the buyer/seller/admin workspaces. A signed-in buyer or
+  // seller should not see it in the switcher. Admins and drivers can, and
+  // unsigned visitors see every option so they can choose one.
+  const switcherRoles = useMemo(() => {
+    if (adminAuthenticated || driverAuthenticated || !session) return roles;
+    return roles.filter(([key]) => key !== 'driver');
+  }, [adminAuthenticated, driverAuthenticated, session]);
+
   return (
     <div className="app-shell">
       {/* The mobile tab bar is always in the DOM and hidden with CSS above the
@@ -248,7 +259,7 @@ function App() {
           check would render nothing for the first frame on a phone and shift
           the layout, and it cannot know the width before layout anyway. */}
       <nav className="mobile-tabs" aria-label="Workspaces">
-        {roles.map(([key, label]) => (
+        {switcherRoles.map(([key, label]) => (
           <button
             className={`mobile-tab ${role === key ? 'active' : ''}`}
             key={key}
@@ -266,7 +277,7 @@ function App() {
         <a className="app-logo" href="#main" aria-label="AquaLink dashboard"><span>A</span>Aqua<strong>Link</strong></a>
         <div className="workspace-label">WORKSPACE</div>
         <div className="role-list">
-          {roles.map(([key, label, description]) => (
+          {switcherRoles.map(([key, label, description]) => (
             <button className={`role-button ${role === key ? 'active' : ''}`} key={key} type="button" onClick={() => selectRole(key)}>
               <span className={`role-icon ${key}`} aria-hidden="true">{ROLE_ICONS[key]}</span>
               <span><b>{label}</b><small>{description}</small></span>
@@ -381,7 +392,7 @@ function App() {
           <DriverDashboard
             orders={orders}
             fleetDrivers={fleetDrivers}
-            driverIdentifier={session?.phone || session?.identifier ?? ''}
+            driverIdentifier={session?.phone || (session?.identifier ?? '')}
             driverName={session?.displayName ?? ''}
             onAccept={driverAccept}
             onAdvance={driverAdvance}

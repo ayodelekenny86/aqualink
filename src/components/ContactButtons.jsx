@@ -44,6 +44,22 @@ export function orderMessage({ code, location, volume, status, eta }) {
 }
 
 export default function ContactButtons({ phone = DEFAULT_SUPPORT.phone, whatsapp, name = DEFAULT_SUPPORT.name, message, label = 'Message', className = '', compact = false }) {
+  const hasPhone = Boolean(phone && String(phone).trim());
+  if (!hasPhone) {
+    return (
+      <span className={`contact-buttons ${className}`.trim()}>
+        <a
+          className="contact-button whatsapp"
+          href={whatsappHref(DEFAULT_SUPPORT.phone, message)}
+          target="_blank"
+          rel="noreferrer noopener"
+          aria-label="Contact support"
+        >
+          <span aria-hidden="true">✆</span>{!compact && 'Contact support'}
+        </a>
+      </span>
+    );
+  }
   // WhatsApp and the phone number are allowed to differ: a customer may have a
   // separate WhatsApp number. wa.me targets WhatsApp, tel: dials the phone, so
   // each link uses the right one and falls back to the other when unset.

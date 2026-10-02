@@ -161,8 +161,8 @@ describe('claiming and progressing a job', () => {
 
     await user.click(screen.getByRole('button', { name: /show/i }));
     const card = screen.getByTestId('driver-job-AQ-1001');
-    expect(within(card).getByText(/delivered/i)).toBeInTheDocument();
-    expect(within(card).getByText(/45/)).toBeInTheDocument();
+    expect(within(card).getByText('Delivered', { selector: '.status' })).toBeInTheDocument();
+    expect(within(card).getByText(/GH₵45/i, { selector: '.driver-job-done' })).toBeInTheDocument();
   });
 });
 
@@ -203,8 +203,10 @@ describe('the delivery stepper', () => {
     expect(container.querySelector('.driver-stepper')).toBeNull();
   });
 
-  test('marks every step done once delivered', () => {
+  test('marks every step done once delivered', async () => {
+    const user = userEvent.setup();
     const { container } = renderDashboard({ orders: [order({ status: 'Delivered' })] });
+    await user.click(screen.getByRole('button', { name: /show/i }));
     const stepper = container.querySelector('.driver-stepper');
     expect(stepper.querySelectorAll('li.done')).toHaveLength(4);
   });
