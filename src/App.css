@@ -371,3 +371,201 @@ button { cursor: pointer; }
   .admin-pricing-actions button { flex: 1; }
   .payment-form { grid-template-columns: 1fr; }
 }
+
+/* ------------------------------------------------------------------ */
+/* Mobile tab bar                                                      */
+/* ------------------------------------------------------------------ */
+/* Hidden on desktop and revealed at the mobile breakpoint. The sidebar is
+   still the desktop navigation; this is the phone equivalent, pinned to the
+   bottom where a thumb can reach it. */
+.mobile-tabs { display: none; }
+
+@media (max-width: 650px) {
+  /* The sidebar duplicates this navigation as an icon row, and having both on
+     screen pushed the workspace picker into the scroll path twice. The tab bar
+     is the phone's primary nav. */
+  .sidebar { display: none; }
+  .main-content { width: 100%; margin: 0; padding: 0 16px calc(96px + env(safe-area-inset-bottom, 0px)); }
+  .app-shell { display: block; }
+
+  .mobile-tabs {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 40;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+    background: #fff;
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -4px 18px rgba(24, 52, 67, .09);
+  }
+  .mobile-tab {
+    position: relative;
+    display: grid;
+    gap: 3px;
+    justify-items: center;
+    /* 44px is the smallest comfortable touch target; below it, drivers using
+       this one-handed at a delivery point mis-tap between workspaces. */
+    min-height: 52px;
+    padding: 6px 2px;
+    color: var(--muted);
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    font-size: 9px;
+    font-weight: 700;
+  }
+  .mobile-tab.active { color: var(--teal); background: #eef6f2; }
+  .mobile-tab .role-icon { width: 24px; height: 24px; font-size: 13px; }
+  .mobile-tab-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mobile-tab em {
+    position: absolute;
+    top: 2px;
+    right: calc(50% - 20px);
+    display: grid;
+    min-width: 15px;
+    height: 15px;
+    padding: 0 3px;
+    place-items: center;
+    color: #fff;
+    background: var(--coral);
+    border-radius: 8px;
+    font-size: 8px;
+    font-style: normal;
+  }
+
+  /* Comfortable touch targets across the app on a phone. Desktop keeps the
+     tighter 10px type, which is right for a pointer and cramped for a thumb. */
+  .primary-button, .outline-button, .text-button, .confirm-button { min-height: 44px; padding: 12px 16px; font-size: 12px; }
+  .input-wrap input, select, .access-gate input, .auth-form input, .seller-form input, .seller-form select,
+  .ai-form input, .driver-location-form input, .saved-address-list button, .support-actions button { min-height: 44px; font-size: 13px; }
+  .access-gate form button, .buyer-grid button { min-height: 46px; }
+
+   /* The order detail modal is a full-height sheet on a phone rather than a
+      centred box, which on a 360px-wide screen left the footer buttons below
+      the fold with no way to reach them. */
+   .modal-backdrop { align-items: stretch; padding: 0; }
+   .order-modal {
+     width: 100%;
+     max-width: none;
+     max-height: 100vh;
+     max-height: 100dvh;
+     overflow-y: auto;
+     padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+     border-radius: 16px 16px 0 0;
+   }
+   .order-modal-head { position: sticky; top: 0; z-index: 1; background: #fff; }
+   .order-modal-foot { flex-direction: column; align-items: stretch; gap: 10px; }
+   .order-modal-foot .contact-button { justify-content: center; min-height: 44px; }
+
+   /* Safe-area insets so content is never pinned under a notch or home bar on
+      mobile, and the topbar gains left/right padding to clear iOS rounded corners */
+   .topbar {
+     padding-left: env(safe-area-inset-left, 0px);
+     padding-right: env(safe-area-inset-right, 0px);
+   }
+   .main-content {
+     padding-left: max(18px, env(safe-area-inset-left, 18px));
+     padding-right: max(18px, env(safe-area-inset-right, 18px));
+   }
+   .mobile-tabs {
+     padding-left: env(safe-area-inset-left, 0px);
+     padding-right: env(safe-area-inset-right, 0px);
+   }
+}
+
+/* Coarse pointers get the same target sizes regardless of viewport: a tablet in
+   a van has no hover and a small tap area. */
+@media (pointer: coarse) {
+  .contact-button, .primary-button, .outline-button { min-height: 44px; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Driver workspace                                                    */
+/* ------------------------------------------------------------------ */
+.driver-workspace { padding-bottom: 30px; }
+.driver-stats-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 26px; }
+.driver-stats-bar article { display: grid; gap: 7px; padding: 18px; background: #fff; border: 1px solid var(--line); border-radius: 5px; }
+.driver-stats-bar span { color: #91a0a1; font-family: 'DM Mono', monospace; font-size: 8px; }
+.driver-stats-bar strong { font-family: Georgia, serif; font-size: 26px; font-weight: 400; }
+.driver-stats-bar small { color: var(--muted); font-size: 9px; line-height: 1.4; }
+.driver-stats-bar .driver-earnings strong { color: #287660; }
+
+.driver-feed { margin-bottom: 22px; padding: 22px 24px; }
+.driver-job-list { display: grid; gap: 14px; margin-top: 16px; }
+.driver-job { display: grid; gap: 14px; padding: 18px; border-radius: 5px; }
+.driver-job-head { display: flex; gap: 14px; align-items: start; justify-content: space-between; }
+.driver-job-head strong { display: block; font-size: 13px; }
+.driver-job-head small { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; }
+.driver-job-detail { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 13px 0; border-top: 1px solid #edf1ef; border-bottom: 1px solid #edf1ef; }
+.driver-job-detail div { display: grid; gap: 4px; }
+.driver-job-detail span { color: #91a0a1; font-family: 'DM Mono', monospace; font-size: 8px; }
+.driver-job-detail strong { font-size: 11px; }
+.driver-job-actions { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; }
+.driver-job-done { color: #287660; font-size: 10px; font-weight: 700; }
+.status-pickedup { color: #6b4d87; background: #f0e8f7; }
+.status-assigned { color: #9b6b16; background: #fff0d1; }
+.status-enroute { color: #286a8a; background: #dceef4; }
+.status-awaiting { color: #758982; background: #eef3f0; }
+
+/* Delivery stepper. Each step is a dot plus a label, and the connecting line is
+   drawn by the list item rather than an SVG so it inherits colour from the
+   done/current state. */
+.driver-stepper { display: flex; gap: 0; margin: 0; padding: 0; list-style: none; counter-reset: none; }
+.driver-stepper li { position: relative; display: grid; gap: 5px; justify-items: center; flex: 1; }
+.driver-stepper li::before {
+  position: absolute;
+  top: 9px;
+  left: -50%;
+  width: 100%;
+  height: 2px;
+  background: #e2eae7;
+  content: '';
+}
+.driver-stepper li:first-child::before { display: none; }
+.driver-stepper li.done::before, .driver-stepper li.current::before { background: var(--teal); }
+.step-dot {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 19px;
+  height: 19px;
+  place-items: center;
+  color: #8ba1a5;
+  background: #fff;
+  border: 2px solid #e2eae7;
+  border-radius: 50%;
+  font-size: 8px;
+  font-weight: 700;
+}
+.driver-stepper li.done .step-dot { color: #fff; background: var(--teal); border-color: var(--teal); }
+.driver-stepper li.current .step-dot { color: var(--teal); border-color: var(--teal); }
+.step-label { color: var(--muted); font-size: 8px; text-align: center; }
+.driver-stepper li.done .step-label, .driver-stepper li.current .step-label { color: var(--ink); font-weight: 700; }
+
+@media (max-width: 900px) { .driver-stats-bar { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 650px) {
+  .driver-refresh { width: 100%; margin-top: 10px; }
+  .driver-job-detail { grid-template-columns: 1fr; }
+  .driver-job-head { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .driver-job { padding: 20px; }
+  .driver-stats-bar { grid-template-columns: 2fr 1fr; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Social sign-in and the delivery code                                */
+/* ------------------------------------------------------------------ */
+.social-divider { display: flex; gap: 12px; align-items: center; max-width: 380px; margin: 22px 0 14px; color: #849397; font-family: 'DM Mono', monospace; font-size: 8px; letter-spacing: .08em; text-transform: uppercase; }
+.social-divider::before, .social-divider::after { height: 1px; flex: 1; background: var(--line); content: ''; }
+.social-divider span { white-space: nowrap; }
+
+.order-delivery-code { margin: 18px 0; padding: 16px 18px; text-align: center; background: #f0f8f4; border: 1px dashed #9dcbb7; border-radius: 5px; }
+.order-delivery-code strong { display: block; margin: 8px 0 6px; color: var(--ink); font-family: 'DM Mono', monospace; font-size: 27px; letter-spacing: .12em; }
+.order-delivery-code small { color: var(--muted); font-size: 9px; line-height: 1.5; }
+
+/* Driver phone-linking form */
+.driver-link-form { display: grid; gap: 10px; margin-top: 16px; }
+.driver-link-form input { padding: 12px; border: 1px solid #cddbd8; border-radius: 4px; font-size: 13px; }
+
+/* Sign-out button in topbar */
+#topbar-signout { color: var(--muted); background: transparent; border: 0; font-size: 18px; padding: 4px 8px; }

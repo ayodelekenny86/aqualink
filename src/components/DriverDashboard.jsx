@@ -13,6 +13,7 @@
 import { useMemo, useState } from 'react';
 import ContactButtons, { orderMessage } from './ContactButtons';
 import { formatCedi } from '../lib/money';
+import { formatPhoneForDisplay, normalizePhone } from '../lib/accounts';
 import {
   DRIVER_STEPS,
   advanceAction,
@@ -123,6 +124,8 @@ export default function DriverDashboard({
   onReject,
   showNotice,
   busyOrderId = null,
+  linkDriverPhone,
+  onRefresh,
 }) {
   const [showCompleted, setShowCompleted] = useState(false);
 
@@ -142,17 +145,55 @@ export default function DriverDashboard({
   // definition. Saying so plainly is better than rendering an empty feed that
   // looks like a quiet day.
   if (!driver) {
+    // A Google or Facebook driver signed in with an email, which dispatch
+    // matches by phone. Offer to link the driver phone (the one Ops registered)
+    // so resolveDriver can find them on the roster. If the account is local but
+    // still not rostered, there is nothing to link.
+    const isSocialDriver = driverIdentifier?.includes('@') && linkDriverPhone;
+    if (!isSocialDriver) {
+      return (
+        <section className="access-gate panel" data-testid="driver-not-rostered">
+          <span className="access-lock">⚑</span>
+          <p className="eyebrow">Driver workspace</p>
+          <h1>Not on the driver roster yet.</h1>
+          <p>
+            This account is signed in as a driver, but its number is not on the fleet roster, so no
+            deliveries can be assigned to it. AquaLink Ops adds drivers to the roster before their
+            first job.
+          </p>
+          <p><strong>Signed in as</strong> {driverName || driverIdentifier || 'this account'}</p>
+        </section>
+      );
+    }
+
     return (
-      <section className="access-gate panel" data-testid="driver-not-rostered">
-        <span className="access-lock">⚑</span>
-        <p className="eyebrow">Driver workspace</p>
-        <h1>Not on the driver roster yet.</h1>
+      <section className="access-gate panel" data-testid="driver-link-phone">
+        <span className="access-lock">⇢</span>
+        <p className="eyebrow">Link your driver phone</p>
+        <h1>Sign in to see your deliveries.</h1>
         <p>
-          This account is signed in as a driver, but its number is not on the fleet roster, so no
-          deliveries can be assigned to it. AquaLink Ops adds drivers to the roster before their
-          first job.
+          You signed in with an email address. AquaLink matches drivers to deliveries by
+          phone number, so enter the driver phone Ops registered for you.
         </p>
-        <p><strong>Signed in as</strong> {driverName || driverIdentifier || 'this account'}</p>
+        <form
+          className="driver-link-form"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            const input = event.target.elements.driverPhone;
+            const result = await linkDriverPhone(input.value.trim());
+            if (!result?.ok) {
+              showNotice(result?.error || 'Could not link that phone number.');
+            }
+          }}
+        >
+          <input
+            aria-label="Driver phone number"
+            name="driverPhone"
+            placeholder="e.g. 0545009046"
+            inputMode="tel"
+          />
+          <button className="primary-button full" type="submit">Link phone →</button>
+        </form>
       </section>
     );
   }
@@ -165,6 +206,16 @@ export default function DriverDashboard({
           <h1>Hello, {driverName?.split(' ')[0] || driver.name}.</h1>
           <p>Claim a job, tell the buyer you are on the way, and close it with their code.</p>
         </div>
+        {onRefresh && (
+          <button
+            className="outline-button driver-refresh"
+            type="button"
+            aria-label="Refresh driver feed"
+            onClick={onRefresh}
+          >
+            ↻ Refresh
+          </button>
+        )}
       </div>
 
       <div className="driver-stats-bar">

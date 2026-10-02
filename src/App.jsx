@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect, useMemo } from 'react';
+import { lazy, Suspense, useState, useEffect, useMemo, useCallback } from 'react';
 import './App.css';
 import { languages, translations } from './data/translations';
 import useAuth from './hooks/useAuth';
@@ -25,7 +25,7 @@ import DriverDashboard from './components/DriverDashboard';
 import DeliveryCodeDialog from './components/DeliveryCodeDialog';
 import InstitutionDashboard from './components/InstitutionDashboard';
 import DriverTrackingView from './components/DriverTrackingView';
-import { list } from './lib/collections';
+import { list, replaceAll } from './lib/collections';
 
 // Admin-only and overlay surfaces load on demand. A buyer who never opens the
 // admin console never downloads it, which keeps the initial bundle small.
@@ -107,10 +107,10 @@ function App() {
   seedProducts();
 
   const {
-    ready, role, selectRole, notice, showNotice, dismissNotice,
+    role, selectRole, notice, showNotice, dismissNotice,
     session, signOut, accountExists,
-    buyerAuthenticated, adminAuthenticated, sellerAuthenticated,
-    startPhoneSignIn, confirmPhoneCode, signInWithPassword, signInWithGoogleIdentity, signInWithMetaIdentity, registerAccount,
+    buyerAuthenticated, driverAuthenticated, adminAuthenticated, sellerAuthenticated,
+    startPhoneSignIn, confirmPhoneCode, signInWithPassword, signInWithGoogleIdentity, signInWithMetaIdentity, registerAccount, linkDriverPhone,
     phoneCode, phoneIdentifier, signInError, opsToken,
     authStep, email, setEmail, emailCode, sendOtp, confirmEmailCode,
     sellerProfile, setSellerProfile, sellerApproved, sellerApplicationId,
@@ -215,6 +215,12 @@ function App() {
     setBusyDriverOrderId(null);
   };
 
+  const driverRefresh = useCallback(() => {
+    // Re-read orders from localStorage so the driver feed picks up changes another
+    // role made in the same browser without waiting for the next poll cycle.
+    replaceAll('orders', list('orders'));
+  }, []);
+
   const detailOrder = orders.find((order) => order.id === detailOrderId) ?? null;
 
   // Which order the checkout panel acts on.
@@ -235,6 +241,25 @@ function App() {
 
   return (
     <div className="app-shell">
+      {/* The mobile tab bar is always in the DOM and hidden with CSS above the
+          breakpoint, rather than being mounted from a media query. A JS width
+          check would render nothing for the first frame on a phone and shift
+          the layout, and it cannot know the width before layout anyway. */}
+      <nav className="mobile-tabs" aria-label="Workspaces">
+        {roles.map(([key, label]) => (
+          <button
+            className={`mobile-tab ${role === key ? 'active' : ''}`}
+            key={key}
+            type="button"
+            aria-current={role === key ? 'page' : undefined}
+            onClick={() => selectRole(key)}
+          >
+            <span className={`role-icon ${key}`} aria-hidden="true">{ROLE_ICONS[key]}</span>
+            <span className="mobile-tab-label">{key === 'ops' ? 'Admin' : key === 'institution' ? 'Org' : label.split(' ')[0]}</span>
+            {key === role && roleUnread > 0 && <em>{roleUnread}</em>}
+          </button>
+        ))}
+      </nav>
       <aside className="sidebar">
         <a className="app-logo" href="#main" aria-label="AquaLink dashboard"><span>A</span>Aqua<strong>Link</strong></a>
         <div className="workspace-label">WORKSPACE</div>
@@ -250,7 +275,7 @@ function App() {
       </aside>
 
       <main className="main-content" id="main">
-        <header className="topbar"><div className="breadcrumb"><span>AquaLink</span><i>/</i><strong>{t[role]}</strong><select aria-label="Operating region" value={region} onChange={(event) => { setRegion(event.target.value); showNotice(`Workspace switched to ${event.target.value}.`); }}><option>Accra</option><option>Kumasi</option><option>Takoradi</option><option>Tema</option><option>Lagos</option><option>Abidjan</option></select></div><div className="topbar-actions"><label className="language-picker"><span>文</span><select aria-label="Language" value={language} onChange={(event) => setLanguage(event.target.value)}>{languages.map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label><button className={`ai-trigger ${aiOpen ? 'active' : ''}`} type="button" onClick={toggleAi}><span>✦</span> Aqua AI</button><button className="icon-button" type="button" aria-label="Notifications" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen(!notificationsOpen)}><span>♧</span>{roleUnread > 0 && <em>{roleUnread}</em>}</button><button className="profile mobile-profile" type="button"><span className="avatar">AK</span></button></div></header>
+         <header className="topbar"><div className="breadcrumb"><span>AquaLink</span><i>/</i><strong>{t[role]}</strong><select aria-label="Operating region" value={region} onChange={(event) => { setRegion(event.target.value); showNotice(`Workspace switched to ${event.target.value}.`); }}><option>Accra</option><option>Kumasi</option><option>Takoradi</option><option>Tema</option><option>Lagos</option><option>Abidjan</option></select></div><div className="topbar-actions"><label className="language-picker"><span>文</span><select aria-label="Language" value={language} onChange={(event) => setLanguage(event.target.value)}>{languages.map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label><button className={`ai-trigger ${aiOpen ? 'active' : ''}`} type="button" onClick={toggleAi}><span>✦</span> Aqua AI</button><button className="icon-button" type="button" aria-label="Notifications" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen(!notificationsOpen)}><span>♧</span>{roleUnread > 0 && <em>{roleUnread}</em>}</button>{session && role !== 'buyer' && (buyerAuthenticated || driverAuthenticated || sellerAuthenticated || adminAuthenticated) && true && <button className="icon-button" type="button" aria-label="Sign out" title="Sign out" onClick={() => signOut()}"><span>⎋</span></button>}<button className="profile mobile-profile" type="button"><span className="avatar">AK</span></button></div></header>
         <PWASetup />
         <PWADetectOffline onOfflineChange={(offline) => showNotice(offline ? 'You are offline. Changes will sync when reconnected.' : 'Back online. Syncing...')} />
         {notice && <div className="notice" role="status"><span>✓</span>{notice}<button type="button" aria-label="Dismiss notification" onClick={dismissNotice}>×</button></div>}
@@ -331,7 +356,7 @@ function App() {
           <DriverDashboard
             orders={orders}
             fleetDrivers={fleetDrivers}
-            driverIdentifier={session?.identifier ?? ''}
+            driverIdentifier={session?.phone || session?.identifier ?? ''}
             driverName={session?.displayName ?? ''}
             onAccept={driverAccept}
             onAdvance={driverAdvance}
@@ -339,6 +364,8 @@ function App() {
             onReject={driverRelease}
             showNotice={showNotice}
             busyOrderId={busyDriverOrderId}
+            linkDriverPhone={linkDriverPhone}
+            onRefresh={driverRefresh}
           />
         ) : (
           <DriverAccessGate

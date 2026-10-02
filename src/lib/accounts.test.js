@@ -136,7 +136,24 @@ describe('account store', () => {
   });
 
   test('every seeded role is a known role', () => {
-    expect(ACCOUNT_ROLES).toEqual(['buyer', 'seller', 'institution', 'ops']);
+    // `driver` is a first-class role because a driver signs in through this same
+    // registry and needs an account to hold a session against. Omitting it made
+    // `createAccount({ role: 'driver' })` fail, leaving no way for the driver app
+    // to authenticate at all.
+    expect(ACCOUNT_ROLES).toEqual(['buyer', 'seller', 'driver', 'institution', 'ops']);
+  });
+
+  test('accepts a driver account and can sign it back in', async () => {
+    const created = await createAccount({
+      identifier: '0545009046',
+      password: PASSWORD,
+      role: 'driver',
+    });
+    expect(created.role).toBe('driver');
+
+    const result = await authenticateWithPassword('0545009046', PASSWORD);
+    expect(result.ok).toBe(true);
+    expect(result.account.role).toBe('driver');
   });
 });
 

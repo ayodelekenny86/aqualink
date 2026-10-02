@@ -13,6 +13,7 @@ import {
   findAccount,
   formatPhoneForDisplay,
   listAccounts,
+  linkPhoneNumber,
   validateIdentifier,
 } from '../lib/accounts';
 import { applyAsSeller, opsSignIn, sellerStatus } from '../lib/payments';
@@ -104,6 +105,7 @@ export function useAuth() {
       identifierType: account.identifierType,
       displayName: account.displayName,
       role: account.role,
+      phone: account.phone ?? null,
       signedInAt: new Date().toISOString(),
     });
     writeValue('session', {
@@ -111,6 +113,7 @@ export function useAuth() {
       identifierType: account.identifierType,
       displayName: account.displayName,
       role: account.role,
+      phone: account.phone ?? null,
       signedInAt: new Date().toISOString(),
     });
     setSignInError('');
@@ -467,7 +470,7 @@ export function useAuth() {
     }
   }, [startSession, showNotice]);
 
-  /**
+   /**
     * Create (or sign in to) an account from a Meta identity whose SDK login and
     * Graph-API verification metaAuth has already performed.
     *
@@ -505,6 +508,30 @@ export function useAuth() {
     }
   }, [startSession, showNotice]);
 
+  /**
+   * Link a driver phone number to the signed-in account.
+   *
+   * A Google or Facebook driver signs in with an email, but dispatch matches
+   * drivers by phone. This stores the phone on the account and rewires the
+   * session identifier to the phone so `resolveDriver` finds them on the fleet
+   * roster immediately.
+   */
+  const linkDriverPhone = useCallback(async (phone) => {
+    try {
+      const updated = linkPhoneNumber(session.identifier, phone);
+      if (!updated) {
+        setSignInError('Could not link that phone number.');
+        return { ok: false, reason: 'link-failed' };
+      }
+      startSession(updated);
+      showNotice(`Your driver phone (${formatPhoneForDisplay(updated.phone)}) is linked. You now see jobs assigned to it.`);
+      return { ok: true, account: updated };
+    } catch (error) {
+      setSignInError(error.message);
+      return { ok: false, error: error.message };
+    }
+  }, [session?.identifier, startSession, showNotice]);
+
   return {
     ready,
     role,
@@ -517,6 +544,7 @@ export function useAuth() {
     accountExists,
 
     buyerAuthenticated,
+    driverAuthenticated,
     adminAuthenticated,
     sellerAuthenticated,
     startPhoneSignIn,
@@ -524,7 +552,8 @@ export function useAuth() {
     signInWithPassword,
     signInWithGoogleIdentity,
     signInWithMetaIdentity,
-    registerAccount,
+     registerAccount,
+    linkDriverPhone,
     phoneCode,
     phoneIdentifier,
     signInError,

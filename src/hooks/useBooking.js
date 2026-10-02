@@ -430,6 +430,8 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
     driverUpdate,
     refreshDriverUpdate,
     updateOrderStatus,
+    acceptDriverJob,
+    releaseDriverJob,
     issueDeliveryCode,
     confirmDelivery,
     requestRefund,

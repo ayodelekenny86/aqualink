@@ -179,6 +179,7 @@ export async function createAccount({
   status = 'active',
   provider = 'local',
   providerSubject = null,
+  phone = null,
   now = Date.now(),
 } = {}) {
   if (!ACCOUNT_ROLES.includes(role)) throw new ValidationError('Unknown account role.', 'role');
@@ -196,14 +197,12 @@ export async function createAccount({
     role,
     displayName: displayName.trim(),
     status,
-    // How this account proves who it is: 'local' owns a password, 'google' owns
-    // a verified provider subject. Recorded so the two can be linked later and
-    // so no code has to guess which credential is authoritative.
     provider,
     providerSubject,
-    // Phone and Google accounts sign in through their provider, so they keep no
-    // stored secret. Inventing a random password here would only create a fake
-    // secret that looks real and could be "reset" into a broken state later.
+    // A social driver's identifier is an email, but dispatch matches on phone
+    // numbers. Storing the phone here lets resolveDriver link a Google/Facebook
+    // driver to their fleet roster entry after sign-in.
+    phone,
     passwordSalt: null,
     passwordHash: null,
     failedAttempts: 0,
@@ -241,6 +240,32 @@ export function deleteAccount(identifier) {
   if (after.length === before.length) return false;
   saveAccounts(after);
   return true;
+}
+
+/**
+ * Find an account by its email identifier (the identifier a Google/Facebook
+ * driver signs in with).
+ */
+export function findByEmail(email) {
+  const normalized = normalizeEmail(email);
+  if (!normalized) return null;
+  return listAccounts().find((account) => account.identifier === normalized) ?? null;
+}
+
+/**
+ * Associate a phone number with an existing social account.
+ *
+ * A Google or Facebook driver signs in with an email, but dispatch matches
+ * drivers by phone. After the provider identity is verified, the driver enters
+ * their driver phone (the one Ops registered), and it is stored here so
+ * `resolveDriver` can find them on the roster.
+ */
+export function linkPhoneNumber(identifier, phone) {
+  const account = findAccount(identifier);
+  if (!account) return null;
+  const normalized = normalizePhone(phone);
+  if (!normalized) throw new ValidationError('Enter a valid Ghana number, for example 0545009046.', 'phone');
+  return patchAccount(account, { phone: normalized });
 }
 
 function patchAccount(account, changes) {

@@ -30,22 +30,36 @@ export const DRIVER_STEPS = [
   { status: 'Delivered', label: 'Delivered' },
 ];
 
-/** Normalise a phone number the same way the fleet and contact code do. */
+/** Digits only. */
 function digits(value) {
   return String(value ?? '').replace(/\D/g, '');
 }
 
 /**
+ * Reduce a Ghanaian number to its nine national digits.
+ *
+ * `0545009046`, `+233545009046`, `233545009046` and `+233 54 500 9046` all
+ * become `545009046`. Both the country code and the national trunk zero have to
+ * come off, or the local and international forms of the same number do not
+ * match — which produced a driver who had signed in successfully and then saw
+ * no jobs, with nothing on screen to explain why.
+ */
+function nationalDigits(value) {
+  let local = digits(value);
+  if (local.startsWith('233')) local = local.slice(3);
+  if (local.startsWith('0')) local = local.slice(1);
+  return local;
+}
+
+/**
  * Whether two phone numbers are the same number.
  *
- * Compared on the last nine national digits rather than on an exact string, so
- * `0545009046`, `+233545009046` and `233 54 500 9046` all match. An exact
- * comparison silently produced a driver who had signed in but could see no jobs,
- * because the fleet seed and the account registry rarely agreed on format.
+ * Compared on the nine national digits rather than by exact string, so the
+ * three formats a number is actually written in all match.
  */
 export function samePhone(a, b) {
-  const first = digits(a).replace(/^233/, '');
-  const second = digits(b).replace(/^233/, '');
+  const first = nationalDigits(a);
+  const second = nationalDigits(b);
   if (!first || !second) return false;
   return first === second;
 }
