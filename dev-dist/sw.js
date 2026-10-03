@@ -81,22 +81,22 @@ define(['./workbox-2427537b'], (function (workbox) { 'use strict';
     "revision": "3ca0b8505b4bec776b69afdba2768812"
   }, {
     "url": "index.html",
-    "revision": "0.5950d9bc8"
+    "revision": "0.2i16i2gj618"
   }], {});
   workbox.cleanupOutdatedCaches();
   workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("index.html"), {
     allowlist: [/^\/$/]
   }));
-  workbox.registerRoute(/^https:\/\/api\.paystack\.co\/.*/i, new workbox.NetworkFirst({
-    "cacheName": "paystack-api",
+  workbox.registerRoute(/^https:\/\/accounts\.google\.com\/.*/i, new workbox.NetworkFirst({
+    "cacheName": "google-auth",
     "networkTimeoutSeconds": 10,
     plugins: [new workbox.ExpirationPlugin({
-      maxEntries: 50,
+      maxEntries: 10,
       maxAgeSeconds: 86400
     })]
   }), 'GET');
-  workbox.registerRoute(/^https:\/\/accounts\.google\.com\/.*/i, new workbox.NetworkFirst({
-    "cacheName": "google-auth",
+  workbox.registerRoute(/^https:\/\/connect\.facebook\.net\/.*/i, new workbox.NetworkFirst({
+    "cacheName": "facebook-sdk",
     "networkTimeoutSeconds": 10,
     plugins: [new workbox.ExpirationPlugin({
       maxEntries: 10,

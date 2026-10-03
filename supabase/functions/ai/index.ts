@@ -2,7 +2,7 @@ import { applyCors, fail, json, readJson } from '../_lib/utils.ts';
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') ?? '';
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 function formatCedi(minor: number): string {
   const sign = minor < 0 ? '-' : '';
@@ -67,7 +67,7 @@ async function callGemini(apiKey: string, role: string, question: string, contex
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.5-flash',
       generationConfig: {
         temperature: 0.3,
         topP: 0.95,

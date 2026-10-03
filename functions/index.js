@@ -53,6 +53,7 @@ const ALLOWED_ORIGINS = defineString('ALLOWED_ORIGINS', { default: '' });
 //
 //   APP_ORIGIN=https://your-app.web.app
 const APP_ORIGIN = defineString('APP_ORIGIN', { default: '' });
+const GEMINI_API_KEY = defineSecret('GEMINI_API_KEY');
 
 const CURRENCY = 'GHS';
 const COLLECTIONS = { orders: 'orders', config: 'config', ops: 'ops' };
@@ -919,6 +920,111 @@ export const apiTestNotification = onRequest({ secrets: [OPS_SESSION_SECRET] }, 
   } catch (error) {
     logger.error('test notification failed', error);
     return fail(res, 500, 'notify_failed', 'Could not send test notification.');
+  }
+});
+
+/* ----------------------------------------------------------- AI chat */
+
+const SYSTEM_PROMPTS = {
+  buyer: `You are Aqua, the AI assistant for AquaLink, a water delivery service in Ghana. You answer questions about the buyer's orders, pricing, delivery status, and loyalty rewards. You read the buyer's real order history from the data provided. If you don't know something, say so rather than inventing an answer. Never invent phone numbers, emails, order references, or prices. Always quote GH₵ amounts in the format GH₵XX.XX.`,
+  seller: `You are Aqua, the AI assistant for AquaLink's seller dashboard. You answer questions about seller performance, order payouts, delivery reliability, and pricing. You read the seller's real order data from the provided context. If you don't know something, say so.`,
+  driver: `You are Aqua, the AI assistant for AquaLink's driver app. You answer questions about a driver's deliveries, earnings, and route information. You read the driver's real delivery data from the provided context. If you don't know something, say so.`,
+  ops: `You are Aqua, the AI operations copilot for AquaLink. You answer questions about revenue, seller performance, delivery reliability, order status, and pricing configuration. You read real order data from the provided context. If you don't know something, say so.`,
+  institution: `You are Aqua, the AI assistant for AquaLink's institutional dashboard. You answer questions about supply schedules, budgets, and delivery volumes. You read real data from the provided context. If you don't know something, say so.`,
+};
+
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+
+function formatCedi(minor) {
+  const sign = minor < 0 ? '-' : '';
+  const abs = Math.abs(minor);
+  const major = Math.floor(abs / 100);
+  const rest = abs % 100;
+  return `${sign}GH₵${major.toLocaleString('en-GB')}.${String(rest).padStart(2, '0')}`;
+}
+
+function buildContext(body) {
+  const role = String(body.role ?? 'buyer');
+  const question = String(body.question ?? '').trim();
+  const orders = Array.isArray(body.orders) ? body.orders : [];
+  const split = body.split;
+  const sellerScores = Array.isArray(body.sellerScores) ? body.sellerScores : [];
+  const reliabilityScores = Array.isArray(body.reliabilityScores) ? body.reliabilityScores : [];
+  const buyerId = body.buyerId ?? null;
+
+  let context = '';
+  if (orders.length > 0) {
+    context += `Recent orders:\n${orders.slice(0, 5).map((o) =>
+      `- ${o.code || o.id}: ${o.location || 'unknown'}, ${o.volume || o.volumeLitres + 'L'}, status=${o.status}, charged=${o.chargedMinor ? formatCedi(o.chargedMinor) : 'unknown'}, driver=${o.driverName || 'unassigned'}, seller=${o.sellerName || 'unassigned'}`
+    ).join('\n')}\n`;
+  }
+  if (split) {
+    context += `\nRevenue split: ${split.seller || 0}% seller, ${split.driver || 0}% driver, ${split.platformCommission || 0}% platform, ${split.buyerServiceCharge || 0}% buyer fee.`;
+  }
+  if (sellerScores.length > 0) {
+    context += `\n\nSeller performance:\n${sellerScores.slice(0, 10).map((s) =>
+      `- ${s.sellerId}: score=${s.score} (${s.band?.label || 'unranked'}), ${s.slaHours || 0}h avg`
+    ).join('\n')}\n`;
+  }
+  if (reliabilityScores.length > 0) {
+    context += `\nDelivery reliability:\n${reliabilityScores.slice(0, 10).map((s) =>
+      `- ${s.sellerId}: ${s.slaHours || 0}h average, ${s.slaMeasured ? 'timed' : 'untimed'}`
+    ).join('\n')}\n`;
+  }
+  if (buyerId) {
+    context += `\nBuyer ID: ${buyerId}`;
+  }
+
+  return { role, question, context };
+}
+
+export const apiAiChat = onRequest({ secrets: [GEMINI_API_KEY] }, async (req, res) => {
+  applyCors(req, res);
+  if (req.method === 'OPTIONS') return res.status(204).send('');
+  if (req.method !== 'POST') return fail(res, 405, 'method_not_allowed', 'Use POST.');
+
+  try {
+    const body = await readJson(req);
+    const { role, question, context } = buildContext(body);
+
+    if (!question) return fail(res, 400, 'missing_question', 'A question is required.');
+
+    const apiKey = GEMINI_API_KEY.value();
+    if (!apiKey) {
+      return fail(res, 503, 'ai_unconfigured', 'The AI assistant is not configured on this deployment.');
+    }
+
+    const systemPrompt = SYSTEM_PROMPTS[role] ?? SYSTEM_PROMPTS.buyer;
+    const userPrompt = `${systemPrompt}\n\nContext:\n${context}\n\nQuestion: ${question}\n\nAnswer concisely in plain text, no markdown formatting.`;
+
+    const response = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gemini-2.5-flash',
+        generationConfig: {
+          temperature: 0.3,
+          topP: 0.95,
+          maxOutputTokens: 2048,
+        },
+        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      logger.error('gemini api error', { status: response.status, body: err });
+      return fail(res, 502, 'ai_error', `Gemini API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const answer = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!answer) return fail(res, 502, 'ai_error', 'Gemini returned an empty response.');
+
+    return res.status(200).json({ answer, role });
+  } catch (error) {
+    logger.error('ai chat failed', error);
+    return fail(res, 500, 'ai_error', 'Could not get an AI response.');
   }
 });
 

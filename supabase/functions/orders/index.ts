@@ -87,6 +87,16 @@ Deno.serve(async (req: Request) => {
       return fail(500, 'order_failed', 'Could not create the order.');
     }
 
+    // Fire a notification so the seller/driver dashboard updates without a refresh.
+    await db.from('notifications').insert({
+      role: 'seller',
+      title: 'New order awaiting pickup',
+      body: `${order.code} · ${order.location} · ${volumeLitres}L`,
+      order_id: order.id,
+      kind: 'order_created',
+      read: false,
+    }).catch((e) => console.error('notification insert failed', e));
+
     return json({ order: { ...order } }, 201);
   }
 

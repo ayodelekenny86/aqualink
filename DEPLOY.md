@@ -21,7 +21,7 @@ server owns order pricing and every provider secret.
 npm install
 supabase link --project-ref YOUR_PROJECT_REF
 supabase db push
-supabase functions deploy fcm pricing orders payments sellers ops config
+supabase functions deploy fcm pricing orders payments sellers ops config ai notifications
 ```
 
 ## Secrets to set
@@ -36,6 +36,7 @@ OPS_ADMIN_EMAIL
 OPS_ADMIN_PASSWORD        # 12+ characters
 APP_ORIGIN                # https://your-app.vercel.app
 ALLOWED_ORIGINS           # comma-separated
+GEMINI_API_KEY            # for the AI assistant Edge Function
 ```
 
 Then create the one ops account:
