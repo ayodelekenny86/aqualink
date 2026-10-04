@@ -53,9 +53,14 @@ export function useAuth() {
   const [signInError, setSignInError] = useState('');
 
   // Email verification strip.
+  //
+  // This started at 'verified', which made the account panel assert "Email
+  // verified" for anyone who had only ever signed in with a phone number. It is
+  // 'idle' until `confirmEmailCode` actually succeeds, so the panel reports the
+  // state that holds rather than the one the UI hoped for.
   const [emailChallenge, setEmailChallenge] = useState(null);
   const [emailCode, setEmailCode] = useState('');
-  const [authStep, setAuthStep] = useState('verified');
+  const [authStep, setAuthStep] = useState('idle');
 
   // Seller profile and approval.
   const [sellerProfile, setSellerProfileState] = useState(() => readValue('seller.profile', initialSellerProfile));

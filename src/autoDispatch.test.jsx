@@ -86,7 +86,7 @@ async function signInAsBuyer(user) {
   const code = (await screen.findByTestId('otp-code')).textContent;
   await user.type(screen.getByRole('textbox', { name: /buyer otp/i }), code);
   await user.click(screen.getByRole('button', { name: /verify otp/i }));
-  await screen.findByRole('heading', { name: /good morning/i });
+  await screen.findByRole('heading', { name: /good (morning|afternoon|evening)\./i });
 }
 
 async function bookWater(user, location = 'East Legon, Accra', volume = '2,000 gallons') {

@@ -97,7 +97,7 @@ async function verifyBuyer(user, identifier = '0544007788') {
 
   await user.type(screen.getByRole('textbox', { name: /buyer otp/i }), code);
   await user.click(screen.getByRole('button', { name: /verify otp/i }));
-  await screen.findByRole('heading', { name: /good morning, alex/i });
+  await screen.findByRole('heading', { name: /good (morning|afternoon|evening)\./i });
 }
 
 /** Signs in to ops with the account the test created. */
@@ -150,8 +150,13 @@ test('renders the buyer booking workspace', async () => {
 
   await verifyBuyer(user);
 
-  expect(screen.getByRole('heading', { name: /good morning, alex/i })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: /good (morning|afternoon|evening)\./i })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: /where should we deliver/i })).toBeInTheDocument();
+  // The header used to be a literal, so it read "Tuesday, 21 August 2026" on
+  // every day. It must now be today's date.
+  const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  expect(screen.getByText(today)).toBeInTheDocument();
+  expect(screen.queryByText(/21 August 2026/i)).not.toBeInTheDocument();
   // The booking form used to hardcode "GH₵300 · GH₵250". The price now comes
   // from the server, so the form says so rather than quoting a stale figure.
   expect(screen.getByText(/calculated on the server/i)).toBeInTheDocument();
@@ -160,6 +165,18 @@ test('renders the buyer booking workspace', async () => {
   // with no orders is Bronze, so the panel says that rather than inventing a
   // Silver balance.
   expect(screen.getByText(/bronze tier/i)).toBeInTheDocument();
+});
+
+test('does not claim an email is verified for a phone-only buyer', async () => {
+  const user = userEvent.setup();
+  render(<App />);
+
+  await verifyBuyer(user);
+
+  // `authStep` used to start at 'verified', so this panel asserted "Email
+  // verified · OTP login enabled" for anyone who had only signed in by phone.
+  expect(screen.getByText(/no email linked/i)).toBeInTheDocument();
+  expect(screen.queryByText(/email verified/i)).not.toBeInTheDocument();
 });
 
 test('answers a buyer question with Aqua AI', async () => {
