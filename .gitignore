@@ -144,3 +144,11 @@ yarn-error.log*
 *.pem
 *.key
 
+# Generated output. `dist` is covered above; these two are written by tooling
+# rather than by the app, and committing them makes every build show as a diff.
+# A trailing `# comment` is part of the pattern in gitignore, so keep the
+# explanations on their own lines.
+# vite-plugin-pwa dev service worker (devOptions)
+dev-dist/
+# Firebase CLI local cache and deploy state
+.firebase/

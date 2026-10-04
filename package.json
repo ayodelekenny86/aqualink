@@ -28,9 +28,10 @@
     "test:run": "vitest run",
     "demo": "npm run dev",
     "deploy": "npm run build",
-    "deploy:live": "npm run build && firebase deploy --only hosting",
+    "deploy:live": "npm run build && npx firebase deploy --only hosting",
     "verify:live": "node scripts/verify-live.mjs",
-    "supabase:deploy": "supabase functions deploy fcm pricing orders payments sellers ops config notifications ai"
+    "supabase:deploy": "npx supabase functions deploy fcm pricing orders payments sellers ops config notifications ai",
+    "supabase:push": "npx supabase db push"
   },
   "eslintConfig": {
     "extends": [
