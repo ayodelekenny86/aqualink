@@ -24,6 +24,47 @@ supabase db push
 supabase functions deploy fcm pricing orders payments sellers ops config ai notifications
 ```
 
+`supabase db push` and `supabase functions deploy` both need an authenticated
+CLI. If `supabase projects list` reports "Access token not provided", run
+`supabase login` first; the CLI prints a verification URL and waits for the code.
+
+## Check what is actually live
+
+`npm run verify:live` probes the deployed site and every Edge Function, so a
+missing deploy is reported by name instead of surfacing as a CORS error in the
+browser console.
+
+```sh
+npm run verify:live
+```
+
+It exits non-zero and lists each failure. Three failures are expected on a fresh
+deployment and are fixed by the commands below:
+
+| Failure | Cause | Fix |
+| --- | --- | --- |
+| `functions/v1/ai` | The AI function was never deployed | `supabase functions deploy ai` |
+| `functions/v1/notifications` | The notifications function was never deployed | `supabase functions deploy notifications` |
+| `ai/chat has a usable key` | `GEMINI_API_KEY` is unset, so the function answers 503 | `supabase secrets set GEMINI_API_KEY=…` |
+
+The last one is not cosmetic. Without the key the AI panel does not fail loudly:
+`useAquaAi` catches the 503 and falls back to the local keyword matcher, so the
+assistant keeps answering while every reply is the offline one. The panel header
+shows which answered, but only after you look for it.
+
+## Finishing the current deployment
+
+The front end is live and the pricing/config functions are deployed. These three
+steps complete it:
+
+```sh
+supabase login                                              # once
+supabase db push                                            # phone column on accounts
+supabase secrets set GEMINI_API_KEY=your-key                # enables real Gemini answers
+npm run supabase:deploy                                     # all 10 functions
+npm run verify:live                                         # confirm
+```
+
 ## Secrets to set
 
 In the Supabase Dashboard, Settings > Edge Functions:
