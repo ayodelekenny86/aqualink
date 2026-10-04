@@ -33,8 +33,16 @@ export function toMajor(minor) {
 /**
  * Format minor units as a Ghanaian cedi string.
  * Uses a fixed 2dp so statements never show floating-point dust.
+ *
+ * A missing or non-numeric amount renders as "GH₵—", not "GH₵NaN.NaN". This is
+ * not cosmetic: `Math.abs(undefined)` is NaN, and `NaN.toLocaleString()` is
+ * literally "NaN", so an order whose price the server never populated was shown
+ * to the buyer, the driver and the operator as "GH₵NaN.NaN" in an order list.
+ * An em dash says the figure is not available; a broken string reads as though
+ * the app had computed something.
  */
 export function formatCedi(minor) {
+  if (!Number.isFinite(minor)) return 'GH₵—';
   const sign = minor < 0 ? '-' : '';
   const abs = Math.abs(minor);
   const major = Math.floor(abs / MINOR_UNITS_PER_MAJOR);

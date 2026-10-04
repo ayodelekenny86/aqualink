@@ -89,9 +89,17 @@ async function signInAsBuyer(user) {
   await screen.findByRole('heading', { name: /good (morning|afternoon|evening)\./i });
 }
 
+// The server requires a receipt email on every booking, so a booking helper that
+// omits one exercises a request the production API rejects. Every booking test
+// goes through this instead of filling the form by hand.
+async function fillBookingDetails(user, { location, volume, receiptEmail = 'buyer@example.com' } = {}) {
+  if (location) await user.type(screen.getByPlaceholderText(/enter an address/i), location);
+  if (volume) await user.selectOptions(screen.getByRole('combobox', { name: /water volume/i }), volume);
+  if (receiptEmail) await user.type(screen.getByRole('textbox', { name: /email for the receipt/i }), receiptEmail);
+}
+
 async function bookWater(user, location = 'East Legon, Accra', volume = '2,000 gallons') {
-  await user.type(screen.getByPlaceholderText(/enter an address/i), location);
-  await user.selectOptions(screen.getByRole('combobox', { name: /water volume/i }), volume);
+  await fillBookingDetails(user, { location, volume });
   await user.click(screen.getByRole('button', { name: /confirm booking/i }));
   return screen.findByRole('status');
 }
@@ -199,7 +207,7 @@ test('the buyer can supply a WhatsApp number different from their phone', async 
   const user = userEvent.setup();
   await signInAsBuyer(user);
 
-  await user.type(screen.getByPlaceholderText(/enter an address/i), 'Osu, Accra');
+  await fillBookingDetails(user, { location: 'Osu, Accra' });
   await user.type(screen.getByRole('textbox', { name: /whatsapp number/i }), '0551234567');
   await user.click(screen.getByRole('button', { name: /confirm booking/i }));
 

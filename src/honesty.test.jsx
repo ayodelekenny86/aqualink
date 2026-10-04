@@ -117,6 +117,18 @@ const GROUPS = [
       { label: 'reserve recommendation', pattern: /reserve capacity/i },
     ],
   },
+  {
+    // The sidebar showed a fixed name, avatar and city on every account, so every
+    // user of the app was identified as a person who does not exist, in a city
+    // they may never have been in. The identity is derived from the session now.
+    name: 'a fixed signed-in persona',
+    file: APP,
+    claims: [
+      { label: 'invented signed-in name', pattern: /Alex K\./ },
+      { label: 'invented avatar initials', pattern: />AK</ },
+      { label: 'hardcoded signed-in city', pattern: /Accra, Ghana/ },
+    ],
+  },
 ];
 
 for (const group of GROUPS) {

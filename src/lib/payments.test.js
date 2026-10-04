@@ -5,12 +5,15 @@ import {
   fetchQuote,
   initialisePayment,
   listReceipts,
+  normaliseOrder,
   receiptHtml,
   referenceFromLocation,
   saveReceipt,
+  toServerOrderRow,
   verifyPayment,
 } from './payments';
 import { clearAll } from './storage';
+import { formatCedi } from './money';
 
 /**
  * The point of these tests is the absence of a fake. The old client had a demo
@@ -58,6 +61,116 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+});
+
+describe('reading the server order shape', () => {
+  // A real reply from `/orders/create`, captured from the deployed function
+  // rather than written from the client's assumptions. It is snake_cased
+  // because the endpoint is Postgres-shaped.
+  const SERVER_ORDER = {
+    id: 'AQ-C1F4FA2D378A2D459D76',
+    code: 'AQ-C1F4FA2D378A2D459D76',
+    email: 'buyer@example.com',
+    phone: '+233201234567',
+    location: 'Labone, Accra',
+    volume_litres: 7571,
+    currency: 'GHS',
+    pricing: { listPrice: 600, discountPercent: 50, surgePercent: 0, surgeReason: '' },
+    split: { buyerServiceCharge: 0, seller: 45, driver: 15, platformCommission: 40 },
+    gross_minor: 30000,
+    charged_minor: 30000,
+    buyer_pays: 30000,
+    buyer_service_charge: 0,
+    seller_receives: 13500,
+    driver_receives: 4500,
+    platform_commission: 12000,
+    company_take: 12000,
+    discount_minor: 30000,
+    surge_minor: 0,
+    status: 'Awaiting payment',
+    paystack_reference: null,
+    created_at: '2026-10-04T17:52:31.504Z',
+  };
+
+  test('every amount the app reads is present after mapping', () => {
+    // The app reads camelCase. The server answers snake_case, and `createOrder`
+    // used to return the response untouched, so each of these was `undefined`
+    // and the buyer was told they would be charged GH₵NaN.NaN.
+    const order = normaliseOrder(SERVER_ORDER);
+    for (const field of [
+      'chargedMinor', 'grossMinor', 'buyerPays', 'buyerServiceCharge',
+      'sellerReceives', 'driverReceives', 'platformCommission', 'companyTake',
+      'discountMinor', 'surgeMinor', 'volumeLitres', 'paystackReference', 'createdAt',
+    ]) {
+      expect(order[field], `${field} must be mapped`).not.toBeUndefined();
+    }
+    expect(order.chargedMinor).toBe(30000);
+    expect(order.sellerReceives).toBe(13500);
+    expect(order.driverReceives).toBe(4500);
+    expect(order.volumeLitres).toBe(7571);
+  });
+
+  test('derives the list price the server never sends as an amount', () => {
+    // The server sends the post-discount gross and the discount it took. The
+    // gross alone is GH₵300, so using it as the list price made a 50%-off
+    // GH₵600 booking advertise GH₵300 as the list price.
+    const order = normaliseOrder(SERVER_ORDER);
+    expect(order.listMinor).toBe(60000);
+    expect(formatCedi(order.listMinor)).toBe('GH₵600.00');
+    expect(formatCedi(order.chargedMinor)).toBe('GH₵300.00');
+  });
+
+  test('prefers a list price the server does send', () => {
+    const order = normaliseOrder({ ...SERVER_ORDER, list_minor: 61000 });
+    expect(order.listMinor).toBe(61000);
+  });
+
+  test('leaves nested pricing and split untouched, they are already camelCase', () => {
+    const order = normaliseOrder(SERVER_ORDER);
+    expect(order.pricing.discountPercent).toBe(50);
+    expect(order.split.seller).toBe(45);
+  });
+
+  test('passes an order that is already camelCase through unchanged', () => {
+    const camel = { chargedMinor: 30000, listMinor: 60000 };
+    expect(normaliseOrder(camel)).toEqual(camel);
+  });
+
+  // The client used to push its whole display object at the table. Those fields
+  // do not exist there, so PostgREST rejected the statement outright with
+  // `column orders.price does not exist` and nothing was written.
+  test('writes back only the columns the orders table actually has', () => {
+    const display = {
+      ...normaliseOrder(SERVER_ORDER),
+      // Client-only display fields that must never be sent.
+      price: 'GH₵300.00',
+      listPrice: 'GH₵600.00',
+      whatsapp: '0551234567',
+      buyerPhone: '+233201234567',
+      buyerName: '+233201234567',
+      confirmCode: '',
+      driverName: 'Ama Boateng',
+    };
+    const row = toServerOrderRow(display);
+    for (const forbidden of ['price', 'listPrice', 'whatsapp', 'buyerPhone', 'buyerName', 'confirmCode', 'driverName']) {
+      expect(row, `${forbidden} is not a column on orders`).not.toHaveProperty(forbidden);
+    }
+    // And the real columns survive the round trip.
+    expect(row.charged_minor).toBe(30000);
+    expect(row.gross_minor).toBe(30000);
+    expect(row.seller_receives).toBe(13500);
+    expect(row.driver_receives).toBe(4500);
+    expect(row.volume_litres).toBe(7571);
+    expect(row.pricing).toEqual(SERVER_ORDER.pricing);
+    expect(row.split).toEqual(SERVER_ORDER.split);
+  });
+
+  test('omits absent fields rather than sending undefined', () => {
+    const row = toServerOrderRow({ chargedMinor: 30000 });
+    expect(row.charged_minor).toBe(30000);
+    for (const value of Object.values(row)) expect(value).not.toBeUndefined();
+    expect(row.paystack_reference).toBeNull();
+  });
 });
 
 describe('starting a payment', () => {

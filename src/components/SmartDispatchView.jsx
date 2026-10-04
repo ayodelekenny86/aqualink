@@ -12,6 +12,7 @@
 import { useMemo, useState } from 'react';
 import { assignDriver, assignSeller } from '../lib/dispatch';
 import { getFleet } from '../lib/fleet';
+import { gallonsForOrder } from '../lib/volume';
 import { askAiQuestion } from '../lib/ai';
 import { formatCedi } from '../lib/money';
 
@@ -53,8 +54,12 @@ export default function SmartDispatchView({ orders, showNotice }) {
     return dispatchable.map((order) => {
       // The scorer works in gallons; orders carry litres. Normalise once per order
       // so the driver and seller rankings read the same volume.
-      const litres = Number.parseInt(String(order.volume ?? order.volumeLitres ?? '0'), 10) || 0;
-      const scored = { ...order, volumeGallons: litres > 0 ? litres * 0.264172 : 0 };
+      //
+      // This read `order.volume` — the display string "2,000 gal" — and parsed
+      // it, which stops at the comma. A 2,000 gallon order was scored as 2
+      // litres, or about half a gallon, so every capacity check in the ranking
+      // passed for reasons that had nothing to do with the truck.
+      const scored = { ...order, volumeGallons: gallonsForOrder(order) };
       const driver = assignDriver({ order: scored, drivers });
       const seller = assignSeller({ order: scored, sellers });
       return {

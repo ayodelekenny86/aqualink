@@ -55,8 +55,11 @@ function authorised(init) {
 
 /** The order shape the server returns, matching `apiCreateOrder`. */
 function serverOrder(body, pricing = DEFAULT_PRICING, split = DEFAULT_SPLIT) {
-  const volumeGallons = Number.parseInt(String(body.volume ?? '2,000'), 10) || 0;
-  const volumeLitres = Math.round(volumeGallons * 3.785411784);
+  // The server receives litres, not a formatted label. The comma bug is
+  // therefore impossible on this side — which is exactly why the stub must not
+  // invent a label here: doing so reproduced the client's own `parseInt` defect
+  // and hid it from every test.
+  const volumeLitres = Number(body.volumeLitres ?? 0);
   const priced = priceOrder({ pricing, split, volumeLitres });
 
   const id = `AQ-${Math.random().toString(16).slice(2, 8).toUpperCase()}`;
@@ -66,21 +69,26 @@ function serverOrder(body, pricing = DEFAULT_PRICING, split = DEFAULT_SPLIT) {
     email: body.email,
     phone: body.phone,
     location: body.location,
-    volumeLitres,
+    // snake_case amounts, exactly as Postgres-shaped JSON comes back. The client
+    // adapter in `lib/payments.js` renames them; a stub that answered camelCase
+    // would make every money field silently undefined in production only.
+    volume_litres: volumeLitres,
     currency: 'GHS',
-    pricing,
-    split,
-    listMinor: priced.listMinor,
-    grossMinor: priced.grossMinor,
-    chargedMinor: priced.chargedMinor,
-    buyerServiceCharge: priced.buyerServiceCharge,
-    sellerReceives: priced.sellerReceives,
-    driverReceives: priced.driverReceives,
-    platformCommission: priced.platformCommission,
-    companyTake: priced.companyTake,
-    discountMinor: priced.discountMinor,
-    surgeMinor: priced.surgeMinor,
+    pricing: { ...priced.pricing },
+    split: { ...priced.split },
+    gross_minor: priced.grossMinor,
+    charged_minor: priced.chargedMinor,
+    buyer_pays: priced.buyerPays,
+    buyer_service_charge: priced.buyerServiceCharge,
+    seller_receives: priced.sellerReceives,
+    driver_receives: priced.driverReceives,
+    platform_commission: priced.platformCommission,
+    company_take: priced.companyTake,
+    discount_minor: priced.discountMinor,
+    surge_minor: priced.surgeMinor,
     status: 'Awaiting payment',
+    paystack_reference: null,
+    created_at: new Date().toISOString(),
   };
   ORDERS.set(id, order);
   return order;
@@ -131,7 +139,20 @@ const mock = vi.fn(async (url, init = {}) => {
     }
 
     if (routeKey === 'orders' && init.method === 'POST') {
-      return json({ order: serverOrder(JSON.parse(init.body), currentPricing, currentSplit) }, 201);
+      // Mirror the real handler's guards. This stub used to accept any body,
+      // which is how the booking flow shipped with no way to supply the receipt
+      // email the server requires: `orders/create` answered 400 in production
+      // while every test booked successfully. A stub that is more permissive
+      // than the server it stands in for hides exactly this class of bug.
+      const body = JSON.parse(init.body || '{}');
+      const email = String(body.email ?? '').trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        return json({ code: 'invalid_email', message: 'A valid email address is required for the receipt.' }, 400);
+      }
+      if (!String(body.location ?? '').trim()) {
+        return json({ code: 'invalid_location', message: 'A delivery address or landmark is required.' }, 400);
+      }
+      return json({ order: serverOrder(body, currentPricing, currentSplit) }, 201);
     }
     if (routeKey === 'pricing' && init.method !== 'POST') {
       // Mirrors `apiPricing`: the stored config alongside the derived quote, so

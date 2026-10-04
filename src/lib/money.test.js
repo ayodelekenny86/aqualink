@@ -32,6 +32,20 @@ describe('minor units', () => {
     expect(formatCedi(25050)).toBe('GH₵250.50');
     expect(formatCedi(5)).toBe('GH₵0.05');
     expect(formatCedi(123456789)).toBe('GH₵1,234,567.89');
+    expect(formatCedi(0)).toBe('GH₵0.00');
+  });
+
+  // `Math.abs(undefined)` is NaN and `NaN.toLocaleString()` is "NaN", so a
+  // missing amount used to render as the literal string "GH₵NaN.NaN" in the
+  // order list — to the buyer, the driver and the operator.
+  test('never renders NaN for a missing amount', () => {
+    expect(formatCedi(undefined)).toBe('GH₵—');
+    expect(formatCedi(null)).toBe('GH₵—');
+    expect(formatCedi(Number.NaN)).toBe('GH₵—');
+    expect(formatCedi('30000')).toBe('GH₵—');
+    for (const bad of [undefined, null, Number.NaN, Infinity, 'x', {}]) {
+      expect(formatCedi(bad)).not.toMatch(/NaN/);
+    }
   });
 });
 

@@ -3,19 +3,13 @@ import { generateBookingCode, generateConfirmationCode } from '../lib/secureCode
 import { list, replaceAll } from '../lib/collections';
 import { assignDriver, assignSeller } from '../lib/dispatch';
 import { getFleet, recordAssignment, seedFleet } from '../lib/fleet';
-import { createOrder } from '../lib/payments';
+import { createOrder, toServerOrderRow } from '../lib/payments';
 import { allocate, formatCedi, DEFAULT_PRICING, DEFAULT_SPLIT, quotePrice } from '../lib/money';
 import { supabase, supabaseUrl, anonKey } from '../lib/supabase';
+import { gallonsFromLabel, litresFromLabel } from '../lib/volume';
 
-const LITRES_PER_GALLON = 3.785411784;
-
-function toLitres(volumeLabel) {
-  const gallons = Number.parseInt(String(volumeLabel ?? ''), 10);
-  if (!Number.isFinite(gallons) || gallons <= 0) return 0;
-  return Math.round(gallons * LITRES_PER_GALLON);
-}
-
-const initialBooking = { location: '', volume: '2,000 gallons', window: 'As soon as possible', payment: 'Mobile money', whatsapp: '' };
+const toLitres = litresFromLabel;
+const initialBooking = { location: '', volume: '2,000 gallons', window: 'As soon as possible', payment: 'Mobile money', whatsapp: '', receiptEmail: '' };
 const initialSavedAddresses = [];
 
 /**
@@ -156,12 +150,27 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
       return;
     }
 
+    // The server requires a real email because it is the receipt address and the
+    // proof that the caller owns the order: `/payments/initialize` refuses any
+    // address that does not match. A phone-only buyer had no way to supply one —
+    // the form had no email field at all — so every booking returned
+    // `invalid_email` and the primary action of the app was dead on production
+    // while passing in tests, because the stub accepted any address.
+    //
+    // Checked here rather than only at the server so the buyer is told what to do
+    // before a round trip, and so the failure is not a raw error string.
+    const receiptEmail = booking.receiptEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(receiptEmail)) {
+      onNotice('Add the email address your receipt should go to. It is required to book.');
+      return;
+    }
+
     let serverOrder;
     // Whether the server already wrote this order to the database. It does, under
     // the id it chose, and that document is the one the payment endpoints read.
     let writtenByServer = false;
     try {
-      serverOrder = await createOrder({ email, phone: buyerPhone, location, volumeLitres });
+      serverOrder = await createOrder({ email: receiptEmail, phone: buyerPhone, location, volumeLitres });
       writtenByServer = true;
     } catch (caught) {
       // No server reachable — e.g. running locally without Supabase. Fall back
@@ -191,11 +200,11 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
       status: 'Awaiting payment',
       payment: 'Not yet paid',
       date: new Date().toISOString(),
-      // The account email is the server's proof that the caller owns this
-      // order: `/api/payments/initialize` refuses a mismatch. Without it on the
-      // order, the checkout panel had no email to prefill, the buyer retyped it
-      // by hand, and any typo produced a 403 with no way to recover in-app.
-      email,
+      // The receipt email is the server's proof that the caller owns this order:
+      // `/payments/initialize` refuses a mismatch. Without it on the order, the
+      // checkout panel had no address to prefill, the buyer retyped it by hand,
+      // and any typo produced a 403 with no way to recover in-app.
+      email: receiptEmail,
       paystackReference: serverOrder.paystackReference ?? null,
       price: formatCedi(serverOrder.chargedMinor),
       listPrice: formatCedi(serverOrder.listMinor ?? serverOrder.grossMinor),
@@ -211,26 +220,33 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
       volumeLitres,
       whatsapp: booking.whatsapp ?? '',
       confirmCode: '',
-      buyerName: email || 'Buyer',
+      // A phone account carries no name, and the receipt email is an address, not
+      // a name. The driver reads this as "Buyer" and calls it, so it holds the
+      // phone number rather than an invented one.
+      buyerName: buyerPhone,
       buyerPhone,
       createdAt: new Date().toISOString(),
     };
 
+    let synced = true;
     if (USE_SERVER && supabase) {
       try {
-        if (writtenByServer) {
-          // Write to the row the server created, merging into it. Inserting a
-          // second row for the same booking would make the panel, the ops queue
-          // and summary.js all read the collection directly, so one booking
-          // counted twice, and the duplicate carried a different id, so marking
-          // it paid never reached the order the Paystack reference was on.
-          await supabase.from('orders').update(newOrder).eq('id', reference);
-        } else {
-          await supabase.from('orders').insert(newOrder);
-        }
+        // supabase-js resolves with `{ error }` rather than rejecting, so a
+        // `try/catch` around it catches nothing. A rejected PostgREST statement
+        // used to leave the app printing "Booking confirmed" while nothing had
+        // been written. Inspect the result instead of trusting it.
+        const result = writtenByServer
+          // Update the row the server created rather than inserting a second one:
+          // the panel, the ops queue and summary.js all read the collection
+          // directly, so a duplicate booking counted twice and carried a
+          // different id, which meant marking it paid never reached the order the
+          // Paystack reference was on.
+          ? await supabase.from('orders').update(toServerOrderRow(serverOrder)).eq('id', reference)
+          : await supabase.from('orders').insert(toServerOrderRow(serverOrder));
+        if (result?.error) throw new Error(result.error.message);
       } catch (err) {
         console.error('Failed to write order to Supabase:', err);
-        onNotice('Order created but failed to sync. Will retry on next load.');
+        synced = false;
       }
     }
 
@@ -245,7 +261,9 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
     // to run after commit has written it. Running it first meant it looked up
     // a row that did not exist yet and the auto-assignment never landed.
     const { drivers, sellers } = getFleet();
-    const dispatchable = { location, volumeGallons: Number.parseInt(volume, 10) || 0 };
+    // `parseInt` read "2,000 gallons" as 2, so capacity matching compared a 2,000
+    // gallon delivery against tanker sizes and happily picked a 2-gallon truck.
+    const dispatchable = { location, volumeGallons: gallonsFromLabel(volume) };
     const driver = assignDriver({ order: dispatchable, drivers });
     const seller = assignSeller({ order: dispatchable, sellers });
     recordAssignment(reference, { driver, seller });
@@ -254,7 +272,14 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
       ? `${driver.candidate.name} (${driver.candidate.base.split(',')[0]}) is assigned`
       : 'a driver is being assigned';
     const surgeNote = (serverOrder.surgeMinor ?? 0) > 0 ? ` Surge ${formatCedi(serverOrder.surgeMinor)} applied.` : '';
-    onNotice(`Booking confirmed. Your reference is ${reference}. You will be charged ${formatCedi(serverOrder.chargedMinor)}.${surgeNote} ${who}.`);
+    // A booking that did not reach the server is not a confirmed booking. The
+    // order exists locally and the payment endpoints will still read the server's
+    // own row, but the buyer has to be told the record is incomplete rather than
+    // handed a reference that ops cannot see.
+    const syncNote = synced
+      ? ''
+      : ' Note: this order has not been saved to the server yet, so ops cannot see it. Raise it with support before paying.';
+    onNotice(`Booking confirmed. Your reference is ${reference}. You will be charged ${formatCedi(serverOrder.chargedMinor)}.${surgeNote} ${who}.${syncNote}`);
     notify?.({
       role: 'ops',
       title: `New order ${reference} · ${location}`,
@@ -416,8 +441,13 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
   }, [orders, onNotice, commit]);
 
   const requestRefund = useCallback((orderId) => {
-    onNotice(`Refund request opened for ${orderId}. Ops will review it and email ${email} with the decision.`);
-  }, [email, onNotice]);
+    // Named the account email, which a phone-only buyer never has, so this read
+    // "Ops will review it and email  with the decision" — a promise to contact
+    // nobody. The address the buyer actually supplied at booking is on the order.
+    const order = orders.find((item) => item.id === orderId);
+    const contact = order?.email || email;
+    onNotice(`Refund request opened for ${orderId}. Ops will review it${contact ? ` and reply to ${contact}` : ''} with the decision.`);
+  }, [email, orders, onNotice]);
 
   return {
     orders,

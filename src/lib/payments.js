@@ -50,6 +50,106 @@ export async function fetchQuote({ volumeLitres = 0, signal } = {}) {
   return apiRequest(`/pricing?${query}`, { signal });
 }
 /**
+ * The field names the server sends, and the camelCase names the app reads.
+ *
+ * The order endpoint is a Postgres-shaped API, so its amounts arrive
+ * snake_cased: `charged_minor`, `gross_minor`, `buyer_service_charge`. The rest
+ * of the app reads camelCase (`chargedMinor`), and `createOrder` used to hand
+ * the response straight back, so every amount was `undefined` on a real booking.
+ * `formatCedi(undefined)` renders **GH₵NaN.NaN**, which is what a buyer was told
+ * they would be charged, and what every payout figure in the order was derived
+ * from. Tests never saw it because the stub returned camelCase.
+ *
+ * Nested `pricing` and `split` objects are already camelCase on the server, so
+ * they are passed through untouched.
+ */
+const ORDER_AMOUNT_FIELDS = [
+  ['list_minor', 'listMinor'],
+  ['volume_litres', 'volumeLitres'],
+  ['gross_minor', 'grossMinor'],
+  ['charged_minor', 'chargedMinor'],
+  ['buyer_pays', 'buyerPays'],
+  ['buyer_service_charge', 'buyerServiceCharge'],
+  ['seller_receives', 'sellerReceives'],
+  ['driver_receives', 'driverReceives'],
+  ['platform_commission', 'platformCommission'],
+  ['company_take', 'companyTake'],
+  ['discount_minor', 'discountMinor'],
+  ['surge_minor', 'surgeMinor'],
+  ['paystack_reference', 'paystackReference'],
+  ['created_at', 'createdAt'],
+];
+
+/**
+ * Rename the server's order fields to the names the app reads.
+ *
+ * Amounts are carried through as-is rather than recomputed: the server owns the
+ * price, and the client exists only to display what it was told.
+ */
+export function normaliseOrder(order) {
+  if (!order || typeof order !== 'object') return order;
+  const normalised = { ...order };
+  for (const [from, to] of ORDER_AMOUNT_FIELDS) {
+    if (normalised[to] === undefined && normalised[from] !== undefined) {
+      normalised[to] = normalised[from];
+    }
+  }
+  // The server never sends the undiscounted list price as an amount. It sends
+  // the gross (post-discount) figure and the discount it took, so the list
+  // price is those two added back together. Falling back to the gross figure
+  // instead made a 25%-off order advertise its discounted price as the list
+  // price, which is how a 50%-off GH₵600 booking listed GH₵300.
+  if (normalised.listMinor === undefined
+    && Number.isFinite(normalised.grossMinor)
+    && Number.isFinite(normalised.discountMinor)) {
+    normalised.listMinor = normalised.grossMinor + normalised.discountMinor;
+  }
+  return normalised;
+}
+
+/**
+ * The reverse of `normaliseOrder`: the columns the `orders` table actually has.
+ *
+ * The client used to push its whole display object at the table. That object is
+ * full of fields the server never created — `price`, `listPrice`, `whatsapp`,
+ * `buyerPhone`, `chargedMinor` and so on — so PostgREST rejected the entire
+ * statement with `column orders.price does not exist`. The server's own row was
+ * already correct, so nothing was lost by dropping the write, but the client
+ * fields that belong on that row (the driver and seller it assigned) never
+ * landed either.
+ *
+ * Only names the server created are sent. The display fields stay in the local
+ * cache, which is where the app reads them from anyway.
+ */
+export function toServerOrderRow(order) {
+  const pick = (key) => (order?.[key] === undefined ? undefined : order[key]);
+  const row = {
+    code: pick('code'),
+    email: pick('email'),
+    phone: pick('phone'),
+    location: pick('location'),
+    volume_litres: pick('volumeLitres'),
+    currency: pick('currency') ?? 'GHS',
+    pricing: pick('pricing'),
+    split: pick('split'),
+    gross_minor: pick('grossMinor'),
+    charged_minor: pick('chargedMinor'),
+    buyer_pays: pick('buyerPays'),
+    buyer_service_charge: pick('buyerServiceCharge'),
+    seller_receives: pick('sellerReceives'),
+    driver_receives: pick('driverReceives'),
+    platform_commission: pick('platformCommission'),
+    company_take: pick('companyTake'),
+    discount_minor: pick('discountMinor'),
+    surge_minor: pick('surgeMinor'),
+    paystack_reference: pick('paystackReference') ?? null,
+  };
+  // Drop the keys the order never had rather than sending `undefined`, which
+  // PostgREST rejects as a null on a not-null column.
+  return Object.fromEntries(Object.entries(row).filter(([, value]) => value !== undefined));
+}
+
+/**
  * Create an order. The server decides the price and returns it; any amount the
  * browser might have wanted to send is not accepted.
  */
@@ -59,7 +159,7 @@ export async function createOrder({ email, phone, location, volumeLitres }, { si
     signal,
     body: { email, phone, location, volumeLitres },
   });
-  return payload.order;
+  return normaliseOrder(payload.order);
 }
 
 /**

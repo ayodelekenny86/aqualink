@@ -9,12 +9,13 @@ vi.mock('./components/PWASetup', () => ({
 }));
 
 import { afterEach, beforeEach, expect, test } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App';
 import { clearAll } from './lib/storage';
 import { installFakeApi, reviewSellerApplication, STUB_OPS_CREDENTIALS, teardownFakeApi } from './testServer';
 import { listAccounts, deleteAccount } from './lib/accounts';
+import { list } from './lib/collections';
 import { readValue, writeValue } from './lib/storage';
 
 /**
@@ -179,6 +180,48 @@ test('does not claim an email is verified for a phone-only buyer', async () => {
   expect(screen.queryByText(/email verified/i)).not.toBeInTheDocument();
 });
 
+test('shows the signed-in identity in the sidebar instead of a fixed persona', async () => {
+  const user = userEvent.setup();
+  const { container } = render(<App />);
+  // Scoped to the sidebar, because the workspace switcher and the region
+  // selector legitimately contain some of the same words.
+  const profile = () => within(container.querySelector('.sidebar-bottom'));
+
+  // Signed out, the sidebar must not name somebody who is not signed in.
+  expect(profile().getByText('Signed out')).toBeInTheDocument();
+
+  await verifyBuyer(user);
+
+  // The sidebar used to read a fixed name, avatar and city on every account, so
+  // every user of the app was told they were the same invented person in Accra.
+  // A phone account is registered with the role label as its display name, so
+  // that placeholder is treated as no name and the identifier is what shows.
+  expect(profile().getByText('054 400 7788')).toBeInTheDocument();
+  expect(profile().queryByText(/^Alex K\.$/)).not.toBeInTheDocument();
+  expect(profile().queryByText('AK')).not.toBeInTheDocument();
+  expect(profile().queryByText('Buyer')).not.toBeInTheDocument();
+  expect(profile().queryByText('Signed out')).not.toBeInTheDocument();
+  // The avatar carries initials derived from the identifier rather than a
+  // hardcoded pair.
+  expect(profile().getByText('04')).toBeInTheDocument();
+});
+
+test('the sidebar identity follows the signed-in account, not a hardcoded city', async () => {
+  const user = userEvent.setup();
+  const { container } = render(<App />);
+  const profile = () => within(container.querySelector('.sidebar-bottom'));
+
+  await verifyBuyer(user);
+
+  // "Accra, Ghana" was a literal. The region in the subtitle is the one the
+  // topbar selector is actually set to.
+  expect(profile().getByText('Accra')).toBeInTheDocument();
+  await user.selectOptions(screen.getByLabelText(/operating region/i), 'Kumasi');
+  expect(profile().getByText('Kumasi')).toBeInTheDocument();
+  expect(profile().queryByText('Accra')).not.toBeInTheDocument();
+  expect(screen.queryByText(/Accra, Ghana/)).not.toBeInTheDocument();
+});
+
 test('answers a buyer question with Aqua AI', async () => {
   const user = userEvent.setup();
   render(<App />);
@@ -206,6 +249,29 @@ test('the Aqua panel refuses to invent forecasts or driver positions', async () 
   expect(screen.queryByText(/stage 6 trucks|pre-position 6/i)).not.toBeInTheDocument();
 });
 
+test('a phone-only buyer can book, and is told why an email is needed', async () => {
+  const user = userEvent.setup();
+  render(<App />);
+
+  await verifyBuyer(user);
+
+  await user.type(screen.getByPlaceholderText(/enter an address/i), 'Labone, Accra');
+  await user.click(screen.getByRole('button', { name: /confirm booking/i }));
+
+  // The server has always required a receipt email, but the form had no email
+  // field, so every booking answered 400 `invalid_email` in production: the app's
+  // primary action was dead and the only symptom was a raw error banner. The
+  // check now happens before the request, with an instruction instead.
+  expect(screen.getByRole('status')).toHaveTextContent(/email address your receipt should go to/i);
+  expect(list('orders')).toHaveLength(0);
+
+  // Supplying one makes the booking go through.
+  await user.type(screen.getByRole('textbox', { name: /email for the receipt/i }), 'buyer@example.com');
+  await user.click(screen.getByRole('button', { name: /confirm booking/i }));
+  expect(await screen.findByRole('status')).toHaveTextContent(/booking confirmed/i);
+  expect(list('orders')[0].email).toBe('buyer@example.com');
+});
+
 test('creates a delivery booking and switches workspaces', async () => {
   const user = userEvent.setup();
   render(<App />);
@@ -213,6 +279,7 @@ test('creates a delivery booking and switches workspaces', async () => {
   await verifyBuyer(user);
 
   await user.type(screen.getByPlaceholderText(/enter an address/i), 'Labone, Accra');
+  await user.type(screen.getByRole('textbox', { name: /email for the receipt/i }), 'buyer@example.com');
   await user.click(screen.getByRole('button', { name: /confirm booking/i }));
 
   expect(screen.getByRole('status')).toHaveTextContent(/booking confirmed/i);
@@ -232,6 +299,7 @@ test('issues a server-issued reference for each new order', async () => {
   await verifyBuyer(user);
 
   await user.type(screen.getByPlaceholderText(/enter an address/i), 'Labone, Accra');
+  await user.type(screen.getByRole('textbox', { name: /email for the receipt/i }), 'buyer@example.com');
   await user.click(screen.getByRole('button', { name: /confirm booking/i }));
 
   const notice = await screen.findByRole('status');
@@ -252,6 +320,7 @@ test('never invents a saved address the user did not enter', async () => {
   expect(screen.queryByRole('button', { name: /⌖/ })).not.toBeInTheDocument();
 
   await user.type(screen.getByPlaceholderText(/enter an address/i), 'Labone, Accra');
+  await user.type(screen.getByRole('textbox', { name: /email for the receipt/i }), 'buyer@example.com');
   await user.click(screen.getByRole('button', { name: /save this address/i }));
 
   await user.click(screen.getByRole('combobox', { name: /water volume/i }));
@@ -376,6 +445,7 @@ test('shows an honest delivery estimate for a buyer with no timed history', asyn
 
   await verifyBuyer(user);
   await user.type(screen.getByPlaceholderText(/enter an address/i), 'Labone, Accra');
+  await user.type(screen.getByRole('textbox', { name: /email for the receipt/i }), 'buyer@example.com');
   await user.click(screen.getByRole('button', { name: /confirm booking/i }));
   await screen.findByRole('status');
 
@@ -407,6 +477,7 @@ test('buyer finance totals the real service charges on a paid order', async () =
 
   await verifyBuyer(user);
   await user.type(screen.getByPlaceholderText(/enter an address/i), 'Labone, Accra');
+  await user.type(screen.getByRole('textbox', { name: /email for the receipt/i }), 'buyer@example.com');
   await user.click(screen.getByRole('button', { name: /confirm booking/i }));
   await screen.findByRole('status');
 

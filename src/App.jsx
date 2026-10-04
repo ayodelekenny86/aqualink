@@ -48,6 +48,48 @@ const ROLE_ICONS = { buyer: '⌂', seller: '↗', driver: '⇢', institution: '�
 
 const SUPPORT_PHONE = '0545009046';
 
+// The name each workspace is registered under when no real name is on file.
+//
+// Registration passes the role label as the display name, so "Buyer" is a
+// placeholder rather than a person. It has to be recognised as one here, or the
+// sidebar ends up introducing the signed-in user as "Buyer" — a label the
+// workspace switcher directly above it already says.
+const PLACEHOLDER_NAMES = { buyer: 'Buyer', seller: 'Seller', driver: 'Driver', institution: 'Institution', ops: 'Admin' };
+
+// Who is signed in, for the sidebar and the mobile avatar.
+//
+// This was a literal name, avatar and city on every account, so a driver in
+// Kumasi and an operator in the console were both told they were the same
+// invented person in Accra. It is derived from the session now: the account's
+// own display name where a real one exists, the identifier otherwise, and an
+// honest signed-out state when there is no session at all. The region is the one
+// selected in the topbar, not a fixed city.
+function identityFor(session, region) {
+  if (!session) {
+    return { initials: '—', name: 'Signed out', detail: 'Choose a workspace to continue', signedIn: false };
+  }
+
+  const displayName = session.displayName?.trim() ?? '';
+  const placeholder = PLACEHOLDER_NAMES[session.role];
+  const hasName = Boolean(displayName) && displayName.toLowerCase() !== placeholder?.toLowerCase();
+
+  // A phone account is registered without a name, so the identifier is the only
+  // honest thing to show. It is formatted because a raw +233… string is not a
+  // label anyone reads.
+  const identifier = session.identifierType === 'phone'
+    ? formatPhoneForDisplay(session.identifier)
+    : session.identifier;
+  const name = hasName ? displayName : identifier;
+  const detail = hasName ? `${identifier} · ${region}` : region;
+
+  const words = name.split(/[\s._-]+/).filter(Boolean);
+  const letters = words.length > 1
+    ? words.slice(0, 2).map((word) => word[0]).join('')
+    : name.replace(/\D/g, '').slice(0, 2) || name.slice(0, 2);
+
+  return { initials: letters.toUpperCase(), name, detail, signedIn: true };
+}
+
 /**
  * Money shown to buyers, sellers and institutions, computed from the orders that
  * actually exist.
@@ -228,6 +270,9 @@ function App() {
 
   const canSignOut = session && (buyerAuthenticated || driverAuthenticated || sellerAuthenticated || adminAuthenticated);
 
+  // The sidebar identity follows the session instead of a fixed persona.
+  const identity = useMemo(() => identityFor(session, region), [session, region]);
+
   // Which order the checkout panel acts on.
   //
   // After a Paystack redirect the URL carries the reference that was just paid,
@@ -285,7 +330,7 @@ function App() {
             </button>
           ))}
         </div>
-        <div className="sidebar-bottom"><button className="sidebar-link" type="button" onClick={() => showNotice('Help request received. Our support team will call you back shortly.')}><span>?</span>Help & support</button><div className="profile"><span className="avatar">AK</span><span><b>Alex K.</b><small>Accra, Ghana</small></span><span className="more">•••</span></div></div>
+        <div className="sidebar-bottom"><button className="sidebar-link" type="button" onClick={() => showNotice('Help request received. Our support team will call you back shortly.')}><span>?</span>Help & support</button><div className="profile"><span className="avatar">{identity.initials}</span><span><b>{identity.name}</b><small>{identity.detail}</small></span><span className="more">•••</span></div></div>
       </aside>
 
       <main className="main-content" id="main">
@@ -310,7 +355,7 @@ function App() {
                 {roleUnread > 0 && <em>{roleUnread}</em>}
               </button>
               {canSignOut && <button className="icon-button topbar-signout" type="button" aria-label="Sign out" title="Sign out" onClick={() => signOut()}><span>⎋</span></button>}
-              <button className="profile mobile-profile" type="button"><span className="avatar">AK</span></button>
+              <button className="profile mobile-profile" type="button" aria-label={`Signed in as ${identity.name}`}><span className="avatar">{identity.initials}</span></button>
             </div>
           </header>
         <PWASetup />
@@ -636,7 +681,7 @@ function BuyerView({ booking, updateBooking, requestDelivery, orders, showNotice
     <section className="auth-strip panel"><div><span className="section-kicker">ACCOUNT & SECURITY</span><strong>{emailState.strong}</strong><small>{emailState.small}</small></div>{emailState.showEmailForm ? <form className="auth-form" onSubmit={(event) => { event.preventDefault(); sendOtp(); }}><input aria-label="Email address" value={email} onChange={(event) => setEmail(event.target.value)} type="email" /><button className="outline-button" type="submit">Send OTP</button></form> : <form className="auth-form" onSubmit={async (event) => { event.preventDefault(); const result = await confirmEmailCode(emailOtp); if (result?.ok) setEmailOtp(''); }}><input aria-label="OTP code" value={emailOtp} onChange={(event) => setEmailOtp(event.target.value)} placeholder="Enter 6-digit OTP" inputMode="numeric" /><button className="primary-button" type="submit">Verify</button></form>}</section>
     <section className="saved-addresses panel"><div><span className="section-kicker">FAST REBOOK</span><strong>Saved addresses</strong><small>Repeat a trusted delivery without typing it again.</small></div><div className="saved-address-list">{savedAddresses.map((address) => <button type="button" key={address} onClick={() => repeatBooking(address)}>⌖ {address}</button>)}<button type="button" onClick={() => { const typed = booking.location.trim(); if (!typed) { showNotice('Type a delivery location first, then save it here.'); return; } if (savedAddresses.includes(typed)) { showNotice('That address is already saved.'); return; } setSavedAddresses([...savedAddresses, typed]); showNotice(`Saved ${typed} for quick rebooking.`); }}>+ Save this address</button></div></section>
     <div className="buyer-grid">
-      <section className="panel booking-panel"><div className="panel-title"><div><span className="section-kicker">NEW BOOKING · {t.book}</span><h2>{t.location}</h2></div><span className="verified-pill">✓ Verified sellers</span></div><form onSubmit={requestDelivery}><label>Delivery location<div className="input-wrap"><span>⌖</span><input name="location" value={booking.location} onChange={updateBooking} placeholder="Enter an address or landmark" /></div></label><label>WhatsApp number <small className="field-hint">(optional, if different from your phone)</small><div className="input-wrap"><span>✆</span><input name="whatsapp" value={booking.whatsapp} onChange={updateBooking} placeholder="e.g. 0551234567" inputMode="tel" /></div></label><div className="form-row"><label>Water volume<select name="volume" value={booking.volume} onChange={updateBooking}><option>1,000 gallons</option><option>2,000 gallons</option><option>5,000 gallons</option></select></label><label>Delivery window<select name="window" value={booking.window} onChange={updateBooking}><option>As soon as possible</option><option>Today, 12:00–14:00</option><option>Tomorrow morning</option></select></label></div><div className="quote"><span><small>YOUR PRICE</small><strong>Calculated on the server</strong></span><span className="quote-note">The exact amount, including the service charge, is calculated when you book and shown before you pay. It is not quoted here because the server is the only place that sets it.</span></div><label className="payment-label">Payment method<select name="payment" value={booking.payment} onChange={updateBooking}><option>Mobile money or card via Paystack</option><option>Cash on delivery (pay the driver)</option></select></label><p className="escrow-note">Card and mobile money payments are taken by Paystack and confirmed before your order counts as paid. Cash on delivery is settled with the driver.</p><button className="primary-button full" type="submit">{t.book} <span>→</span></button></form></section>
+      <section className="panel booking-panel"><div className="panel-title"><div><span className="section-kicker">NEW BOOKING · {t.book}</span><h2>{t.location}</h2></div><span className="verified-pill">✓ Verified sellers</span></div><form onSubmit={requestDelivery}><label>Delivery location<div className="input-wrap"><span>⌖</span><input name="location" value={booking.location} onChange={updateBooking} placeholder="Enter an address or landmark" /></div></label><label>Email for the receipt <small className="field-hint">(required — your receipt and payment confirmation go here)</small><div className="input-wrap"><span>✉</span><input name="receiptEmail" type="email" value={booking.receiptEmail} onChange={updateBooking} placeholder="you@example.com" autoComplete="email" /></div></label><label>WhatsApp number <small className="field-hint">(optional, if different from your phone)</small><div className="input-wrap"><span>✆</span><input name="whatsapp" value={booking.whatsapp} onChange={updateBooking} placeholder="e.g. 0551234567" inputMode="tel" /></div></label><div className="form-row"><label>Water volume<select name="volume" value={booking.volume} onChange={updateBooking}><option>1,000 gallons</option><option>2,000 gallons</option><option>5,000 gallons</option></select></label><label>Delivery window<select name="window" value={booking.window} onChange={updateBooking}><option>As soon as possible</option><option>Today, 12:00–14:00</option><option>Tomorrow morning</option></select></label></div><div className="quote"><span><small>YOUR PRICE</small><strong>Calculated on the server</strong></span><span className="quote-note">The exact amount, including the service charge, is calculated when you book and shown before you pay. It is not quoted here because the server is the only place that sets it.</span></div><label className="payment-label">Payment method<select name="payment" value={booking.payment} onChange={updateBooking}><option>Mobile money or card via Paystack</option><option>Cash on delivery (pay the driver)</option></select></label><p className="escrow-note">Card and mobile money payments are taken by Paystack and confirmed before your order counts as paid. Cash on delivery is settled with the driver.</p><button className="primary-button full" type="submit">{t.book} <span>→</span></button></form></section>
       <div className="side-stack"><section className="panel rewards-panel"><div className="panel-title"><div><span className="section-kicker">YOUR REWARDS</span><h2>{tier} tier</h2></div><span className="tier-badge">✦</span></div><div className="reward-progress"><strong>{points}</strong>{nextTier ? <span>{points} / {points + pointsToNext} to {nextTier}</span> : <span>Top of the ladder</span>}<div><i style={{ width: `${Math.round(progress * 100)}%` }} /></div></div><div className="reward-foot"><span>{loyaltyProfile ? `2% cashback available · ${cashback}` : 'No paid orders yet, so no cashback has been earned.'}</span><button type="button" onClick={() => showNotice(loyaltyProfile ? `Your wallet balance is ${walletBalance}.` : 'Your wallet balance is GH₵0.00 — pay for one order to start earning.')}>View wallet →</button></div></section><DeliveryEstimateCard order={orders.find(o => o.status === 'Assigned' || o.status === 'En Route')} estimateForOrder={estimateForOrder} orders={orders} /><LiveAgentCard role="buyer" driverUpdate={driverUpdate} refreshDriverUpdate={refreshDriverUpdate} showNotice={showNotice} /></div>
     </div>
     <section className="orders-section"><div className="section-heading"><div><span className="section-kicker">ACTIVITY</span><h2>{t.recent}</h2></div><button className="text-button" type="button" onClick={() => showNotice('Showing all delivery history.')}>View all →</button></div><div className="orders-table"><div className="table-head"><span>ORDER</span><span>LOCATION</span><span>VOLUME</span><span>STATUS</span><span>PAYMENT</span></div>{orders.map((order) => <div className="order-row" key={order.id}><strong>{order.id}<small>{order.date}</small></strong><span>{order.location}</span><span>{order.volume}</span><span><i className={`status ${order.status.toLowerCase()}`}>{order.status}</i>{order.status === 'En Route' && <button className="confirm-button" type="button" onClick={() => showNotice(order.driverName ? `${order.driverName} is on the way. Position updated from the seller app.` : 'A driver is on the way. Position updated from the seller app.')}>Driver position</button>}{order.status === 'Delivered' && order.payment !== 'Released' && <span className="confirm-row"><input aria-label={`Delivery code for ${order.id}`} value={deliveryCodes[order.id] ?? ''} onChange={(event) => setDeliveryCodes({ ...deliveryCodes, [order.id]: event.target.value })} placeholder="Delivery code" /><button className="confirm-button" type="button" onClick={() => confirmDelivery(order.id, deliveryCodes[order.id])}>Confirm receipt</button></span>}{order.status === 'Delivered' && <button className="confirm-button" type="button" onClick={() => showNotice(`Receipt for ${order.id} is ready to download or email.`)}>Receipt</button>}{order.status === 'Delivered' && <button className="confirm-button" type="button" onClick={() => requestRefund(order.id)}>Request refund</button>}</span><b>{order.payment}<small>{order.price}</small></b></div>)}</div></section><section className="support-card panel"><div><span className="section-kicker">HUMAN SUPPORT</span><h2>{t.support}</h2><p>Accra support: phone, email, WhatsApp, or a ticket for late deliveries, refunds, quality concerns, or payment receipts.</p></div><div className="support-actions"><a href="tel:+233302000123">☎ Call +233 30 200 0123</a><a href="mailto:support@aqualink.gh">✉ support@aqualink.gh</a><a href="https://wa.me/233545009046" target="_blank" rel="noreferrer">◌ WhatsApp 0545009046</a><button type="button" onClick={() => showNotice('Support ticket created. Reference: SUP-2048.')}>Open support ticket</button></div></section>
