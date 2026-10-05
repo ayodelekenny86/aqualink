@@ -20,7 +20,28 @@ function relativeTime(iso) {
   return `${Math.round(hours / 24)}d ago`;
 }
 
-export default function NotificationsPanel({ notifications, unreadCount, onMarkAllRead, onMarkRead, onClose, onOrderClick, supportPhone }) {
+/**
+ * What to say when this device cannot hear about anything another device does.
+ *
+ * The panel used to show an empty feed and nothing else, and an empty feed reads as
+ * "nothing has happened" — not as "this deployment cannot deliver notifications
+ * between devices". On this server that was literally true: `notifications` was not
+ * in the Realtime publication, so the server refused the subscription, and no event
+ * could ever arrive. A driver waiting on a delivery status on their phone was told
+ * nothing, by a panel that looked like it was listening.
+ */
+function syncNotice(sync) {
+  if (sync === 'blocked') {
+    return 'Notifications from other devices are not reaching this one. The server refused the live connection, so this list only shows what happened on this device.';
+  }
+  if (sync === 'unconfigured') {
+    return 'No notification server is configured for this deployment, so this list only shows what happened on this device.';
+  }
+  return null;
+}
+
+export default function NotificationsPanel({ notifications, unreadCount, onMarkAllRead, onMarkRead, onClose, onOrderClick, supportPhone, sync }) {
+  const notice = syncNotice(sync);
   return (
     <section className="notifications-panel" aria-label="Notifications">
       <header>
@@ -31,11 +52,13 @@ export default function NotificationsPanel({ notifications, unreadCount, onMarkA
         <button type="button" className="modal-close" aria-label="Close notifications" onClick={onClose}>×</button>
       </header>
 
+      {notice && <p className="notifications-sync-note" role="status">{notice}</p>}
+
       <button type="button" className="text-button mark-all" onClick={onMarkAllRead} disabled={unreadCount === 0}>
         Mark all as read
       </button>
 
-      {notifications.length === 0 && <p className="empty-feed">No notifications yet.</p>}
+      {notifications.length === 0 && <p className="empty-feed">{notice ? 'Nothing has happened on this device yet.' : 'No notifications yet.'}</p>}
 
       <ul>
         {notifications.map((item) => (

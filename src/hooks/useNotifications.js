@@ -8,6 +8,21 @@ const USE_SERVER = typeof window !== 'undefined' && !!supabaseUrl && !!anonKey;
 export const NOTIFICATION_POLL_MS = 15000;
 
 /**
+ * Whether notifications from another device can reach this one.
+ *
+ * `live` is the only state in which cross-device delivery works. `blocked` means the
+ * server refused the Realtime subscription, and `unconfigured` means there is no
+ * server to subscribe to. Both used to be indistinguishable from a quiet day: the
+ * feed was simply empty, and an empty feed reads as "nothing has happened" rather
+ * than as "this app cannot see anything".
+ */
+export const NOTIFICATION_SYNC = {
+  live: 'live',
+  blocked: 'blocked',
+  unconfigured: 'unconfigured',
+};
+
+/**
  * Notification feed with unread tracking and real-time sync.
  *
  * When Supabase is configured, the feed subscribes to Realtime changes on the
@@ -20,6 +35,7 @@ export const NOTIFICATION_POLL_MS = 15000;
  */
 export default function useNotifications() {
   const [items, setItems] = useState(() => list('notifications'));
+  const [sync, setSync] = useState(USE_SERVER ? NOTIFICATION_SYNC.blocked : NOTIFICATION_SYNC.unconfigured);
   const lastChecked = useRef(Date.now());
   const lastFingerprint = useRef('');
 
@@ -57,6 +73,15 @@ export default function useNotifications() {
         refresh();
       })
       .subscribe((status) => {
+        // Every one of these means this device will not hear about anything another
+        // device does. `CHANNEL_ERROR` is what a table missing from the
+        // `supabase_realtime` publication produces — the server accepts the join and
+        // then refuses it — so it is the common case here, not an edge one.
+        if (status === 'SUBSCRIBED') {
+          setSync(NOTIFICATION_SYNC.live);
+          return;
+        }
+        setSync(NOTIFICATION_SYNC.blocked);
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           fallbackRef.current = setInterval(() => {
             if (typeof document !== 'undefined' && document.hidden) return;
@@ -155,5 +180,5 @@ export default function useNotifications() {
   const forRole = useCallback((role) => items.filter((row) => row.role === role), [items]);
   const unreadCount = useCallback((role) => items.filter((row) => row.role === role && !row.read).length, [items]);
 
-  return { items, forRole, unreadCount, notify, markRead, markAllRead, refresh, lastChecked };
+  return { items, forRole, unreadCount, notify, markRead, markAllRead, refresh, lastChecked, sync };
 }

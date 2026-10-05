@@ -164,7 +164,7 @@ function App() {
   } = useAuth();
 
   const {
-    forRole, unreadCount, notify, markRead, markAllRead,
+    forRole, unreadCount, notify, markRead, markAllRead, sync: notificationSync,
   } = useNotifications();
 
   const { pricing, split, publish, apply } = useAdminPricing({ onNotice: showNotice });
@@ -374,6 +374,7 @@ function App() {
               onMarkRead={markRead}
               onClose={() => setNotificationsOpen(false)}
               onOrderClick={setDetailOrderId}
+              sync={notificationSync}
               supportPhone={SUPPORT_PHONE}
             />
           </Suspense>
