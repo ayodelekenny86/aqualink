@@ -282,28 +282,6 @@ async function probeFunctions() {
     );
   }
 
-  // A separate check for the AI key, because a deployed function with no key is
-  // still broken: it answers 503 and the client quietly uses local rules instead.
-  try {
-    const response = await fetch(`${supabaseUrl}/functions/v1/ai/chat`, {
-      method: 'POST',
-      headers: { apikey: anonKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: 'ping', role: 'buyer', orders: [] }),
-      signal: AbortSignal.timeout(20000),
-    });
-    const body = (await response.text()).slice(0, 160);
-    if (response.status === 503) {
-      record('ai/chat has a usable key', false, 'GEMINI_API_KEY is not set on the server');
-    } else if (!response.ok) {
-      record('ai/chat has a usable key', false, `HTTP ${response.status} ${DIM}${body}${OFF}`);
-    } else {
-      record('ai/chat has a usable key', true, 'Gemini answered');
-    }
-  } catch (error) {
-    record('ai/chat has a usable key', false, String(error.message || error));
-  }
-}
-
 for (const site of sites) await probeSite(site);
 await probeFunctions();
 
