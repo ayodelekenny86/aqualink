@@ -4,7 +4,6 @@ import useDriverTracking from '../hooks/useDriverTracking';
 import useLoadBalancing from '../hooks/useLoadBalancing';
 import useSmartAssignment from '../hooks/useSmartAssignment';
 import usePredictiveAnalytics from '../hooks/usePredictiveAnalytics';
-import useSmartNotifications from '../hooks/useSmartNotifications';
 
 function DriverMarker({ driver, onClick }) {
   const statusColors = {
@@ -278,7 +277,6 @@ export function DriverTrackingView({ orders, onNotice }) {
   const { zoneLoads, driverWorkloads, rebalancingSuggestions, autoRebalanceEnabled, setAutoRebalanceEnabled, surgeMode, activateSurge, fleetSummary, refreshLoads, applyRebalancing, lastRebalance } = useLoadBalancing({ orders, driverPositions, onNotice });
   const { assignments, optimizationQueue, autoAssignEnabled, setAutoAssignEnabled, fleetStats: assignmentFleetStats, assignOrder, autoAssignAll, optimizeRoutes, applyOptimization, lastOptimization } = useSmartAssignment({ orders, driverPositions, onNotice, updateOrderStatus: (id, status, cb) => cb() });
   const { churnAnalysis, ltvPredictions, segments, anomalies, revenueForecast, summary: analyticsSummary, loading: analyticsLoading, refresh: refreshAnalytics } = usePredictiveAnalytics({ orders, customers: [], driverPositions });
-  const { notifications, preferences, unreadCount, sendNotification, checkTriggers } = useSmartNotifications({ user: { identifier: 'ops', role: 'ops' }, orders, driverPositions, schedules: [], budget: null, qualityRecords: [], onNotice });
 
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [viewMode, setViewMode] = useState('map'); // 'map' | 'list'

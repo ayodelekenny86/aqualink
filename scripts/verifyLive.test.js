@@ -134,28 +134,6 @@ test('every table the client subscribes to is published for Realtime', async () 
     ).toBe(`${table} => published`);
   }
 });
-  // Postgres changes are only delivered for tables in the `supabase_realtime`
-  // publication. Without this, `useNotifications` subscribes and the server refuses
-  // the join, no cross-device event can ever arrive, and the feed is empty for a
-  // reason the panel used to have no way of saying. The subscription was confirmed
-  // against the server and refused:
-  //
-  //   "Unable to subscribe to changes with given parameters. Please check Realtime
-  //    is enabled for the given connect parameters: [table: notifications]"
-  //
-  // Nothing can prove this from a unit test, so what is pinned here is that the
-  // migration exists and that it is written to be re-runnable.
-  const migration = await readFile('supabase/migrations/20250104000000_notifications_realtime.sql', 'utf8');
-  expect(migration).toMatch(/alter publication supabase_realtime add table public\.notifications/);
-  // `add table` is not idempotent, so an unguarded migration aborts on re-apply.
-  expect(migration).toMatch(/pg_publication_tables/);
-
-  // And the client must consume that Realtime state rather than ignore it.
-  const hook = await readFile('src/hooks/useNotifications.js', 'utf8');
-  expect(hook).toMatch(/NOTIFICATION_SYNC\.blocked/);
-  const panel = await readFile('src/components/NotificationsPanel.jsx', 'utf8');
-  expect(panel).toMatch(/not reaching this one/i);
-});
 
 test('every build is stamped with the commit it came from', async () => {
   // Without the stamp a stale deployment is indistinguishable from a current one.

@@ -4,7 +4,6 @@ import useInstitutionDashboard from '../hooks/useInstitutionDashboard';
 import useDemandForecast from '../hooks/useDemandForecast';
 import usePredictiveAnalytics from '../hooks/usePredictiveAnalytics';
 import useDynamicPricing from '../hooks/useDynamicPricing';
-import useSmartNotifications from '../hooks/useSmartNotifications';
 import useWaterQuality from '../hooks/useWaterQuality';
 
 function ScheduleCard({ schedule, onToggle, onDelete, onEdit }) {
@@ -120,7 +119,6 @@ export function InstitutionDashboard({ orders, showNotice }) {
   const { forecast, summary: forecastSummary, trend, anomalies, peakHours, loading: forecastLoading, refresh: refreshForecast } = useDemandForecast({ orders, region: 'ACCRA' });
   const { churnAnalysis, ltvPredictions, segments, anomalies: predAnomalies, revenueForecast, summary: analyticsSummary, loading: analyticsLoading, refresh: refreshAnalytics } = usePredictiveAnalytics({ orders, customers: [], driverPositions: {} });
   const { pricing, customerProfile, loading: pricingLoading, refresh: refreshPricing, getPriceForVolume, getPriceExplanation, summary: pricingSummary } = useDynamicPricing({ orders, driverPositions: {}, customerId: null, region: 'ACCRA' });
-  const { notifications, preferences, unreadCount, sendNotification, checkTriggers } = useSmartNotifications({ user: { identifier: 'institution', role: 'institution' }, orders, driverPositions: {}, schedules, budget, qualityRecords, onNotice: showNotice });
   const { records: waterRecords, compliance, trends, forecasts, certificates, sourceRisks, alerts, summary: qualitySummary, loading: qualityLoading, addQualityRecord: addWaterQualityRecord, getSourceSummary, refresh: refreshWaterQuality } = useWaterQuality({ qualityRecords, sources: [...new Set(qualityRecords.map(r => r.source))], onNotice: showNotice });
 
   const [activeTab, setActiveTab] = useState('overview');

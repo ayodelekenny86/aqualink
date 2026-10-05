@@ -5,7 +5,6 @@ import useDemandForecast from '../hooks/useDemandForecast';
 import useSmartAssignment from '../hooks/useSmartAssignment';
 import usePredictiveAnalytics from '../hooks/usePredictiveAnalytics';
 import useDynamicPricing from '../hooks/useDynamicPricing';
-import useSmartNotifications from '../hooks/useSmartNotifications';
 import useSellerInventory from '../hooks/useSellerInventory';
 import useLoadBalancing from '../hooks/useLoadBalancing';
 
@@ -188,7 +187,6 @@ export function SellerDashboard({
   const { assignments, optimizationQueue, autoAssignEnabled, setAutoAssignEnabled, fleetStats, assignOrder, autoAssignAll, optimizeRoutes, applyOptimization, lastOptimization } = useSmartAssignment({ orders, driverPositions: driverLocations, onNotice: showNotice, updateOrderStatus });
   const { churnAnalysis, ltvPredictions, segments, anomalies: predAnomalies, revenueForecast, summary: analyticsSummary, loading: analyticsLoading, refresh: refreshAnalytics } = usePredictiveAnalytics({ orders, customers: [], driverPositions: driverLocations });
   const { pricing, experiments, customerProfile, loading: pricingLoading, refresh: refreshPricing, getPriceForVolume, getPriceExplanation, summary: pricingSummary } = useDynamicPricing({ orders, driverPositions: driverLocations, customerId: sellerProfile?.identifier, region: sellerProfile?.region });
-  const { notifications, preferences, unreadCount, sendNotification, checkTriggers } = useSmartNotifications({ user: sellerProfile, orders, driverPositions: driverLocations, schedules: [], budget: null, qualityRecords: [], onNotice: showNotice });
   const { inventory, equipment, lowInventory, pendingMaintenance, reorderRecommendations, summary: inventorySummary, loading: inventoryLoading, recordDelivery, recordRestock, recordMaintenance } = useSellerInventory({ sellerProfile, orders, driverPositions: driverLocations, forecast });
   const { zoneLoads, driverWorkloads, rebalancingSuggestions, autoRebalanceEnabled, setAutoRebalanceEnabled, surgeMode, activateSurge, fleetSummary, refreshLoads } = useLoadBalancing({ orders, driverPositions: driverLocations, onNotice: showNotice });
 

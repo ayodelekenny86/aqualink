@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 /**
  * Check what the deployed AquaLink actually answers.
  *
@@ -10,9 +10,9 @@
  *
  * It also checks the two things a build script cannot: **which build is live** and
  * **what that build contains**. Both have already gone wrong here. A production
- * URL served a bundle from 82 commits earlier — one with the invented GMV tiles,
+ * URL served a bundle from 82 commits earlier â€” one with the invented GMV tiles,
  * an escrow balance this app does not have, and an admin console that granted
- * operator access for any non-empty password — and the deployed origin had no CSP
+ * operator access for any non-empty password â€” and the deployed origin had no CSP
  * at all, so none of it was visible from the repo. A check that only asks "does
  * the site answer 200" passes on exactly that deployment.
  *
@@ -69,7 +69,7 @@ const sites = (
  * that every action in it exists, so checking one action per function could not
  * have caught a missing one. Reading the table removes the duplication that let it
  * drift, which is the same failure mode as the three copies of the pricing
- * arithmetic — one of which had already lost its range checks.
+ * arithmetic â€” one of which had already lost its range checks.
  */
 const routes = readRoutes();
 
@@ -90,7 +90,7 @@ function readRoutes() {
 const DEMO_TELLS = [
   { label: 'admin access granted by any password', pattern: /this demo workspace/ },
   { label: 'a simulated OTP notice', pattern: /simulated in this frontend/ },
-  { label: 'an invented GH₵18,540 GMV figure', pattern: /18,540/ },
+  { label: 'an invented GHâ‚µ18,540 GMV figure', pattern: /18,540/ },
   { label: 'an escrow balance this app does not have', pattern: /4,820/ },
   { label: 'a fixed signed-in persona', pattern: /Alex K\./ },
 ];
