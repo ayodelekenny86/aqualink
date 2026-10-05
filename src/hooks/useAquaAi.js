@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { translations } from '../data/translations';
 import { formatCedi } from '../lib/money';
 import { tierFor, computePoints, TIERS } from './useLoyalty';
-import { askAiQuestion } from '../lib/ai';
+import { askAiQuestion, aiFallbackMessage, classifyAiFailure } from '../lib/ai';
 
 /**
  * The Aqua panel.
@@ -180,6 +180,11 @@ export function useAquaAi({ language, orders = [], split, sellerScores = [], rel
   const [aiMessages, setAiMessages] = useState([greeting]);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSource, setAiSource] = useState(null);
+  // Why the last answer came from the local matcher. This is a separate piece of
+  // state rather than part of `aiSource` because it changes the meaning of what the
+  // user is reading: "your device is offline" and "this server was never
+  // configured" produce the same answer and need different words under it.
+  const [aiFallbackReason, setAiFallbackReason] = useState(null);
 
   const askAi = useCallback(async (event) => {
     event.preventDefault();
@@ -202,12 +207,18 @@ export function useAquaAi({ language, orders = [], split, sellerScores = [], rel
         language,
       });
       setAiSource(source);
+      setAiFallbackReason(null);
       setAiMessages((messages) => [...messages, { from: 'ai', text: answer }]);
-    } catch {
-      // Server unreachable (offline, dev mode, etc.) — fall back to the local
-      // keyword matcher so the panel still answers from real order data.
-      const answer = getAiAnswer(question, { language, orders, split, sellerScores, reliabilityScores, buyerId });
+    } catch (error) {
+      // Read the actual failure rather than swallowing it. The local matcher is a
+      // fair answer — it is summed from real orders — but on this deployment it is
+      // what every answer is, because the `ai` function was never deployed, and
+      // saying so is the only way a reader can tell the difference between an
+      // assistant and a keyword table.
+      const reason = classifyAiFailure(error);
       setAiSource('fallback');
+      setAiFallbackReason(reason);
+      const answer = getAiAnswer(question, { language, orders, split, sellerScores, reliabilityScores, buyerId });
       setAiMessages((messages) => [...messages, { from: 'ai', text: answer }]);
     }
     setAiLoading(false);
@@ -216,7 +227,7 @@ export function useAquaAi({ language, orders = [], split, sellerScores = [], rel
   const toggleAi = useCallback(() => setAiOpen((open) => !open), []);
   const closeAi = useCallback(() => setAiOpen(false), []);
 
-  return { aiOpen, toggleAi, closeAi, aiInput, setAiInput, aiMessages, askAi, aiLoading, aiSource };
+  return { aiOpen, toggleAi, closeAi, aiInput, setAiInput, aiMessages, askAi, aiLoading, aiSource, aiFallbackReason };
 }
 
 export default useAquaAi;

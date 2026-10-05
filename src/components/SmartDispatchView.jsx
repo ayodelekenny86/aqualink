@@ -13,12 +13,17 @@ import { useMemo, useState } from 'react';
 import { assignDriver, assignSeller } from '../lib/dispatch';
 import { getFleet } from '../lib/fleet';
 import { gallonsForOrder } from '../lib/volume';
-import { askAiQuestion } from '../lib/ai';
+import { askAiQuestion, AI_FALLBACK_REASONS, classifyAiFailure } from '../lib/ai';
 import { formatCedi } from '../lib/money';
 
 /**
  * Run a focused Gemini query about dispatch for a single order.
- * Returns the AI's recommendation text, or null when the server is unreachable.
+ *
+ * Returns the AI's recommendation text, or `null` when the server is unreachable,
+ * along with the classified reason so the notice can name it. "Not available right
+ * now" reads like a transient hiccup; on this deployment the `ai` function is not
+ * deployed at all, and an operator reading that should be told to deploy it rather
+ * than to try again.
  */
 async function getAiDispatchInsight(order, drivers, sellers) {
   try {
@@ -33,9 +38,9 @@ async function getAiDispatchInsight(order, drivers, sellers) {
       orders: [order],
       split: null,
     });
-    return answer;
-  } catch {
-    return null;
+    return { answer, reason: null };
+  } catch (error) {
+    return { answer: null, reason: classifyAiFailure(error) };
   }
 }
 
@@ -73,11 +78,12 @@ export default function SmartDispatchView({ orders, showNotice }) {
 
   const requestInsight = async (order) => {
     setLoading((prev) => ({ ...prev, [order.id]: true }));
-    const insight = await getAiDispatchInsight(order, drivers, sellers);
+    const { answer: insight, reason } = await getAiDispatchInsight(order, drivers, sellers);
     setInsights((prev) => ({ ...prev, [order.id]: insight }));
     setLoading((prev) => ({ ...prev, [order.id]: false }));
     if (!insight) {
-      showNotice('AI dispatch insight is not available right now. Showing the scored recommendation.');
+      const cause = AI_FALLBACK_REASONS[reason] ?? AI_FALLBACK_REASONS.failed;
+      showNotice(`${cause} The scored recommendation below is used instead, and it is computed from real capacity and order data.`);
     }
   };
 

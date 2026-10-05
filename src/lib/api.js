@@ -151,13 +151,18 @@ export async function apiRequest(path, { method = 'GET', body, signal, auth = nu
   try {
     payload = text ? JSON.parse(text) : {};
   } catch {
-    throw new Error('The payments service returned an unreadable response.');
+    throw new Error('The server returned an unreadable response.');
   }
 
   if (!response.ok) {
     // The server's message is written for a customer, so prefer it over anything
     // generic. Fall back only when there is none.
-    const error = new Error(payload.message || `The payments service is unavailable (${response.status}).`);
+    //
+    // The fallback names no service, because this one function is used by every
+    // endpoint in the app. It used to say "payments service" unconditionally, so
+    // the AI panel reported a missing Gemini key as a payments outage and an
+    // operator reading it would go looking in the wrong place.
+    const error = new Error(payload.message || `The server could not complete that request (${response.status}).`);
     error.code = payload.code ?? null;
     error.status = response.status;
     throw error;

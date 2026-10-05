@@ -320,6 +320,67 @@ describe('return URL handling', () => {
 });
 
 describe('receipts', () => {
+  // A real reply from `/payments/verify`, captured from the deployed function.
+  // Note what is absent: there is no `breakdown`. The endpoint reports the amount
+  // the provider took and nothing about how it is split.
+  const SETTLEMENT = {
+    settled: true,
+    status: 'settled',
+    reason: 'payment_confirmed',
+    reference: 'aq1-abc',
+    orderId: 'AQ-1A2B3C',
+    amountMinor: 30000,
+    currency: 'GHS',
+    provider: 'paystack',
+  };
+
+  test('fills the receipt from the order when the settlement carries no split', () => {
+    // This is the call the panel actually makes. It used to pass
+    // `result.breakdown`, which is undefined in production, so every figure fell
+    // through to `?? 0` and the customer's receipt read GH₵0.00 throughout — on
+    // the document they keep, for a payment that had just taken GH₵300.00.
+    const receipt = buildReceipt({ order: ORDER, payment: SETTLEMENT });
+
+    expect(receipt.totalCharged).toBe('GH₵300.00');
+    expect(receipt.orderValue).toBe('GH₵300.00');
+    expect(receipt.sellerShare).toBe('GH₵135.00');
+    expect(receipt.driverShare).toBe('GH₵45.00');
+    expect(receipt.platformShare).toBe('GH₵120.00');
+    expect(receipt.provider).toBe('paystack');
+    // No figure may read as a zero the customer was never charged.
+    for (const value of [receipt.totalCharged, receipt.orderValue, receipt.sellerShare, receipt.driverShare, receipt.platformShare]) {
+      expect(value).not.toBe('GH₵0.00');
+    }
+  });
+
+  test('prefers the amount the settlement says was taken', () => {
+    // If the provider took a different figure from the priced order, the receipt
+    // must show what was actually charged.
+    const receipt = buildReceipt({ order: ORDER, payment: { ...SETTLEMENT, amountMinor: 33000 } });
+    expect(receipt.totalCharged).toBe('GH₵330.00');
+  });
+
+  test('never prints a zero for a figure the server never sent', () => {
+    const receipt = buildReceipt({ order: { id: 'AQ-1', email: 'b@example.com' }, payment: { reference: 'r1' } });
+    expect(receipt.totalCharged).toBeNull();
+    expect(receipt.sellerShare).toBeNull();
+    // And the printed document says so rather than showing a blank or a zero.
+    const html = receiptHtml(receipt);
+    expect(html).toMatch(/Not recorded/);
+    expect(html).not.toMatch(/GH₵0\.00/);
+  });
+
+  test('names the provider that actually took the payment', () => {
+    // Both providers are live at once. The document used to always say Paystack,
+    // so every Flutterwave receipt credited the wrong company.
+    expect(receiptHtml(buildReceipt({ order: ORDER, payment: { ...SETTLEMENT, provider: 'flutterwave' } })))
+      .toMatch(/Payment confirmed by Flutterwave/);
+    expect(receiptHtml(buildReceipt({ order: ORDER, payment: { ...SETTLEMENT, provider: 'paystack' } })))
+      .toMatch(/Payment confirmed by Paystack/);
+    expect(receiptHtml(buildReceipt({ order: ORDER, payment: { ...SETTLEMENT, provider: null } })))
+      .toMatch(/Payment confirmed<\/p>/);
+  });
+
   test('records the server-confirmed breakdown', () => {
     const receipt = buildReceipt({
       order: ORDER,

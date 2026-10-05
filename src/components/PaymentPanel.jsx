@@ -4,6 +4,7 @@ import {
   downloadReceipt,
   initialisePayment,
   listReceipts,
+  receiptCell,
   referenceFromLocation,
   saveReceipt,
   verifyPayment,
@@ -70,7 +71,11 @@ export default function PaymentPanel({ order, onPaid, showNotice }) {
           setNotice(`Payment of ${formatCedi(result.amountMinor ?? 0)} was received for order ${settledId}. Open that order to download its receipt.`);
           return;
         }
-        const built = buildReceipt({ order, payment: result, breakdown: result.breakdown });
+        // `verify` returns the amount the provider took but no revenue split,
+        // so there is no `breakdown` on the response to pass. The order carries
+        // the split the server wrote when it priced the booking, which is where
+        // the receipt's seller, driver and platform lines come from.
+        const built = buildReceipt({ order, payment: result });
         saveReceipt(built);
         setReceipt(built);
         setHistory(listReceipts());
@@ -178,10 +183,13 @@ export default function PaymentPanel({ order, onPaid, showNotice }) {
         <div className="receipt-card" role="status">
           <h3>Receipt {receipt.reference}</h3>
           <dl>
-            <div><dt>Total charged</dt><dd>{receipt.totalCharged}</dd></div>
-            <div><dt>Water seller</dt><dd>{receipt.sellerShare}</dd></div>
-            <div><dt>Driver</dt><dd>{receipt.driverShare}</dd></div>
-            <div><dt>AquaLink</dt><dd>{receipt.platformShare}</dd></div>
+            {/* Same rendering rule as the downloaded document, so the card the
+                customer sees and the file they keep cannot disagree — and an
+                unrecorded figure reads as missing rather than as GH₵0.00. */}
+            <div><dt>Total charged</dt><dd>{receiptCell(receipt.totalCharged)}</dd></div>
+            <div><dt>Water seller</dt><dd>{receiptCell(receipt.sellerShare)}</dd></div>
+            <div><dt>Driver</dt><dd>{receiptCell(receipt.driverShare)}</dd></div>
+            <div><dt>AquaLink</dt><dd>{receiptCell(receipt.platformShare)}</dd></div>
           </dl>
           <button className="outline-button" type="button" onClick={() => downloadReceipt(receipt)}>
             Download receipt ↓
@@ -195,7 +203,7 @@ export default function PaymentPanel({ order, onPaid, showNotice }) {
           <ul>
             {history.slice(0, 5).map((row) => (
               <li key={row.reference}>
-                <span>{row.reference} · {row.totalCharged}</span>
+                <span>{row.reference} · {receiptCell(row.totalCharged)}</span>
                 <button className="text-button" type="button" onClick={() => downloadReceipt(row)}>Download</button>
               </li>
             ))}

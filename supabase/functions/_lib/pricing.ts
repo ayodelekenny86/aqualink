@@ -1,7 +1,8 @@
 /**
  * Pricing logic for Supabase Edge Functions.
  * Mirrors functions/lib/pricing.js and src/lib/money.js exactly.
- * Changes must be applied in all three places; money.test.js pins the values.
+ * Changes must be applied in all three places; `src/lib/pricingContract.test.js`
+ * pins all three against each other.
  */
 
 export const MINOR_UNITS_PER_MAJOR = 100;
@@ -89,6 +90,19 @@ export function allocate(amountMinor: number, split = DEFAULT_SPLIT) {
 
 export function quotePrice(pricing = DEFAULT_PRICING) {
   const { listPrice = 0, discountPercent = 0, surgePercent = 0 } = pricing;
+
+  // These three guards were missing here while the other two copies had them, which
+  // is the drift `pricingContract.test.js` exists to prevent — and this is the copy
+  // that decides what a buyer is actually charged. The write path validates too
+  // (`validatePricingInput`), but the read path merges whatever is in the config row
+  // over the defaults and calls this directly, so a value that got in by any other
+  // route used to produce a negative quote instead of a clear failure.
+  if (!Number.isFinite(listPrice) || listPrice < 0) throw new RangeError('List price cannot be negative.');
+  if (!Number.isFinite(discountPercent) || discountPercent < 0 || discountPercent > 100) {
+    throw new RangeError('Discount must be between 0% and 100%.');
+  }
+  if (!Number.isFinite(surgePercent) || surgePercent < 0) throw new RangeError('Surge cannot be negative.');
+
   const listMinor = toMinor(listPrice);
   const discounted = Math.round((listMinor * (100 - discountPercent)) / 100);
   const surge = Math.round((discounted * surgePercent) / 100);

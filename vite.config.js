@@ -1,6 +1,42 @@
+import { execFileSync } from "node:child_process";
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from 'vite-plugin-pwa';
+
+/**
+ * The commit a bundle was built from, written into `index.html` as a meta tag.
+ *
+ * Without it a stale deployment is indistinguishable from a current one. The
+ * bundle is content-hashed, so the only way to tell is to read the page — and the
+ * failure mode is silent: the app keeps working, just not the app you wrote. A
+ * production URL was found serving a build from 82 commits earlier, complete with
+ * the invented GMV tiles and an admin console that accepted any password, and
+ * nothing in the repo reported it. `npm run verify:live` now reads this tag and
+ * names the commit that is actually live.
+ */
+function buildStamp() {
+  const stamp = { commit: 'unknown', dirty: false, builtAt: new Date().toISOString() };
+  try {
+    stamp.commit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    // A build from a dirty tree is not reproducible from its commit, so the stamp
+    // says so rather than naming a commit the deployed bytes do not match.
+    stamp.dirty = execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim().length > 0;
+  } catch {
+    // Not a git checkout (a CI tarball, a vendor copy). The tag still carries a
+    // build time, so "is this newer than the deploy I made" still has an answer.
+  }
+
+  return {
+    name: 'aqualink-build-stamp',
+    transformIndexHtml(html) {
+      const tag = [
+        `<meta name="aqualink-build" content="${stamp.commit}${stamp.dirty ? '-dirty' : ''}" />`,
+        `<meta name="aqualink-built" content="${stamp.builtAt}" />`,
+      ].join('\n    ');
+      return html.includes('</head>') ? html.replace('</head>', `    ${tag}\n  </head>`) : html;
+    },
+  };
+}
 
 // Where the server is reachable from the dev box. Two backends are supported:
 //
@@ -25,6 +61,7 @@ export default defineConfig(({ mode }) => {
   return {
   plugins: [
     react(),
+    buildStamp(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'robots.txt', 'Octocat.png'],

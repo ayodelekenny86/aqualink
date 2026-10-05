@@ -30,7 +30,8 @@ CLI. If `supabase projects list` reports "Access token not provided", run
 
 ## Check what is actually live
 
-`npm run verify:live` probes the deployed site and every Edge Function, so a
+`npm run verify:live` probes every hosting origin this project uses, the build
+that is actually being served, and every Edge Function, so a stale deploy or a
 missing deploy is reported by name instead of surfacing as a CORS error in the
 browser console.
 
@@ -38,8 +39,34 @@ browser console.
 npm run verify:live
 ```
 
-It exits non-zero and lists each failure. Three failures are expected on a fresh
-deployment and are fixed by the commands below:
+It checks more than "does the site answer 200", because a deployment can answer
+200 and still be wrong. Four of its checks are about content rather than
+availability:
+
+| Check | What it catches |
+| --- | --- |
+| `the live build matches this checkout` | A deployment serving an old commit. Every build stamps its commit into `index.html` as `aqualink-build`, so a bundle from a month ago is reported as such |
+| `the served bundle contains no fabricated claims` | A build from before the honesty work, still showing invented GMV, an escrow balance and a fixed persona on a live URL |
+| `the served bundle is built against the server` | A build with no API origin in it, which cannot price an order or take a payment |
+| `a CSP is set` | An origin serving the app with no Content-Security-Policy at all |
+
+It also probes **every client route**, read out of the ROUTES table in
+`src/lib/api.js` rather than a copy of it kept beside the checker. That copy had
+drifted and was missing six of the twenty routes, and a per-function check could
+not have caught a missing action anyway: `orders/create` answering 405 proves
+`orders` is deployed, not that `orders/verify` exists.
+
+It exits non-zero and lists each failure, prefixed with the host it came from. Set
+`AQUALINK_SITE_URLS` to a comma-separated list to check origins beyond the two
+defaults (`aqualinkgh1.vercel.app` and `viviluxy-assistant.web.app`).
+
+Deploying to Vercel needs no extra config: `vercel.json` carries the same security
+headers as `firebase.json`, plus the SPA rewrite. `scripts/verifyLive.test.js`
+asserts the two header sets stay identical, because a header present on one origin
+and not the other leaves that deployment unprotected while looking the same.
+
+Three failures are expected on a fresh deployment and are fixed by the commands
+below:
 
 | Failure | Cause | Fix |
 | --- | --- | --- |
@@ -48,9 +75,21 @@ deployment and are fixed by the commands below:
 | `ai/chat has a usable key` | `GEMINI_API_KEY` is unset, so the function answers 503 | `supabase secrets set GEMINI_API_KEY=…` |
 
 The last one is not cosmetic. Without the key the AI panel does not fail loudly:
-`useAquaAi` catches the 503 and falls back to the local keyword matcher, so the
-assistant keeps answering while every reply is the offline one. The panel header
-shows which answered, but only after you look for it.
+`useAquaAi` falls back to the local matcher so the assistant keeps answering, and
+on an undeployed server *every* answer is a local one. The panel therefore names
+the reason it fell back — "not deployed", "no AI key set", or "this device could
+not reach the server" — instead of showing a badge that reads like a deliberate
+mode. `classifyAiFailure` in `src/lib/ai.js` is what distinguishes them, and
+`src/lib/ai.test.jsx` pins each case.
+
+Deploying the two missing functions is what removes the condition entirely:
+
+```sh
+supabase login
+supabase functions deploy ai notifications
+supabase secrets set GEMINI_API_KEY=your-key
+npm run verify:live
+```
 
 ## Finishing the current deployment
 
@@ -115,6 +154,26 @@ There is no escrow and no pending-payout queue. Paystack collects money
 directly into the AquaLink account, so confirming delivery marks an order
 delivered and records that the seller payout is handled separately by
 operations.
+
+## One price rule, three copies of the arithmetic
+
+The buyer's price is computed in three places on purpose: `src/lib/money.js`
+runs in the browser, `functions/lib/pricing.js` runs on the Firebase functions,
+and `supabase/functions/_lib/pricing.ts` runs on the Supabase Edge Functions that
+do the actual charging. They are separate files because a modified browser must
+not be able to decide what someone is charged.
+
+They are therefore pinned against each other in
+`src/lib/pricingContract.test.js`, to the pesewa. The Supabase copy was outside
+that test and had already drifted — its `quotePrice` had lost the three range
+guards the other two keep — so the one copy nobody tested was the one charging
+money. If you change an allocation or validation rule, change it in all three and
+let the test tell you which one you missed.
+
+Price is flat per delivery and does not scale with volume. `volumeLitres` is
+accepted and stored, but it is deliberately not part of the arithmetic: the rule
+is "the customer pays GH¢300, inclusive of the 50% discount". Per-litre pricing
+would be a change to that rule, not a bug fix.
 
 ## Reliability scoring
 

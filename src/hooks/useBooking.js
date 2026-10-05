@@ -5,7 +5,7 @@ import { assignDriver, assignSeller } from '../lib/dispatch';
 import { getFleet, recordAssignment, seedFleet } from '../lib/fleet';
 import { createOrder, toServerOrderRow } from '../lib/payments';
 import { allocate, formatCedi, DEFAULT_PRICING, DEFAULT_SPLIT, quotePrice } from '../lib/money';
-import { supabase, supabaseUrl, anonKey } from '../lib/supabase';
+import { supabase, supabaseUrl, anonKey, writeResult } from '../lib/supabase';
 import { gallonsFromLabel, litresFromLabel } from '../lib/volume';
 
 const toLitres = litresFromLabel;
@@ -235,15 +235,20 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
         // `try/catch` around it catches nothing. A rejected PostgREST statement
         // used to leave the app printing "Booking confirmed" while nothing had
         // been written. Inspect the result instead of trusting it.
+        //
+        // Awaited outside the ternary so this reads the same as every other write
+        // in this file — one `writeResult` call per write, no exceptions to
+        // remember. `src/honesty.test.jsx` enforces that shape.
         const result = writtenByServer
           // Update the row the server created rather than inserting a second one:
           // the panel, the ops queue and summary.js all read the collection
           // directly, so a duplicate booking counted twice and carried a
           // different id, which meant marking it paid never reached the order the
           // Paystack reference was on.
-          ? await supabase.from('orders').update(toServerOrderRow(serverOrder)).eq('id', reference)
-          : await supabase.from('orders').insert(toServerOrderRow(serverOrder));
-        if (result?.error) throw new Error(result.error.message);
+          ? supabase.from('orders').update(toServerOrderRow(serverOrder)).eq('id', reference)
+          : supabase.from('orders').insert(toServerOrderRow(serverOrder));
+        const written = writeResult(await result);
+        if (!written.ok) throw new Error(written.error.message);
       } catch (err) {
         console.error('Failed to write order to Supabase:', err);
         synced = false;
@@ -310,17 +315,30 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
     if (status === 'Picked Up') updates.pickedUpAt = now;
     if (status === 'En Route') updates.enRouteAt = now;
     if (status === 'Delivered') updates.deliveredAt = now;
-    if (USE_SERVER && supabase) {
+if (USE_SERVER && supabase) {
       try {
-        await supabase.from('orders').update(updates).eq('id', orderId);
+        // The `catch` here only ever caught a request that never left the device.
+        // A statement PostgREST refused resolved normally, so a rejected status
+        // change left the order exactly as it was while the notice below said it
+        // had moved. Both cases now fall through to the same place: the local copy
+        // is corrected and the user is told the change was not saved.
+        const written = writeResult(await supabase.from('orders').update(updates).eq('id', orderId));
+        if (!written.ok) {
+          console.error('Failed to update order status:', written.error);
+          commit((items) => items.map((item) => (item.id === orderId ? { ...item, ...updates } : item)));
+          onNotice(`${orderId} could not be saved to the server: ${written.error.message}`);
+          return { ok: false, reason: 'write-rejected', error: written.error };
+        }
       } catch (err) {
         console.error('Failed to update order status:', err);
         commit((items) => items.map((item) => (item.id === orderId ? { ...item, ...updates } : item)));
+        onNotice(`${orderId} could not be saved to the server: ${err.message}`);
+        return { ok: false, reason: 'write-failed', error: { message: err.message } };
       }
     } else {
       commit((items) => items.map((item) => (item.id === orderId ? { ...item, ...updates } : item)));
     }
-    onNotice(`Order ${orderId} is now ${status.toLowerCase()}.`);
+    onNotice(`Order ${orderId} is now ${String(status).toLowerCase()}.`);
     const order = orders.find((item) => item.id === orderId);
     notify?.({
       role: 'buyer',
@@ -356,7 +374,11 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
       onNotice(`${orderId} has already been claimed by another driver.`);
       return { ok: false, reason: 'already-claimed' };
     }
-    await updateOrderStatus(orderId, 'Assigned', notify);
+    // The result is passed through rather than assumed. This returned `{ ok: true }`
+    // unconditionally, so a driver whose claim the server refused was told the job
+    // was theirs and drove to an address with nothing waiting for it.
+    const claimed = await updateOrderStatus(orderId, 'Assigned', notify);
+    if (!claimed.ok) return claimed;
     return { ok: true };
   }, [orders, onNotice, updateOrderStatus]);
 
@@ -381,9 +403,18 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
     };
     if (USE_SERVER && supabase) {
       try {
-        await supabase.from('orders').update(updates).eq('id', orderId);
+        const written = writeResult(await supabase.from('orders').update(updates).eq('id', orderId));
+        if (!written.ok) {
+          console.error('Failed to release driver job:', written.error);
+          // The unconditional `commit` below still corrects the local copy, so the
+          // only thing missing is the server agreeing with it.
+          onNotice(`${orderId} returned to the available feed on this device, but the server rejected the change.`);
+          return { ok: false, reason: 'write-rejected', error: written.error };
+        }
       } catch (err) {
         console.error('Failed to release driver job:', err);
+        onNotice(`${orderId} returned to the available feed on this device, but the server was unreachable.`);
+        return { ok: false, reason: 'write-failed', error: { message: err.message } };
       }
     }
     commit((items) => items.map((item) => (item.id === orderId ? { ...item, ...updates } : item)));
@@ -396,16 +427,24 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
     const updates = { confirmCode: code, updatedAt: new Date().toISOString() };
     if (USE_SERVER && supabase) {
       try {
-        await supabase.from('orders').update(updates).eq('id', orderId);
+        const written = writeResult(await supabase.from('orders').update(updates).eq('id', orderId));
+        if (!written.ok) {
+          console.error('Failed to issue delivery code:', written.error);
+          commit((items) => items.map((item) => (item.id === orderId ? { ...item, confirmCode: code } : item)));
+          onNotice(`The server rejected delivery code ${code} for ${orderId}. The code below works on this device only.`);
+          return { ok: false, reason: 'write-rejected', code, error: written.error };
+        }
       } catch (err) {
         console.error('Failed to issue delivery code:', err);
         commit((items) => items.map((item) => (item.id === orderId ? { ...item, confirmCode: code } : item)));
+        onNotice(`Delivery code ${code} works on this device only; the server was unreachable.`);
+        return { ok: false, reason: 'write-failed', code, error: { message: err.message } };
       }
     } else {
       commit((items) => items.map((item) => (item.id === orderId ? { ...item, confirmCode: code } : item)));
     }
     onNotice(`Delivery code ${code} issued for ${orderId}. Share it with the buyer at handover.`);
-    return code;
+    return { ok: true, code };
   }, [onNotice, commit]);
 
   const confirmDelivery = useCallback(async (orderId, code) => {
@@ -422,19 +461,28 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
       confirmCode: '',
       updatedAt: new Date().toISOString(),
     };
+    const localDelivery = { status: 'Delivered', payment: 'Delivered · awaiting seller payout', confirmCode: '' };
     if (USE_SERVER && supabase) {
       try {
-        await supabase.from('orders').update(updates).eq('id', orderId);
+        // This is the write that matters most and the one the `catch` missed. A
+        // delivery the database refused left the order on "En Route" forever while
+        // the buyer was told it was confirmed — and the buyer had already handed
+        // over the water and the code.
+        const written = writeResult(await supabase.from('orders').update(updates).eq('id', orderId));
+        if (!written.ok) {
+          console.error('Failed to confirm delivery:', written.error);
+          commit((items) => items.map((item) => (item.id === orderId ? { ...item, ...localDelivery } : item)));
+          onNotice(`Delivery confirmed on this device only. The server rejected it: ${written.error.message} Operations need to record it manually.`);
+          return { ok: false, reason: 'write-rejected', error: written.error };
+        }
       } catch (err) {
         console.error('Failed to confirm delivery:', err);
-        commit((items) => items.map((item) => (item.id === orderId
-          ? { ...item, status: 'Delivered', payment: 'Delivered · awaiting seller payout', confirmCode: '' }
-          : item)));
+        commit((items) => items.map((item) => (item.id === orderId ? { ...item, ...localDelivery } : item)));
+        onNotice(`Delivery confirmed on this device only. The server was unreachable, so operations need to record it manually.`);
+        return { ok: false, reason: 'write-failed', error: { message: err.message } };
       }
     } else {
-      commit((items) => items.map((item) => (item.id === orderId
-        ? { ...item, status: 'Delivered', payment: 'Delivered · awaiting seller payout', confirmCode: '' }
-        : item)));
+      commit((items) => items.map((item) => (item.id === orderId ? { ...item, ...localDelivery } : item)));
     }
     onNotice(`Delivery confirmed for ${orderId}. Seller payout is handled separately by operations.`);
     return { ok: true };

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { list, insert, update, replaceAll } from '../lib/collections';
-import { supabase, supabaseUrl, anonKey } from '../lib/supabase';
+import { supabase, supabaseUrl, anonKey, writeResult } from '../lib/supabase';
 
 const USE_SERVER = typeof window !== 'undefined' && !!supabaseUrl && !!anonKey;
 
@@ -107,20 +107,37 @@ export default function useNotifications() {
     refresh();
 
     if (USE_SERVER && supabase) {
+      // There is no sync queue. A write that does not land here is lost, and the
+      // only trace is the local copy on this device — so the other device, which
+      // is the one that needed telling, never hears about it.
+      //
+      // The comment here used to say "Offline write will sync when the connection
+      // returns", which described a retry that has never existed. Worse, the
+      // `try/catch` around it caught nothing: `insert` resolves with `{ error }`
+      // when the row is refused, so a notification that reached nobody was
+      // reported as sent.
       try {
-        await supabase.from('notifications').insert({
+        const written = writeResult(await supabase.from('notifications').insert({
           role,
           title,
           body: body ?? '',
           order_id: orderId,
           kind,
           read: false,
-        });
-      } catch {
-        // Offline write will sync when the connection returns.
+        }));
+        if (!written.ok) {
+          console.error('Failed to publish notification:', written.error);
+          return { ...row, delivered: false, error: written.error };
+        }
+      } catch (err) {
+        console.error('Failed to publish notification:', err);
+        return { ...row, delivered: false, error: { message: String(err.message || err) } };
       }
+      return { ...row, delivered: true };
     }
-    return row;
+    // No server configured, so there is nothing to deliver to. Reported as such
+    // rather than as a sent notification.
+    return { ...row, delivered: false, error: { message: 'No notification server is configured for this deployment.' } };
   }, [refresh]);
 
   const markRead = useCallback((id) => {

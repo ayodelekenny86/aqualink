@@ -237,16 +237,37 @@ export function saveReceipt(receipt) {
  *
  * There is no `simulated` flag any more because there is no simulated result to
  * flag. A receipt is only ever built from `settled: true`.
+ *
+ * Where the figures come from, and why `breakdown` is not the whole answer:
+ *
+ * `/payments/verify` returns the amount the provider actually took
+ * (`amountMinor`) but **no revenue split**. The panel passed `result.breakdown`,
+ * which was therefore always `undefined` in production, so every figure below
+ * fell through to `?? 0` and the customer's receipt read GH₵0.00 for the order
+ * value, the total charged, and all three shares — on a document they keep, for
+ * a payment that had just taken GH₵300.00. The tests passed because they handed
+ * `buildReceipt` a hand-written breakdown the server never sends.
+ *
+ * Nothing is re-derived here. The split is what the server wrote onto the order
+ * when it priced the booking, and the total is what the settlement reports it
+ * took. Where neither is known the figure is left unstated rather than shown as
+ * a confident zero.
  */
 export function buildReceipt({ order, payment, breakdown, issuedAt = new Date().toISOString() }) {
-  // The total is whatever the server says was charged, never re-derived here.
-  // Re-deriving it is how a receipt once understated GH¢330.00 as GH¢300.00 and
-  // quietly dropped the fee line. With the default plan the two agree, because
-  // the customer pays the discounted price inclusive, but the receipt must still
-  // report the charged figure rather than recomputing one.
-  const grossMinor = breakdown?.grossMinor ?? 0;
-  const buyerServiceCharge = breakdown?.buyerServiceCharge ?? 0;
-  const totalChargedMinor = breakdown?.buyerPays ?? breakdown?.chargedMinor ?? grossMinor + buyerServiceCharge;
+  const source = breakdown ?? order ?? {};
+
+  // The order value is what the server priced, before any service charge. It is
+  // reported separately so a receipt cannot present the discounted total as the
+  // whole bill — which is how a receipt once understated GH¢330.00 as GH₵300.00.
+  const grossMinor = source.grossMinor;
+  const buyerServiceCharge = source.buyerServiceCharge ?? 0;
+
+  // What the settlement says was taken wins; the priced figure is the fallback.
+  const settledMinor = Number.isFinite(payment?.amountMinor) ? payment.amountMinor : undefined;
+  const totalChargedMinor = settledMinor ?? source.buyerPays ?? source.chargedMinor
+    ?? (Number.isFinite(grossMinor) ? grossMinor + buyerServiceCharge : undefined);
+
+  const line = (minor) => (Number.isFinite(minor) ? formatCedi(minor) : null);
 
   return {
     reference: payment.reference ?? order.code ?? order.id,
@@ -256,14 +277,15 @@ export function buildReceipt({ order, payment, breakdown, issuedAt = new Date().
     paidAt: payment.paidAt ?? null,
     accountName: order.email ?? '',
     currency: payment.currency ?? 'GHS',
-    orderValue: formatCedi(grossMinor),
+    provider: payment.provider ?? null,
+    orderValue: line(grossMinor),
     // Omitted when there is no charge, so a receipt does not itemise a
     // GH₵0.00 fee the customer was never billed.
     ...(buyerServiceCharge > 0 ? { serviceCharge: formatCedi(buyerServiceCharge) } : {}),
-    totalCharged: formatCedi(totalChargedMinor),
-    sellerShare: formatCedi(breakdown?.sellerReceives ?? 0),
-    driverShare: formatCedi(breakdown?.driverReceives ?? 0),
-    platformShare: formatCedi(breakdown?.platformCommission ?? 0),
+    totalCharged: line(totalChargedMinor),
+    sellerShare: line(source.sellerReceives),
+    driverShare: line(source.driverReceives),
+    platformShare: line(source.platformCommission),
     location: order.location ?? '',
     volume: order.volumeLitres ? `${order.volumeLitres} litres` : '',
   };
@@ -275,29 +297,54 @@ function escapeHtml(value) {
   }[char]));
 }
 
+/** What a receipt says about a figure the server never sent. */
+export const NOT_RECORDED = 'Not recorded';
+
+/**
+ * Render one receipt value for display, on screen or in the document.
+ *
+ * `buildReceipt` leaves an unknown figure null instead of defaulting it, because
+ * a receipt reading GH₵0.00 for a settled payment is worse than one admitting the
+ * figure is missing. Both places that show a receipt then print this instead of
+ * a blank cell, so the on-screen card and the downloaded document cannot disagree
+ * about what was and was not recorded.
+ */
+export function receiptCell(value) {
+  return value === null || value === undefined || value === '' ? NOT_RECORDED : String(value);
+}
+
 /**
  * Render a receipt as a self-contained HTML document for download and print.
  * Every value is escaped, so a customer-supplied address cannot inject markup
  * into the downloaded file.
  */
 export function receiptHtml(receipt) {
+  const cell = receiptCell;
+
   const rows = [
-    ['Order reference', receipt.reference],
-    ['Order number', receipt.orderId],
-    ['Issued', new Date(receipt.issuedAt).toLocaleString('en-GB')],
-    ['Location', receipt.location],
-    ['Volume', receipt.volume],
-    ['Paid to', receipt.accountName],
-    ['Order value', receipt.orderValue],
+    ['Order reference', cell(receipt.reference)],
+    ['Order number', cell(receipt.orderId)],
+    ['Issued', cell(new Date(receipt.issuedAt).toLocaleString('en-GB'))],
+    ['Location', cell(receipt.location)],
+    ['Volume', cell(receipt.volume)],
+    ['Paid to', cell(receipt.accountName)],
+    ['Order value', cell(receipt.orderValue)],
     // Only present when a charge was actually applied, matching `buildReceipt`.
     // Emitting the row unconditionally would print an empty or `undefined`
     // service charge on a receipt for a plan that charges none.
     ...(receipt.serviceCharge ? [['Service charge', receipt.serviceCharge]] : []),
-    ['Total charged', receipt.totalCharged],
-    ['Water seller share', receipt.sellerShare],
-    ['Driver share', receipt.driverShare],
-    ['AquaLink share', receipt.platformShare],
+    ['Water seller share', cell(receipt.sellerShare)],
+    ['Driver share', cell(receipt.driverShare)],
+    ['AquaLink share', cell(receipt.platformShare)],
   ];
+
+  // Both providers are live at once, behind their own keys, so naming Paystack
+  // unconditionally credited the wrong one on every Flutterwave receipt.
+  const provider = receipt.provider === 'flutterwave'
+    ? 'Flutterwave'
+    : receipt.provider === 'paystack'
+      ? 'Paystack'
+      : null;
 
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -318,9 +365,9 @@ export function receiptHtml(receipt) {
 </style></head>
 <body><div class="card">
 <h1>AquaLink receipt</h1>
-<p class="sub">Payment confirmed by Paystack</p>
+<p class="sub">${provider ? `Payment confirmed by ${provider}` : 'Payment confirmed'}</p>
 <table>${rows.map(([label, value]) => `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(value)}</td></tr>`).join('')}
-<tr class="total"><td>Total charged</td><td>${escapeHtml(receipt.totalCharged)}</td></tr></table>
+<tr class="total"><td>Total charged</td><td>${escapeHtml(cell(receipt.totalCharged))}</td></tr></table>
 <p class="foot">AquaLink · water delivery coordination</p>
 </div></body></html>`;
 }

@@ -129,7 +129,68 @@ const GROUPS = [
       { label: 'hardcoded signed-in city', pattern: /Accra, Ghana/ },
     ],
   },
+  {
+    // The `ai` function is not deployed on this server, so every answer the Aqua
+    // panel gives today comes from the local matcher. The panel used to call that
+    // an offline condition, which is false: the device is online and the server has
+    // no AI on it. A reader told their device is offline stops looking for the real
+    // cause, which is a deploy or a missing key.
+    name: 'a fallback attributed to the wrong cause',
+    file: APP,
+    claims: [
+      { label: 'offline-only fallback claim', pattern: /local rules when offline/i },
+      { label: 'offline-only AI claim', pattern: /Gemini[^\n]*only[^\n]*offline/i },
+    ],
+  },
 ];
+
+/**
+ * Writes whose result is thrown away.
+ *
+ * `supabase-js` resolves with `{ error }` and does not reject when the database
+ * refuses a statement, so `try/catch` around a write catches network failures and
+ * nothing else. Every write that inferred success from an un-thrown catch was
+ * reporting a change that had not been saved — the worst being a delivery the
+ * buyer was told was confirmed while the order stayed on En Route.
+ *
+ * `writeResult` in `src/lib/supabase.js` is the one place that tells the two cases
+ * apart, and these check every write in the two hooks that decide something a user
+ * is told about still goes through it.
+ *
+ * The negative lookbehind is the point of the pattern: without it it would match
+ * the `await` inside `writeResult(await supabase...)`, which is the correct form.
+ */
+describe('no write reports success without checking what the server said', () => {
+  const HOOKS = ['src/hooks/useBooking.js', 'src/hooks/useNotifications.js'];
+  const UNCHECKED = /(?<!writeResult\()await supabase\.from\([^)]*\)\.(?:update|insert|delete)\(/;
+
+  for (const file of HOOKS) {
+    test(`every Supabase write in ${file} inspects its result`, async () => {
+      const source = await readFile(file, 'utf8');
+      expect(`${file} -> ${visible(source, UNCHECKED).length} unchecked`).toBe(`${file} -> 0 unchecked`);
+    });
+  }
+
+  test('the helper that does the checking exists and is used', async () => {
+    const helper = await readFile('src/lib/supabase.js', 'utf8');
+    expect(helper).toMatch(/export function writeResult/);
+
+    // A helper nothing calls is not a check. Five writes in useBooking (booking,
+    // status change, release, delivery code, delivery confirmation) and one in
+    // useNotifications.
+    const booking = await readFile('src/hooks/useBooking.js', 'utf8');
+    expect(booking.match(/writeResult\(/g) ?? []).toHaveLength(5);
+    const notifications = await readFile('src/hooks/useNotifications.js', 'utf8');
+    expect(notifications.match(/writeResult\(/g) ?? []).toHaveLength(1);
+  });
+
+  test('no write promises a retry that does not exist', async () => {
+    // There is no sync queue behind these writes, so "will sync when the
+    // connection returns" describes a recovery that has never existed.
+    const source = await readFile('src/hooks/useNotifications.js', 'utf8');
+    expect(visible(source, /will sync when/i)).toHaveLength(0);
+  });
+});
 
 for (const group of GROUPS) {
   const files = group.files ?? [group.file];

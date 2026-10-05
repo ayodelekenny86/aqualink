@@ -50,16 +50,26 @@ export function useSellerDashboard({ sellerProfile, orders, onNotice, updateOrde
 
   // Mark job as en route (seller confirms driver has left)
   const startJob = useCallback(async (orderId) => {
-    await updateOrderStatus(orderId, 'En Route', (n) => onNotice(n));
+    // The result decides the message. `updateOrderStatus` reports a rejected write,
+    // and announcing a dispatch that was never recorded is the same failure in a
+    // different place: the seller believes the driver is moving and the buyer is
+    // still waiting.
+    const moved = await updateOrderStatus(orderId, 'En Route', (n) => onNotice(n));
+    if (!moved.ok) return moved;
     onNotice(`Driver dispatched for ${orderId}.`);
+    return moved;
   }, [updateOrderStatus, onNotice]);
 
   // Complete job with delivery code
   const completeJob = useCallback(async (orderId) => {
-    const code = await issueDeliveryCode(orderId);
-    await updateOrderStatus(orderId, 'Delivered', (n) => onNotice(n));
-    onNotice(`Delivery code ${code} issued for ${orderId}. Share with buyer at handover.`);
-    return code;
+    // `issueDeliveryCode` returns a result rather than a bare code, so a code the
+    // server refused is not announced as one the buyer can use.
+    const issued = await issueDeliveryCode(orderId);
+    if (!issued.ok) return issued;
+    const delivered = await updateOrderStatus(orderId, 'Delivered', (n) => onNotice(n));
+    if (!delivered.ok) return { ...delivered, code: issued.code };
+    onNotice(`Delivery code ${issued.code} issued for ${orderId}. Share with buyer at handover.`);
+    return { ...delivered, code: issued.code };
   }, [issueDeliveryCode, updateOrderStatus, onNotice]);
 
   // Get assigned driver for an order
