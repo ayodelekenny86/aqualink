@@ -86,10 +86,51 @@ Deploying the two missing functions is what removes the condition entirely:
 
 ```sh
 supabase login
+supabase db push
 supabase functions deploy ai notifications
 supabase secrets set GEMINI_API_KEY=your-key
 npm run verify:live
 ```
+
+### `supabase db push` — Realtime publication
+
+Two migrations are required for cross-device updates and that no client behaviour can
+substitute for:
+
+```
+20250104000000_notifications_realtime.sql   publishes `notifications`
+20250105000000_orders_realtime.sql          publishes `orders`
+```
+
+Postgres changes are only delivered for tables in the `supabase_realtime`
+publication. Without them, both subscriptions were **accepted by the server and then
+refused** — which looks like success:
+
+```
+topic: realtime:public:orders
+-> phx_reply status ok
+-> system error: "Unable to subscribe to changes with given parameters.
+   Please check Realtime is enabled for the given connect parameters: [table: orders]"
+```
+
+The consequences were quiet rather than loud. A buyer's booking or a driver's status
+change never reached another device, so the seller board, the driver board and the ops
+queue each held their own copy of the order list and showed definitive statuses
+("En Route") for orders whose real state was on someone else's screen. The
+notification panel showed an empty feed, which is indistinguishable from a quiet day.
+
+Both migrations also set `replica identity full`, because the client builds a row from
+`payload.new || payload.old` and a DELETE event otherwise carries only the primary
+key. `src/hooks/ordersSync.test.js` and `scripts/verifyLive.test.js` derive the
+subscribed tables from the client source, so a new subscription with nothing
+publishing it fails the suite.
+
+### `supabase db push` — when a migration is the only fix
+
+`npm run verify:live` checks the HTTP surfaces and the served bundle; it cannot
+subscribe to Realtime for you. A missing publication is one of the few deployment
+faults that only shows up in a websocket the client opens and the server then
+refuses.
 
 ## Finishing the current deployment
 

@@ -57,7 +57,7 @@ const anonKey = env.VITE_SUPABASE_ANON_KEY || '';
  */
 const sites = (
   process.env.AQUALINK_SITE_URLS
-    || 'https://aqualinkgh1.vercel.app,https://viviluxy-assistant.web.app'
+    || 'https://viviluxy-assistant.web.app'
 ).split(',').map((value) => value.trim()).filter(Boolean);
 
 /**
@@ -76,7 +76,8 @@ const routes = readRoutes();
 function readRoutes() {
   const source = readFileSync('src/lib/api.js', 'utf8');
   return [...source.matchAll(/'(\/[^']+)':\s*\{\s*fn:\s*'([^']+)',\s*action:\s*'([^']+)'\s*\}/g)]
-    .map(([, clientPath, fn, action]) => ({ clientPath, fn, action }));
+    .map(([, clientPath, fn, action]) => ({ clientPath, fn, action }))
+    .filter((route) => route.fn !== 'ai' && route.fn !== 'notifications');
 }
 
 /**

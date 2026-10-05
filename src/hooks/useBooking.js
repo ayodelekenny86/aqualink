@@ -20,6 +20,16 @@ const initialSavedAddresses = [];
 const USE_SERVER = typeof window !== 'undefined' && !!supabaseUrl && !!anonKey;
 
 /**
+ * How long to wait for Realtime to confirm the orders subscription before deciding
+ * it never will.
+ *
+ * Long enough for a normal handshake over a slow connection, short enough that a
+ * socket which is simply never going to answer does not leave the app loading.
+ * Exported so a test can use a real deadline rather than mocking timers.
+ */
+export const ORDER_SYNC_TIMEOUT_MS = 10000;
+
+/**
  * Build a server-shaped order from the client's own pricing, for the offline
  * fallback.
  *
@@ -115,16 +125,43 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
           return next;
         });
         setLoading(false);
-      })
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') setLoading(false);
-        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          setError('Could not sync orders in real time.');
-          setLoading(false);
-        }
       });
 
-    return () => { try { supabase.removeChannel(channel); } catch {} };
+    // Every outcome other than a confirmed subscription is a failure, and the
+    // loading flag is cleared on all of them.
+    //
+    // This used to clear on `SUBSCRIBED`, `CHANNEL_ERROR` and `TIMED_OUT` only. A
+    // table missing from the `supabase_realtime` publication produces a *different*
+    // sequence: the server replies to the join with `ok` and then, separately,
+    // refuses it with "Unable to subscribe to changes". So the status that arrives
+    // is not one this hook listed, and whether it arrived at all depended on the
+    // client library mapping a post-join rejection onto `CHANNEL_ERROR`. It does —
+    // but relying on that is how a refused subscription ends up as an app stuck on a
+    // loading state, which is the failure this whole branch exists to report.
+    const failed = (reason) => {
+      setError('Could not sync orders in real time.');
+      setLoading(false);
+      return reason;
+    };
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        setError(null);
+        setLoading(false);
+        return;
+      }
+      failed(status);
+    });
+
+    // A subscription that never reports anything at all — a socket blocked by the
+    // CSP, a captive portal, a tab suspended — leaves the app loading indefinitely.
+    // Bounded, because a loading state that cannot end is worse than a stale one:
+    // it tells the user the app is working when it is not.
+    const deadline = setTimeout(() => failed('timeout'), ORDER_SYNC_TIMEOUT_MS);
+
+    return () => {
+      clearTimeout(deadline);
+      try { supabase.removeChannel(channel); } catch {}
+    };
   }, []);
 
   const updateBooking = useCallback((event) => {

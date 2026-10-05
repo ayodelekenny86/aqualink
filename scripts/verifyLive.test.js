@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 
 /**
  * The deployment checks are only worth running if they would actually fail on a
@@ -106,6 +106,33 @@ test('the route list is read from the app, not copied beside it', async () => {
   const api = await readFile('src/lib/api.js', 'utf8');
   const routeCount = [...api.matchAll(/'(\/[^']+)':\s*\{\s*fn:/g)].length;
   expect(routeCount).toBeGreaterThan(15);
+});
+
+test('every table the client subscribes to is published for Realtime', async () => {
+  // Postgres changes are only delivered for tables in the `supabase_realtime`
+  // publication, and the failure is deceptive: the server replies to the join with
+  // `ok` and *then* refuses it. An unpublished table therefore looks subscribed.
+  //
+  // Both were confirmed refused against this project and both now have a migration.
+  // This test derives the tables from the client rather than listing them, because a
+  // new subscription with nothing publishing it is exactly how the first two
+  // happened.
+  const subscribed = new Set();
+  for (const file of ['src/hooks/useBooking.js', 'src/hooks/useNotifications.js']) {
+    const source = await readFile(file, 'utf8');
+    for (const match of source.matchAll(/table:\s*'([^']+)'/g)) subscribed.add(match[1]);
+  }
+  expect(subscribed.size).toBeGreaterThanOrEqual(2);
+
+  const migrations = await Promise.all(
+    (await readdir('supabase/migrations'))
+      .map((name) => readFile(`supabase/migrations/${name}`, 'utf8')),
+  );
+  for (const table of subscribed) {
+    expect(
+      `${table} => ${migrations.some((m) => m.includes(`add table public.${table}`)) ? 'published' : 'MISSING'}`,
+    ).toBe(`${table} => published`);
+  }
 });
 
 test('the notifications table is published for Realtime', async () => {
