@@ -4,6 +4,9 @@ import { languages, translations } from './data/translations';
 import useAuth from './hooks/useAuth';
 import useBooking from './hooks/useBooking';
 import useReports from './hooks/useReports';
+import useAquaAi, { aiQuickActions } from './hooks/useAquaAi';
+import useNotifications from './hooks/useNotifications';
+import { usePushNotifications, useFCMTokenSync } from './hooks/usePushNotifications';
 import useLoyalty from './hooks/useLoyalty';
 import useSellerPerformance from './hooks/useSellerPerformance';
 import { formatPhoneForDisplay, normalizePhone } from './lib/accounts';
@@ -30,6 +33,8 @@ const AdminPricingConsole = lazy(() => import('./components/AdminPricingConsole'
 const SellerApprovalQueue = lazy(() => import('./components/SellerApprovalQueue'));
 const PaymentPanel = lazy(() => import('./components/PaymentPanel'));
 const OrderDetailModal = lazy(() => import('./components/OrderDetailModal'));
+const NotificationsPanel = lazy(() => import('./components/NotificationsPanel'));
+const SmartDispatchView = lazy(() => import('./components/SmartDispatchView'));
 
 const roles = [
   ['buyer', 'Buyer app', 'Book reliable water'],
@@ -159,11 +164,26 @@ function App() {
   const { pricing, split, publish, apply } = useAdminPricing({ onNotice: showNotice });
 
   const {
+    forRole, unreadCount, notify, markRead, markAllRead, sync: notificationSync,
+  } = useNotifications();
+
+  const { requestPermission } = usePushNotifications();
+  const userIdentifier = session?.identifier || email;
+  useFCMTokenSync(userIdentifier);
+
+  // Request push notification permission when user is authenticated
+  useEffect(() => {
+    if (ready && (buyerAuthenticated || sellerAuthenticated || adminAuthenticated)) {
+      requestPermission().catch(() => {});
+    }
+  }, [ready, buyerAuthenticated, sellerAuthenticated, adminAuthenticated, requestPermission]);
+
+  const {
     orders, booking, updateBooking, requestDelivery, repeatBooking,
     savedAddresses, setSavedAddresses, driverUpdate, refreshDriverUpdate,
     updateOrderStatus, issueDeliveryCode, confirmDelivery, requestRefund,
     acceptDriverJob, releaseDriverJob,
-  } = useBooking({ email, buyerPhone: session?.identifier ?? '', onNotice: showNotice, notify: () => {} });
+  } = useBooking({ email, buyerPhone: session?.identifier ?? '', onNotice: showNotice, notify });
 
   const { downloadReport } = useReports({ region, orders, onNotice: showNotice });
 
@@ -186,6 +206,22 @@ function App() {
   // labelled as an estimate; where timing is unrecorded it says so.
   const reliabilityRanked = rankReliability(orders);
   const reliabilitySummaryData = reliabilitySummary(orders);
+
+  const { aiOpen, toggleAi, closeAi, aiInput, setAiInput, aiMessages, askAi, aiLoading, aiSource, aiFallbackReason } = useAquaAi({
+    language,
+    role,
+    orders,
+    split,
+    sellerScores: sellerRanked,
+    reliabilityScores: reliabilityRanked,
+    buyerId: buyerIdentifier,
+  });
+
+  const roleNotifications = forRole(role);
+  const roleUnread = unreadCount(role);
+
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [detailOrderId, setDetailOrderId] = useState(null);
 
   // The driver workspace resolves the signed-in account against the fleet
   // roster by phone number, so the driver's jobs are the ones dispatch actually
@@ -313,6 +349,13 @@ function App() {
                   {languages.map(([key, label]) => <option value={key} key={key}>{label}</option>)}
                 </select>
               </label>
+              <button className={`ai-trigger ${aiOpen ? 'active' : ''}`} type="button" onClick={toggleAi}>
+                <span>✦</span> Aqua AI
+              </button>
+              <button className="icon-button" type="button" aria-label="Notifications" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen(!notificationsOpen)}>
+                <span>♧</span>
+                {roleUnread > 0 && <em>{roleUnread}</em>}
+              </button>
               {canSignOut && <button className="icon-button topbar-signout" type="button" aria-label="Sign out" title="Sign out" onClick={() => signOut()}><span>⎋</span></button>}
               <button className="profile mobile-profile" type="button" aria-label={`Signed in as ${identity.name}`}><span className="avatar">{identity.initials}</span></button>
             </div>
@@ -320,8 +363,22 @@ function App() {
         <PWASetup />
         <PWADetectOffline onOfflineChange={(offline) => showNotice(offline ? 'You are offline. Changes will sync when reconnected.' : 'Back online. Syncing...')} />
         {notice && <div className="notice" role="status"><span>✓</span>{notice}<button type="button" aria-label="Dismiss notification" onClick={dismissNotice}>×</button></div>}
+        {aiOpen && <AiPanel role={role} input={aiInput} setInput={setAiInput} messages={aiMessages} askAi={askAi} close={closeAi} aiLoading={aiLoading} aiSource={aiSource} aiFallbackReason={aiFallbackReason} />}
         {!ready && <section className="access-gate panel"><span className="access-lock">⌁</span><p className="eyebrow">Preparing secure workspace</p><h1>Setting up your accounts.</h1><p>AquaLink is generating the local account registry and its credentials on this device. This takes a moment and needs no network access.</p>        </section>}
-        {ready && role === 'buyer' && (buyerAuthenticated ? <><BuyerView booking={booking} updateBooking={updateBooking} requestDelivery={requestDelivery} orders={orders} showNotice={showNotice} authStep={authStep} email={email} setEmail={setEmail} emailCode={emailCode} sendOtp={sendOtp} confirmEmailCode={confirmEmailCode} confirmDelivery={confirmDelivery} requestRefund={requestRefund} savedAddresses={savedAddresses} repeatBooking={repeatBooking} setSavedAddresses={setSavedAddresses} t={t} driverUpdate={driverUpdate} refreshDriverUpdate={refreshDriverUpdate} loyalty={loyaltySummary} loyaltyProfile={loyaltyProfile} estimateForOrder={estimateForOrder} /><BuyerFinance orders={orders} showNotice={showNotice} /></> : <BuyerAccessGate onSignedIn={() => {}} startSignIn={startPhoneSignIn} confirmCode={confirmPhoneCode} generatedCode={phoneCode} identifier={phoneIdentifier} error={signInError} onRegister={(value) => registerAccount({ identifier: value, role: 'buyer', displayName: 'Buyer' })} accountExists={accountExists} onGoogle={signInWithGoogleIdentity} onMeta={signInWithMetaIdentity} showNotice={showNotice} />)}
+        {notificationsOpen && (
+          <Suspense fallback={null}>
+            <NotificationsPanel
+              notifications={roleNotifications}
+              unreadCount={roleUnread}
+              onMarkAllRead={() => markAllRead(role)}
+              onMarkRead={markRead}
+              onClose={() => setNotificationsOpen(false)}
+              onOrderClick={setDetailOrderId}
+              sync={notificationSync}
+              supportPhone={SUPPORT_PHONE}
+            />
+          </Suspense>
+        )}
         {detailOrder && (
           <Suspense fallback={null}>
             <OrderDetailModal
