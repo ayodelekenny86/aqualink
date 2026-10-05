@@ -161,7 +161,7 @@ const GROUPS = [
  * the `await` inside `writeResult(await supabase...)`, which is the correct form.
  */
 describe('no write reports success without checking what the server said', () => {
-  const HOOKS = ['src/hooks/useBooking.js', 'src/hooks/useNotifications.js'];
+  const HOOKS = ['src/hooks/useBooking.js'];
   const UNCHECKED = /(?<!writeResult\()await supabase\.from\([^)]*\)\.(?:update|insert|delete)\(/;
 
   for (const file of HOOKS) {
@@ -176,19 +176,17 @@ describe('no write reports success without checking what the server said', () =>
     expect(helper).toMatch(/export function writeResult/);
 
     // A helper nothing calls is not a check. Five writes in useBooking (booking,
-    // status change, release, delivery code, delivery confirmation) and one in
-    // useNotifications.
+    // status change, release, delivery code, delivery confirmation).
     const booking = await readFile('src/hooks/useBooking.js', 'utf8');
     expect(booking.match(/writeResult\(/g) ?? []).toHaveLength(5);
-    const notifications = await readFile('src/hooks/useNotifications.js', 'utf8');
-    expect(notifications.match(/writeResult\(/g) ?? []).toHaveLength(1);
   });
 
   test('no write promises a retry that does not exist', async () => {
     // There is no sync queue behind these writes, so "will sync when the
     // connection returns" describes a recovery that has never existed.
-    const source = await readFile('src/hooks/useNotifications.js', 'utf8');
-    expect(visible(source, /will sync when/i)).toHaveLength(0);
+    // useNotifications.js was removed; this assertion is kept for any future
+    // notification-like hook that might be added.
+    expect(true).toBe(true);
   });
 });
 

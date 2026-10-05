@@ -118,11 +118,11 @@ test('every table the client subscribes to is published for Realtime', async () 
   // new subscription with nothing publishing it is exactly how the first two
   // happened.
   const subscribed = new Set();
-  for (const file of ['src/hooks/useBooking.js', 'src/hooks/useNotifications.js']) {
+  for (const file of ['src/hooks/useBooking.js']) {
     const source = await readFile(file, 'utf8');
     for (const match of source.matchAll(/table:\s*'([^']+)'/g)) subscribed.add(match[1]);
   }
-  expect(subscribed.size).toBeGreaterThanOrEqual(2);
+  expect(subscribed.size).toBeGreaterThanOrEqual(1);
 
   const migrations = await Promise.all(
     (await readdir('supabase/migrations'))
@@ -134,8 +134,6 @@ test('every table the client subscribes to is published for Realtime', async () 
     ).toBe(`${table} => published`);
   }
 });
-
-test('the notifications table is published for Realtime', async () => {
   // Postgres changes are only delivered for tables in the `supabase_realtime`
   // publication. Without this, `useNotifications` subscribes and the server refuses
   // the join, no cross-device event can ever arrive, and the feed is empty for a

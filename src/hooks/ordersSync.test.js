@@ -46,12 +46,8 @@ test('every subscribed table has a publication migration', async () => {
   // like success. Deriving the tables from the client means a new subscription
   // cannot be added without someone noticing there is nothing publishing it.
   const hook = await readFile('src/hooks/useBooking.js', 'utf8');
-  const notifications = await readFile('src/hooks/useNotifications.js', 'utf8');
-  const subscribed = [
-    ...[...hook.matchAll(/table:\s*'([^']+)'/g)].map((m) => m[1]),
-    ...[...notifications.matchAll(/table:\s*'([^']+)'/g)].map((m) => m[1]),
-  ];
-  expect(subscribed.length).toBeGreaterThanOrEqual(2);
+  const subscribed = [...hook.matchAll(/table:\s*'([^']+)'/g)].map((m) => m[1]);
+  expect(subscribed.length).toBeGreaterThanOrEqual(1);
 
   const { readdir, readFile: read } = await import('node:fs/promises');
   const migrations = await readdir('supabase/migrations');
