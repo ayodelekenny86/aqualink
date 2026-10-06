@@ -971,3 +971,144 @@ button { cursor: pointer; }
     animation: none !important;
   }
 }
+
+/* Smooth transitions and animations */
+.panel {
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.panel:hover {
+  box-shadow: 0 4px 12px rgba(24, 52, 67, 0.08);
+}
+
+.primary-button, .outline-button, .text-button, .confirm-button {
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+.primary-button:active, .outline-button:active, .text-button:active, .confirm-button:active {
+  transform: scale(0.98);
+}
+
+.mobile-tab, .mobile-nav-tab {
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.order-modal {
+  animation: slideUp 0.3s ease-out;
+}
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-backdrop {
+  animation: fadeIn 0.2s ease-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.msg-chat-pane {
+  animation: slideIn 0.25s ease-out;
+}
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.offline-banner {
+  animation: slideDown 0.3s ease-out;
+}
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.notice {
+  animation: slideDown 0.3s ease-out;
+}
+
+.ai-panel {
+  animation: fadeIn 0.2s ease-out, slideUp 0.3s ease-out;
+}
+
+.role-button.active {
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(8, 127, 120, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(8, 127, 120, 0); }
+}
+
+.driver-job {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.job-card, .schedule-card, .quality-card {
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+.job-card:hover, .schedule-card:hover, .quality-card:hover {
+  box-shadow: 0 4px 16px rgba(24, 52, 67, 0.1);
+  transform: translateY(-2px);
+}
+
+.tab-button, .seller-tabs button, .institution-tabs button, .smart-tabs button {
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.input-wrap input, .auth-form input, .seller-form input, .seller-form select {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.input-wrap input:focus, .auth-form input:focus, .seller-form input:focus, .seller-form select:focus {
+  box-shadow: 0 0 0 3px rgba(8, 127, 120, 0.2);
+}
+
+.contact-item, .conv-item {
+  transition: background-color 0.1s ease;
+}
+.contact-item:hover, .conv-item:hover {
+  background-color: #f0f8f4;
+}
+
+.unread-badge {
+  animation: popIn 0.2s ease-out;
+}
+@keyframes popIn {
+  from { transform: scale(0); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel, .primary-button, .outline-button, .text-button, .confirm-button,
+  .mobile-tab, .mobile-nav-tab, .order-modal, .modal-backdrop, .msg-chat-pane,
+  .offline-banner, .notice, .ai-panel, .role-button.active, .driver-job,
+  .job-card, .schedule-card, .quality-card, .tab-button, .seller-tabs button,
+  .institution-tabs button, .smart-tabs button, .unread-badge, .loading-spinner {
+    transition: none !important;
+    animation: none !important;
+  }
+}
