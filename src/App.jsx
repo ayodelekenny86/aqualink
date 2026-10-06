@@ -198,6 +198,17 @@ function App() {
 
   const { downloadReport } = useReports({ region, orders, onNotice: showNotice });
 
+  const downloadRatings = useCallback((label = 'Ratings export') => {
+    const blob = new Blob([JSON.stringify(ratings, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${label.replace(/\s+/g, '_').toLowerCase()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showNotice(`Downloaded ${ratings.length} rating${ratings.length !== 1 ? 's' : ''} as JSON.`);
+  }, [ratings, showNotice]);
+
   // Buyer loyalty is summed from this buyer's paid orders, so it only exists
   // for an authenticated buyer. An unauthenticated buyer sees no tier.
   const buyerIdentifier = session?.identifier || email;
