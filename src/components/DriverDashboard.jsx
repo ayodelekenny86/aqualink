@@ -276,13 +276,16 @@ export default function DriverDashboard({
 
   const driver = useMemo(() => resolveDriver(driverIdentifier, fleetDrivers), [driverIdentifier, fleetDrivers]);
   const mine = useMemo(() => driverOrders(driver, orders), [driver, orders]);
+
+  // Driver ratings. Loaded first because the stats bar below prefers the
+  // ratings collection over any `rating` number embedded on the order rows —
+  // the collection carries the full breakdown and is the authoritative source.
+  const { summary: driverRatingSummary, loading: ratingsLoading, refresh: refreshRatings } = useDriverRatings(driver?.id);
+
   // The ratings collection is the authoritative source for what buyers thought.
   // Pass it through so the stats bar and the ratings tab show the same number
   // instead of two averages that can disagree.
   const stats = useMemo(() => driverStats(driver, orders, driverRatingSummary?.ratings ?? []), [driver, orders, driverRatingSummary]);
-
-  // Driver ratings
-  const { summary: driverRatingSummary, loading: ratingsLoading, refresh: refreshRatings } = useDriverRatings(driver?.id);
 
   const available = mine.filter((o) => o.status === 'Awaiting payment');
   const active = mine.filter((o) => ['Assigned', 'Picked Up', 'En Route'].includes(o.status));

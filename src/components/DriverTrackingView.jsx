@@ -4,6 +4,7 @@ import useDriverTracking from '../hooks/useDriverTracking';
 import useLoadBalancing from '../hooks/useLoadBalancing';
 import useSmartAssignment from '../hooks/useSmartAssignment';
 import usePredictiveAnalytics from '../hooks/usePredictiveAnalytics';
+import { useDriverRatings } from '../hooks/useRatings';
 
 function DriverMarker({ driver, onClick }) {
   const statusColors = {
@@ -56,12 +57,15 @@ function RouteLine({ route }) {
   );
 }
 
-function DriverCard({ driver, route, onViewRoute }) {
+function DriverCard({ driver, route, onViewRoute, driverRatings }) {
   const statusLabels = {
     online: 'Available',
     offline: 'Offline',
     'on-job': 'On Delivery',
   };
+
+  const rating = driverRatings?.find((r) => r.driverId === driver.driverId);
+  const average = rating ? (rating.overall ?? rating.average) : null;
 
   return (
     <article className="driver-track-card panel">
@@ -69,6 +73,9 @@ function DriverCard({ driver, route, onViewRoute }) {
         <div>
           <strong>{driver.driverName}</strong>
           <small>{driver.vehicle} · {driver.location}</small>
+          {average != null && (
+            <span className="driver-rating-badge">★ {average.toFixed(1)}</span>
+          )}
         </div>
         <span className={`status ${driver.status === 'online' ? 'status-online' : driver.status === 'on-job' ? 'status-enroute' : 'status-offline'}`}>
           {statusLabels[driver.status] || driver.status}
@@ -273,6 +280,11 @@ export function DriverTrackingView({ orders, onNotice }) {
     setDriverStatus,
   } = useDriverTracking({ orders, onNotice });
 
+  // Ratings per driver, so the fleet list shows reputation alongside live
+  // position. Ops can see which drivers are well thought of without opening
+  // each driver's own dashboard.
+  const { summary: fleetRatings } = useDriverRatings(null);
+
   // Smart features
   const { zoneLoads, driverWorkloads, rebalancingSuggestions, autoRebalanceEnabled, setAutoRebalanceEnabled, surgeMode, activateSurge, fleetSummary, refreshLoads, applyRebalancing, lastRebalance } = useLoadBalancing({ orders, driverPositions, onNotice });
   const { assignments, optimizationQueue, autoAssignEnabled, setAutoAssignEnabled, fleetStats: assignmentFleetStats, assignOrder, autoAssignAll, optimizeRoutes, applyOptimization, lastOptimization } = useSmartAssignment({ orders, driverPositions, onNotice, updateOrderStatus: (id, status, cb) => cb() });
@@ -367,12 +379,13 @@ export function DriverTrackingView({ orders, onNotice }) {
               <h2>{activeDrivers.length} on job · {allDrivers.filter(d => d.status === 'online').length} available</h2>
             </div>
             <div className="driver-track-grid">
-              {driverCards.map(({ driver, route }) => (
+{driverCards.map(({ driver, route }) => (
                 <DriverCard
                   key={driver.driverId}
                   driver={driver}
                   route={route}
-                  onViewRoute={handleViewRoute}
+                  driverRatings={fleetRatings?.ratings ?? []}
+                  VIEWRoute={handleViewRoute}
                 />
               ))}
             </div>

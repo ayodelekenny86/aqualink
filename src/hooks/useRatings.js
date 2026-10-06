@@ -177,14 +177,23 @@ export function useSellerRatings(sellerId) {
 }
 
 export function useDriverRatings(driverId) {
-  const { getDriverSummary, loading, error, refresh } = useRatings();
+  const { getDriverSummary, getDriverRatings, loading, error, refresh, ratings } = useRatings();
   const [summary, setSummary] = useState(null);
 
   useEffect(() => {
     if (driverId) {
       setSummary(getDriverSummary(driverId));
+    } else {
+      // No driverId: return every rating in the collection so a fleet view can
+      // look up any driver's reputation without mounting a hook per driver.
+      setSummary({
+        averages: computeAverages(ratings),
+        distribution: computeDistribution(ratings),
+        count: ratings.length,
+        ratings,
+      });
     }
-  }, [driverId, getDriverSummary]);
+  }, [driverId, getDriverSummary, ratings]);
 
   return { summary, loading, error, refresh };
 }

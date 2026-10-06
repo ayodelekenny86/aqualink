@@ -129,7 +129,7 @@ export function scoreSeller(orders, sellerId, ratings = []) {
   };
 }
 
-export function useSellerPerformance({ orders = [] } = {}) {
+export function useSellerPerformance({ orders = [], ratings = [] } = {}) {
   const [loading, setLoading] = useState(true);
 
   // Derive synchronously so a freshly mounted hook carries its data without
@@ -138,11 +138,11 @@ export function useSellerPerformance({ orders = [] } = {}) {
     const ids = new Set(orders.map(sellerIdOf).filter(Boolean));
     const next = {};
     ids.forEach(id => {
-      const s = scoreSeller(orders, id);
+      const s = scoreSeller(orders, id, ratings);
       if (s) next[id] = s;
     });
     return next;
-  }, [orders]);
+  }, [orders, ratings]);
 
   const ranked = useMemo(() => {
     return Object.values(scores)

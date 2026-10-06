@@ -208,14 +208,16 @@ function App() {
   });
 
   // Ratings system for post-delivery feedback
-  const { submitRating, checkHasRated } = useRatings();
+  const { ratings, submitRating, checkHasRated } = useRatings();
   const [ratingOrderId, setRatingOrderId] = useState(null);
   const [ratingOrder, setRatingOrder] = useState(null);
   const { orders: ratedOrders, openRating } = useRatedOrders(orders, session?.identifier ?? email);
 
   // Seller performance is scored from real orders, so an empty workspace has
-  // no sellers rather than a table of plausible-looking ratings.
-  const { summary: sellerPerfSummary, ranked: sellerRanked } = useSellerPerformance({ orders });
+  // no sellers rather than a table of plausible-looking ratings. Ratings come
+  // from the ratings collection, which carries the full breakdown; the order-
+  // embedded `rating` number is a fallback when the collection has not loaded.
+  const { summary: sellerPerfSummary, ranked: sellerRanked } = useSellerPerformance({ orders, ratings });
 
   // Reliability is a second opinion on seller performance, aimed at the
   // operator question "how dependable is this seller, and how long do they
