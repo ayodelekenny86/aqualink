@@ -184,4 +184,20 @@ describe('the driver stats bar', () => {
     expect(stats.completed).toBe(0);
     expect(stats.earningsMinor).toBe(0);
   });
+
+  test('averageRating is null when no delivered order carries a rating', () => {
+    const stats = driverStats(KOJO, orders);
+    expect(stats.averageRating).toBe(null);
+    expect(stats.ratedCount).toBe(0);
+  });
+
+  test('averageRating is the mean of delivered orders with a rating', () => {
+    const rated = [
+      order({ id: 'G', status: 'Delivered', driverReceives: 4000, rating: 5 }),
+      order({ id: 'H', status: 'Delivered', driverReceives: 4000, rating: 3 }),
+    ];
+    const stats = driverStats(KOJO, rated);
+    expect(stats.averageRating).toBe(4);
+    expect(stats.ratedCount).toBe(2);
+  });
 });
