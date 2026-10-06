@@ -281,17 +281,22 @@ async function probeFunctions() {
         : firstDetail,
     );
   }
+}
 
+async function main() {
   for (const site of sites) await probeSite(site);
   await probeFunctions();
 
-const failed = results.filter((r) => !r.ok);
-console.log('');
-if (failed.length === 0) {
-  console.log(`${GREEN}Everything checked is live.${OFF}`);
-  process.exit(0);
+  const failed = results.filter((r) => !r.ok);
+  console.log('');
+  if (failed.length === 0) {
+    console.log(`${GREEN}Everything checked is live.${OFF}`);
+    process.exit(0);
+  }
+  console.log(`${YELLOW}${failed.length} of ${results.length} checks failed:${OFF}`);
+  for (const item of failed) console.log(`  - ${item.name}${item.detail ? `: ${item.detail}` : ''}`);
+  console.log(`\n${DIM}See DEPLOY.md for the command that fixes each one.${OFF}`);
+  process.exit(1);
 }
-console.log(`${YELLOW}${failed.length} of ${results.length} checks failed:${OFF}`);
-for (const item of failed) console.log(`  - ${item.name}${item.detail ? `: ${item.detail}` : ''}`);
-console.log(`\n${DIM}See DEPLOY.md for the command that fixes each one.${OFF}`);
-process.exit(1);
+
+main();

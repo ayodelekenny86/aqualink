@@ -489,7 +489,7 @@ export function SellerDashboard({
 
           {smartTab === 'forecast' && (
             <div className="smart-panel">
-              {forecastLoading ? <p>Loading forecast…</p> : forecast?.error ? (
+              {forecastLoading ? <div className="loading-state"><div className="loading-spinner" /></div> : forecast?.error ? (
                 <div className="empty-feed">{forecast.error} ({forecast.ordersCount} orders)</div>
               ) : forecast && forecast.length > 0 ? (
                 <>
@@ -602,7 +602,7 @@ export function SellerDashboard({
 
           {smartTab === 'analytics' && (
             <div className="smart-panel">
-              {analyticsLoading ? <p>Loading analytics…</p> : (
+              {analyticsLoading ? <div className="loading-state"><div className="loading-spinner" /></div> : (
                 <>
                   <div className="analytics-summary">
                     <article className="analytics-card">
@@ -658,7 +658,7 @@ export function SellerDashboard({
 
           {smartTab === 'pricing' && (
             <div className="smart-panel">
-              {pricingLoading ? <p>Loading pricing…</p> : (
+              {pricingLoading ? <div className="loading-state"><div className="loading-spinner" /></div> : (
                 <>
                   <div className="pricing-summary">
                     <article className="pricing-card">

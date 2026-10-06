@@ -25,6 +25,7 @@ import DriverDashboard from './components/DriverDashboard';
 import DeliveryCodeDialog from './components/DeliveryCodeDialog';
 import InstitutionDashboard from './components/InstitutionDashboard';
 import DriverTrackingView from './components/DriverTrackingView';
+import MessagingPanel from './components/MessagingPanel';
 import { list, replaceAll } from './lib/collections';
 
 // Admin-only and overlay surfaces load on demand. A buyer who never opens the
@@ -221,6 +222,7 @@ function App() {
   const roleUnread = unreadCount(role);
 
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [messagesOpen, setMessagesOpen] = useState(false);
 
   // The driver workspace resolves the signed-in account against the fleet
   // roster by phone number, so the driver's jobs are the ones dispatch actually
@@ -300,7 +302,7 @@ function App() {
   }, [adminAuthenticated, driverAuthenticated, session]);
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${role === 'driver' ? 'is-driver' : ''}`}>
       {/* The mobile tab bar is always in the DOM and hidden with CSS above the
           breakpoint, rather than being mounted from a media query. A JS width
           check would render nothing for the first frame on a phone and shift
@@ -355,6 +357,9 @@ function App() {
                 <span>♧</span>
                 {roleUnread > 0 && <em>{roleUnread}</em>}
               </button>
+              <button className="icon-button" type="button" aria-label="Messages" aria-expanded={messagesOpen} onClick={() => setMessagesOpen(!messagesOpen)}>
+                <span>✉</span>
+              </button>
               {canSignOut && <button className="icon-button topbar-signout" type="button" aria-label="Sign out" title="Sign out" onClick={() => signOut()}><span>⎋</span></button>}
               <button className="profile mobile-profile" type="button" aria-label={`Signed in as ${identity.name}`}><span className="avatar">{identity.initials}</span></button>
             </div>
@@ -375,6 +380,16 @@ function App() {
               onOrderClick={setDetailOrderId}
               sync={notificationSync}
               supportPhone={SUPPORT_PHONE}
+            />
+          </Suspense>
+        )}
+        {messagesOpen && ready && session && (
+          <Suspense fallback={null}>
+            <MessagingPanel
+              currentUserId={session.identifier}
+              currentUserRole={role}
+              currentUserName={session.displayName || session.identifier}
+              onClose={() => setMessagesOpen(false)}
             />
           </Suspense>
         )}

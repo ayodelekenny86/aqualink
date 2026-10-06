@@ -526,7 +526,7 @@ export function InstitutionDashboard({ orders, showNotice }) {
 
           {smartTab === 'forecast' && (
             <div className="smart-panel">
-              {forecastLoading ? <p>Loading forecast…</p> : forecast?.error ? (
+              {forecastLoading ? <div className="loading-state"><div className="loading-spinner" /></div> : forecast?.error ? (
                 <div className="empty-feed">{forecast.error} ({forecast.ordersCount} orders)</div>
               ) : forecast && forecast.length > 0 ? (
                 <>
