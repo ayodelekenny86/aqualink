@@ -3,7 +3,7 @@ import { supabase, supabaseUrl, anonKey, writeResult } from './supabase';
 
 const COLLECTION = 'ratings';
 
-const USE_SERVER = typeof window !== 'undefined' && !!supabaseUrl && !!anonKey;
+const USE_SERVER = typeof window !== 'undefined' && !!supabaseUrl && !!anonKey && supabase && typeof supabase.from === 'function';
 
 export const RATING_CATEGORIES = [
   { id: 'overall', label: 'Overall experience', weight: 1.0 },

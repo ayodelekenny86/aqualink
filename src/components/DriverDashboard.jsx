@@ -276,7 +276,10 @@ export default function DriverDashboard({
 
   const driver = useMemo(() => resolveDriver(driverIdentifier, fleetDrivers), [driverIdentifier, fleetDrivers]);
   const mine = useMemo(() => driverOrders(driver, orders), [driver, orders]);
-  const stats = useMemo(() => driverStats(driver, orders), [driver, orders]);
+  // The ratings collection is the authoritative source for what buyers thought.
+  // Pass it through so the stats bar and the ratings tab show the same number
+  // instead of two averages that can disagree.
+  const stats = useMemo(() => driverStats(driver, orders, driverRatingSummary?.ratings ?? []), [driver, orders, driverRatingSummary]);
 
   // Driver ratings
   const { summary: driverRatingSummary, loading: ratingsLoading, refresh: refreshRatings } = useDriverRatings(driver?.id);

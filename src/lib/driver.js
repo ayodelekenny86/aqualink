@@ -141,17 +141,32 @@ export function advanceAction(status) {
  * delivered jobs only. Available counts jobs still to claim, active counts jobs
  * in progress. `averageRating` is the mean overall score across delivered orders
  * that carry a rating; null when the driver has no rated deliveries.
+ *
+ * When `ratings` is supplied it wins over any `rating` field embedded on the
+ * order rows. The embedded number is a single overall score and is what
+ * `scoreSeller` reads; the ratings collection carries the full breakdown. When
+ * both exist they can disagree, and the collection is the authoritative one —
+ * so the dashboard prefers it when the caller has loaded it.
  */
-export function driverStats(driver, orders) {
+export function driverStats(driver, orders, ratings = []) {
   const mine = driverOrders(driver, orders);
   const delivered = mine.filter((order) => DRIVER_DONE_STATUSES.includes(order.status));
   const active = mine.filter((order) => DRIVER_ACTIVE_STATUSES.includes(order.status));
   const completed = active.filter((order) => order.status !== 'Awaiting payment');
   const available = active.filter((order) => order.status === 'Awaiting payment');
 
-  const rated = delivered.filter((order) => typeof order.rating === 'number');
+  let rated = [];
+  if (ratings.length) {
+    const ratedOrderIds = new Set(ratings.map((r) => r.orderId));
+    rated = delivered.filter((order) => ratedOrderIds.has(order.id));
+  } else {
+    rated = delivered.filter((order) => typeof order.rating === 'number');
+  }
   const averageRating = rated.length
-    ? Number((rated.reduce((sum, order) => sum + order.rating, 0) / rated.length).toFixed(1))
+    ? Number((rated.reduce((sum, order) => {
+        const r = ratings.find((x) => x.orderId === order.id);
+        return sum + (r ? r.overall : order.rating);
+      }, 0) / rated.length).toFixed(1))
     : null;
 
   return {

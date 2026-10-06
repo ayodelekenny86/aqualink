@@ -467,7 +467,8 @@ function App() {
                 session?.identifier ?? email,
                 ratingOrder.sellerId ?? 'unknown',
                 ratingOrder.driverId ?? 'unknown',
-                ratingData
+                { ...ratingData, sellerName: ratingOrder.sellerName, driverName: ratingOrder.driverName },
+                notify
               );
               if (result?.ok) {
                 setRatingOrderId(null);

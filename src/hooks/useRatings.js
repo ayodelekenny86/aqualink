@@ -38,7 +38,16 @@ export function useRatings() {
 
   const refresh = useCallback(() => load(), [load]);
 
-  const submitRating = useCallback(async (orderId, buyerId, sellerId, driverId, ratingData) => {
+  /**
+   * Submit a rating, then notify the seller and driver so their own dashboards
+   * show the new score without a manual refresh.
+   *
+   * `notify` is the same `useNotifications` callback the rest of the app uses,
+   * passed in here rather than imported directly so this hook stays testable
+   * in isolation: the notification table is an implementation detail of the
+   * buyer's own session, not something a rating library should know about.
+   */
+  const submitRating = useCallback(async (orderId, buyerId, sellerId, driverId, ratingData, notify) => {
     const payload = {
       orderId,
       buyerId,
@@ -50,6 +59,32 @@ export function useRatings() {
     if (result.ok) {
       setRatings((prev) => [result.rating, ...prev]);
       trackEvent(EVENTS.RATING_SUBMITTED, { orderId, overall: ratingData.overall });
+
+      const starLine = '★'.repeat(Math.round(ratingData.overall || 0));
+      const summary = ratingData.comment
+        ? `${starLine} — "${ratingData.comment}"`
+        : starLine;
+      const sellerName = ratingData.sellerName || 'Your seller';
+      const driverName = ratingData.driverName || 'Your driver';
+
+      if (sellerId && notify) {
+        notify({
+          role: 'seller',
+          title: `New rating for order ${orderId}`,
+          body: `${buyerId} rated ${sellerName} ${summary}.`,
+          orderId,
+          kind: 'rating',
+        });
+      }
+      if (driverId && notify) {
+        notify({
+          role: 'driver',
+          title: `New rating for order ${orderId}`,
+          body: `${buyerId} rated ${driverName} ${summary}.`,
+          orderId,
+          kind: 'rating',
+        });
+      }
     }
     return result;
   }, []);
