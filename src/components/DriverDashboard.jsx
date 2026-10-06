@@ -12,6 +12,7 @@ import {
   samePhone,
 } from '../lib/driver';
 import { list, insert, update, findBy } from '../lib/collections';
+import { trackEvent, EVENTS } from '../lib/analytics';
 
 const STATUS_CLASS = {
   'Awaiting payment': 'status-awaiting',
@@ -264,8 +265,8 @@ export default function DriverDashboard({
   const [lastSync, setLastSync] = useState(Date.now());
 
   useEffect(() => {
-    const handleOnline = () => { setOffline(false); setLastSync(Date.now()); };
-    const handleOffline = () => setOffline(true);
+    const handleOnline = () => { setOffline(false); setLastSync(Date.now()); trackEvent(EVENTS.ONLINE_RESTORED); };
+    const handleOffline = () => { setOffline(true); trackEvent(EVENTS.OFFLINE_DETECTED); };
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };

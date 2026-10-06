@@ -7,6 +7,7 @@ import { createOrder, toServerOrderRow } from '../lib/payments';
 import { allocate, formatCedi, DEFAULT_PRICING, DEFAULT_SPLIT, quotePrice } from '../lib/money';
 import { supabase, supabaseUrl, anonKey, writeResult } from '../lib/supabase';
 import { gallonsFromLabel, litresFromLabel } from '../lib/volume';
+import { trackEvent, EVENTS } from '../lib/analytics';
 
 const toLitres = litresFromLabel;
 const initialBooking = { location: '', volume: '2,000 gallons', window: 'As soon as possible', payment: 'Mobile money', whatsapp: '', receiptEmail: '' };
@@ -265,6 +266,14 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
       createdAt: new Date().toISOString(),
     };
 
+    // Track booking started
+    trackEvent(EVENTS.BOOKING_STARTED, { 
+      volume, 
+      volumeLitres,
+      location: serverOrder.location,
+      writtenByServer 
+    });
+
     let synced = true;
     if (USE_SERVER && supabase) {
       try {
@@ -522,6 +531,7 @@ if (USE_SERVER && supabase) {
       commit((items) => items.map((item) => (item.id === orderId ? { ...item, ...localDelivery } : item)));
     }
     onNotice(`Delivery confirmed for ${orderId}. Seller payout is handled separately by operations.`);
+    trackEvent(EVENTS.ORDER_CONFIRMED, { orderId });
     return { ok: true };
   }, [orders, onNotice, commit]);
 

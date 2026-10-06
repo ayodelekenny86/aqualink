@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { trackEvent, EVENTS } from '../lib/analytics';
 
 let registerSWModule = null;
 let loadPromise = null;
@@ -85,8 +86,14 @@ export function PWAUpdatePrompt({ needRefresh, updateServiceWorker }) {
 
 export function PWADetectOffline({ onOfflineChange }) {
   useEffect(() => {
-    const handleOnline = () => onOfflineChange?.(false);
-    const handleOffline = () => onOfflineChange?.(true);
+    const handleOnline = () => {
+      onOfflineChange?.(false);
+      trackEvent(EVENTS.ONLINE_RESTORED);
+    };
+    const handleOffline = () => {
+      onOfflineChange?.(true);
+      trackEvent(EVENTS.OFFLINE_DETECTED);
+    };
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     return () => {

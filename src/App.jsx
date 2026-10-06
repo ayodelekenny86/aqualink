@@ -256,18 +256,21 @@ function App() {
   const driverAccept = async (orderId) => {
     setBusyDriverOrderId(orderId);
     await acceptDriverJob(orderId, notify);
+    trackEvent(EVENTS.DRIVER_JOB_ACCEPTED, { orderId });
     setBusyDriverOrderId(null);
   };
 
   const driverAdvance = async (orderId, status) => {
     setBusyDriverOrderId(orderId);
     await updateOrderStatus(orderId, status, notify);
+    trackEvent(EVENTS.DRIVER_JOB_COMPLETED, { orderId, status });
     setBusyDriverOrderId(null);
   };
 
   const driverRelease = async (orderId) => {
     setBusyDriverOrderId(orderId);
     await releaseDriverJob(orderId, notify);
+    trackEvent(EVENTS.DRIVER_JOB_ACCEPTED, { orderId, released: true });
     setBusyDriverOrderId(null);
   };
 
