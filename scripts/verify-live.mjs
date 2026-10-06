@@ -282,8 +282,8 @@ async function probeFunctions() {
     );
   }
 
-for (const site of sites) await probeSite(site);
-await probeFunctions();
+  for (const site of sites) await probeSite(site);
+  await probeFunctions();
 
 const failed = results.filter((r) => !r.ok);
 console.log('');

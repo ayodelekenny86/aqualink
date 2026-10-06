@@ -201,3 +201,27 @@ export function quotePrice(pricing = DEFAULT_PRICING) {
   const surge = Math.round((discounted * surgePercent) / 100);
   return { listMinor, discounted, surge, surgeMinor: surge, totalMinor: discounted + surge };
 }
+
+/**
+ * Price one order from config and return everything that must be stored
+ * on it. `volumeLitres` is accepted for future distance/volume pricing but does
+ * not affect the figure yet; it is not silently ignored in the signature so the
+ * shape is already right when that rule lands.
+ */
+export function priceOrder({ pricing = DEFAULT_PRICING, split = DEFAULT_SPLIT, volumeLitres = 0 } = {}) {
+  validateSplit(split);
+  const quote = quotePrice(pricing);
+  const breakdown = allocate(quote.totalMinor, split);
+
+  return {
+    volumeLitres,
+    pricing: { ...pricing },
+    split: { ...split },
+    listMinor: quote.listMinor,
+    discountMinor: quote.listMinor - quote.discounted,
+    surgeMinor: quote.surgeMinor,
+    grossMinor: breakdown.gross,
+    chargedMinor: breakdown.buyerPays,
+    ...breakdown,
+  };
+}
