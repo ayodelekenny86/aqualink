@@ -298,6 +298,12 @@ function App() {
     return result;
   }, [confirmDelivery, buyerAuthenticated, orders, session, email, checkHasRated]);
 
+  // Open the rating modal for a delivered order from the order list.
+  const handleRateOrder = useCallback((order) => {
+    setRatingOrder(order);
+    setRatingOrderId(order.id);
+  }, []);
+
   const driverRefresh = useCallback(() => {
     // Re-read orders from localStorage so the driver feed picks up changes another
     // role made in the same browser without waiting for the next poll cycle.
@@ -438,7 +444,7 @@ function App() {
             />
           </Suspense>
         )}
-        {ready && role === 'buyer' && (buyerAuthenticated ? <><BuyerView booking={booking} updateBooking={updateBooking} requestDelivery={requestDelivery} orders={orders} showNotice={showNotice} authStep={authStep} email={email} setEmail={setEmail} emailCode={emailCode} sendOtp={sendOtp} confirmEmailCode={confirmEmailCode} confirmDelivery={confirmDeliveryWithRating} requestRefund={requestRefund} savedAddresses={savedAddresses} repeatBooking={repeatBooking} setSavedAddresses={setSavedAddresses} t={t} driverUpdate={driverUpdate} refreshDriverUpdate={refreshDriverUpdate} loyalty={loyaltySummary} loyaltyProfile={loyaltyProfile} estimateForOrder={estimateForOrder} onRateOrder={openRating} ratedOrders={ratedOrders} /><BuyerFinance orders={orders} showNotice={showNotice} /></> : <BuyerAccessGate onSignedIn={() => {}} startSignIn={startPhoneSignIn} confirmCode={confirmPhoneCode} generatedCode={phoneCode} identifier={phoneIdentifier} error={signInError} onRegister={(value) => registerAccount({ identifier: value, role: 'buyer', displayName: 'Buyer' })} accountExists={accountExists} onGoogle={signInWithGoogleIdentity} onMeta={signInWithMetaIdentity} showNotice={showNotice} />)}
+        {ready && role === 'buyer' && (buyerAuthenticated ? <><BuyerView booking={booking} updateBooking={updateBooking} requestDelivery={requestDelivery} orders={orders} showNotice={showNotice} authStep={authStep} email={email} setEmail={setEmail} emailCode={emailCode} sendOtp={sendOtp} confirmEmailCode={confirmEmailCode} confirmDelivery={confirmDeliveryWithRating} requestRefund={requestRefund} savedAddresses={savedAddresses} repeatBooking={repeatBooking} setSavedAddresses={setSavedAddresses} t={t} driverUpdate={driverUpdate} refreshDriverUpdate={refreshDriverUpdate} loyalty={loyaltySummary} loyaltyProfile={loyaltyProfile} estimateForOrder={estimateForOrder} onRateOrder={handleRateOrder} ratedOrders={ratedOrders} /><BuyerFinance orders={orders} showNotice={showNotice} /></> : <BuyerAccessGate onSignedIn={() => {}} startSignIn={startPhoneSignIn} confirmCode={confirmPhoneCode} generatedCode={phoneCode} identifier={phoneIdentifier} error={signInError} onRegister={(value) => registerAccount({ identifier: value, role: 'buyer', displayName: 'Buyer' })} accountExists={accountExists} onGoogle={signInWithGoogleIdentity} onMeta={signInWithMetaIdentity} showNotice={showNotice} />)}
         {detailOrder && (
           <Suspense fallback={null}>
             <OrderDetailModal
@@ -446,6 +452,8 @@ function App() {
               onClose={() => setDetailOrderId(null)}
               onShowNotice={showNotice}
               viewerRole={role}
+              rating={ratedOrders.find((r) => r.id === detailOrder.id) ?? null}
+              onRate={handleRateOrder}
             />
           </Suspense>
         )}

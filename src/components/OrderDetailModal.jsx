@@ -1,5 +1,19 @@
 import { useEffect, useRef } from 'react';
 import ContactButtons, { orderMessage } from './ContactButtons';
+import { RATING_CATEGORIES } from '../lib/ratings';
+
+/**
+ * A single star, filled or empty. Used by both the detail view and the modal.
+ */
+function StarRow({ value, max = 5, size = 14 }) {
+  return (
+    <span className="review-stars" style={{ fontSize: size }}>
+      {[...Array(max)].map((_, i) => (
+        <span key={i} className={i < value ? 'filled' : ''}>★</span>
+      ))}
+    </span>
+  );
+}
 
 /**
  * Order detail with a delivery timeline.
@@ -33,7 +47,7 @@ function currentStep(order) {
   return index === -1 ? 0 : index;
 }
 
-export default function OrderDetailModal({ order, onClose, viewerRole = 'buyer', onShowNotice }) {
+export default function OrderDetailModal({ order, onClose, viewerRole = 'buyer', onShowNotice, rating = null, onRate }) {
   const closeRef = useRef(null);
 
   useEffect(() => {
@@ -120,6 +134,26 @@ export default function OrderDetailModal({ order, onClose, viewerRole = 'buyer',
           {order.sellerName && <div><dt>Seller</dt><dd>{order.sellerName}</dd></div>}
         </dl>
 
+        {rating && (
+          <section className="order-rating" aria-label="Your rating for this order">
+            <p className="section-kicker">YOUR RATING</p>
+            <div className="review-stars">
+              <StarRow value={rating.overall} />
+              <small>{rating.overall}/5</small>
+            </div>
+            {RATING_CATEGORIES.filter((c) => c.id !== 'overall').map((cat) => (
+              rating[cat.id] ? (
+                <div key={cat.id} className="review-cat" style={{ marginTop: 6 }}>
+                  <span className="cat-label">{cat.label}:</span>
+                  <span className="cat-value">{rating[cat.id]}/5</span>
+                  <StarRow value={rating[cat.id]} size={12} />
+                </div>
+              ) : null
+            ))}
+            {rating.comment && <p className="review-comment" style={{ marginTop: 8 }}>{rating.comment}</p>}
+          </section>
+        )}
+
         {/* The delivery code, shown to whoever can read the order while the
             delivery is in progress. It is what the driver types at the door to
             confirm the water actually changed hands, so it has to be readable on
@@ -167,6 +201,9 @@ export default function OrderDetailModal({ order, onClose, viewerRole = 'buyer',
             <ContactButtons message={contactMessage} label="Contact support" />
           )}
           {onShowNotice && <button type="button" className="outline-button" onClick={() => onShowNotice(`Share link copied for ${order.code ?? order.id}.`)}>Share order</button>}
+          {viewerIsBuyer && order.status === 'Delivered' && !rating && onRate && (
+            <button type="button" className="primary-button" onClick={() => onRate(order)}>★ Rate delivery</button>
+          )}
         </footer>
       </div>
     </div>

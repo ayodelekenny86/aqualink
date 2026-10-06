@@ -353,6 +353,24 @@ button { cursor: pointer; }
   .rating-categories { padding: 12px; }
 }
 
+.rating-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  background: #f5fbf6;
+  border: 1px solid #d5e9dc;
+  border-radius: 999px;
+  font-size: 11px;
+}
+.rating-chip .stars { font-size: 12px; }
+.rating-chip .stars.filled { color: #f0a202; }
+
+.ratings-by-role { display: grid; gap: 8px; margin-top: 12px; }
+.ratings-by-role dt { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.ratings-by-role dd { display: flex; align-items: baseline; gap: 8px; margin: 2px 0 0; font-size: 12px; }
+.ratings-by-role dd small { color: var(--muted); font-size: 11px; }
+
 /* ---------- Revenue breakdown ---------- */
 .revenue-breakdown { padding: 20px 22px; margin-top: 18px; }
 .revenue-bar { display: flex; height: 12px; border-radius: 999px; overflow: hidden; margin: 16px 0 18px; background: #eef2f1; }

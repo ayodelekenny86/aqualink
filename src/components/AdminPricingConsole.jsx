@@ -9,6 +9,7 @@ import {
   quotePrice,
   validateSplit,
 } from '../lib/money';
+import { getRatings, computeAverages, computeDistribution } from '../lib/ratings';
 
 /**
  * Admin pricing control.
@@ -58,6 +59,43 @@ export default function AdminPricingConsole({ onNotice, onPricingChange, opsToke
   // started editing, and merging the server copy over their input would silently
   // revert their change under the cursor.
   const editingRef = useRef(false);
+
+  const [ratingsSummary, setRatingsSummary] = useState(null);
+  const [ratingsByRole, setRatingsByRole] = useState([]);
+  const [ratingsLoading, setRatingsLoading] = useState(false);
+
+  const loadRatings = useCallback(async () => {
+    setRatingsLoading(true);
+    try {
+      const ratings = await getRatings();
+      setRatingsSummary({
+        averages: computeAverages(ratings),
+        distribution: computeDistribution(ratings),
+        count: ratings.length,
+      });
+      const roles = { buyer: [], seller: [], driver: [] };
+      ratings.forEach((r) => {
+        if (r.sellerId) roles.seller.push(r);
+        if (r.driverId) roles.driver.push(r);
+        if (r.buyerId) roles.buyer.push(r);
+      });
+      setRatingsByRole(
+        Object.entries(roles).map(([role, list]) => ({
+          role: role.charAt(0).toUpperCase() + role.slice(1),
+          count: list.length,
+          average: computeAverages(list)?.overall ?? null,
+        }))
+      );
+    } catch (e) {
+      console.warn('Ratings overview failed:', e.message);
+    } finally {
+      setRatingsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadRatings();
+  }, [loadRatings]);
 
   // Show the operator what is actually live, not whatever this browser last
   // cached, so the console cannot be used to edit a price nobody is charged.
@@ -264,6 +302,66 @@ export default function AdminPricingConsole({ onNotice, onPricingChange, opsToke
           )}
         </fieldset>
       </div>
+    </section>
+
+    <section className="panel" aria-label="Ratings overview">
+      <div className="panel-toolbar">
+        <div className="panel-title">
+          <span className="section-kicker">NETWORK RATINGS</span>
+          <h2>Buyer feedback across the fleet</h2>
+        </div>
+        <button className="outline-button" type="button" onClick={loadRatings} disabled={ratingsLoading}>
+          {ratingsLoading ? 'Refreshing…' : '↻ Refresh'}
+        </button>
+      </div>
+      {ratingsSummary ? (
+        <>
+          <div className="rating-summary-grid">
+            <article className="rating-card overall">
+              <span className="rating-card-label">Platform average</span>
+              <strong className="rating-card-value">{ratingsSummary.averages.overall ?? '—'}</strong>
+              <small>out of 5.0</small>
+              <div className="rating-distribution">
+                {ratingsSummary.distribution && Object.entries(ratingsSummary.distribution).map(([star, count]) => (
+                  <div key={star} className="dist-bar">
+                    <span>{star}★</span>
+                    <div className="dist-bar-fill" style={{ width: `${ratingsSummary.count ? (count / ratingsSummary.count * 100) : 0}%` }} />
+                    <span>{count}</span>
+                  </div>
+                ))}
+              </div>
+              <small className="rating-count">{ratingsSummary.count} review{ratingsSummary.count !== 1 ? 's' : ''}</small>
+            </article>
+            {ratingsSummary.averages && Object.entries(ratingsSummary.averages).filter(([k]) => k !== 'overall' && k !== 'total').map(([cat, value]) => (
+              <article key={cat} className="rating-card category">
+                <span className="rating-card-label">{cat.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}</span>
+                <strong className="rating-card-value">{value ?? '—'}</strong>
+                <small>out of 5.0</small>
+              </article>
+            ))}
+          </div>
+          <div className="panel-divider" />
+          <div className="panel-title">
+            <span className="section-kicker">BY ROLE</span>
+            <h2>Who gets rated</h2>
+          </div>
+          <dl className="ratings-by-role">
+            {ratingsByRole.map((entry) => (
+              <div key={entry.role}>
+                <dt>{entry.role}</dt>
+                <dd>
+                  <strong>{entry.count} rating{entry.count !== 1 ? 's' : ''}</strong>
+                  {entry.average != null ? <small> · {entry.average}/5 average</small> : <small> · no scores yet</small>}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </>
+      ) : ratingsLoading ? (
+        <p className="empty-feed">Loading ratings…</p>
+      ) : (
+        <p className="empty-feed">No ratings have been submitted yet.</p>
+      )}
     </section>
   );
 }
