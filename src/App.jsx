@@ -26,6 +26,7 @@ import DeliveryCodeDialog from './components/DeliveryCodeDialog';
 import InstitutionDashboard from './components/InstitutionDashboard';
 import DriverTrackingView from './components/DriverTrackingView';
 import MessagingPanel from './components/MessagingPanel';
+import ErrorBoundary from './components/ErrorBoundary';
 import { list, replaceAll } from './lib/collections';
 
 // Admin-only and overlay surfaces load on demand. A buyer who never opens the
@@ -303,6 +304,16 @@ function App() {
 
   return (
     <div className={`app-shell ${role === 'driver' ? 'is-driver' : ''}`}>
+      <ErrorBoundary fallback={(error, reset) => (
+        <div className="access-gate panel" style={{ maxWidth: '600px', margin: '60px auto', padding: '32px' }}>
+          <div className="error-icon" style={{ fontSize: '48px', textAlign: 'center', marginBottom: '16px' }}>⚠</div>
+          <h1 style={{ textAlign: 'center', marginBottom: '8px' }}>Something went wrong</h1>
+          <p style={{ textAlign: 'center', color: 'var(--muted)', marginBottom: '24px' }}>
+            An unexpected error occurred. Our team has been notified.
+          </p>
+          <button className="primary-button full" onClick={reset}>Try again</button>
+        </div>
+      )}>
       {/* The mobile tab bar is always in the DOM and hidden with CSS above the
           breakpoint, rather than being mounted from a media query. A JS width
           check would render nothing for the first frame on a phone and shift
@@ -503,6 +514,7 @@ function App() {
         {ready && role === 'ops' && adminAuthenticated && <RevenueFinance orders={orders} showNotice={showNotice} />}
         {ready && role === 'ops' && adminAuthenticated && <Suspense fallback={null}><AdminPricingConsole onNotice={showNotice} onPricingChange={(nextPricing, nextSplit) => publish(nextPricing, nextSplit)} opsToken={opsToken} /></Suspense>}
         </main>
+      </ErrorBoundary>
     </div>
   );
 }
