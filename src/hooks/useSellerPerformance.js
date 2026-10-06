@@ -48,7 +48,7 @@ function sellerIdOf(order) {
  * Score a single seller against the full order list. Returns null when the
  * seller has no orders at all, so callers can distinguish "no data" from "zero".
  */
-export function scoreSeller(orders, sellerId) {
+export function scoreSeller(orders, sellerId, ratings = []) {
   const mine = orders.filter(o => sellerIdOf(o) === sellerId);
   if (!mine.length) return null;
 
@@ -74,9 +74,20 @@ export function scoreSeller(orders, sellerId) {
   const revenue = completed.reduce((s, o) => s + (Number(o.sellerReceives) || 0), 0) / 100;
 
   // Buyer ratings attached to delivered orders. A 1-5 score maps to 0-100.
-  const rated = completed.filter(o => typeof o.rating === 'number' && o.rating >= 1 && o.rating <= 5);
+  // When `ratings` is supplied it wins over any `rating` field embedded on the
+  // order rows: the embedded number is a single overall score and is what the
+  // driver stats bar used to read, while the ratings collection carries the full
+  // breakdown. Without this the two surfaces could show different averages for
+  // the same seller.
+  const rated = completed.filter((order) => {
+    if (ratings.length) return ratings.some((r) => r.orderId === order.id);
+    return typeof order.rating === 'number' && order.rating >= 1 && order.rating <= 5;
+  });
   const averageRating = rated.length
-    ? rated.reduce((s, o) => s + o.rating, 0) / rated.length
+    ? rated.reduce((sum, order) => {
+        const r = ratings.find((x) => x.orderId === order.id);
+        return sum + (r ? r.overall : order.rating);
+      }, 0) / rated.length
     : null;
   const ratingScore = averageRating != null ? (averageRating / 5) * 100 : 0;
 
