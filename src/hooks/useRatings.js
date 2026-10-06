@@ -1,0 +1,175 @@
+import { useCallback, useEffect, useState } from 'react';
+import {
+  getRatings,
+  getRatingsForOrder,
+  getRatingsForSeller,
+  getRatingsForDriver,
+  getRatingsByBuyer,
+  hasRatedOrder,
+  createRating,
+  updateRating,
+  computeAverages,
+  computeDistribution,
+  syncRatingsFromServer,
+} from '../lib/ratings';
+import { trackEvent, EVENTS } from '../lib/analytics';
+
+export function useRatings() {
+  const [ratings, setRatings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getRatings();
+      setRatings(data);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const refresh = useCallback(() => load(), [load]);
+
+  const submitRating = useCallback(async (orderId, buyerId, sellerId, driverId, ratingData) => {
+    const payload = {
+      orderId,
+      buyerId,
+      sellerId,
+      driverId,
+      ...ratingData,
+    };
+    const result = await createRating(payload);
+    if (result.ok) {
+      setRatings((prev) => [result.rating, ...prev]);
+      trackEvent(EVENTS.RATING_SUBMITTED, { orderId, overall: ratingData.overall });
+    }
+    return result;
+  }, []);
+
+  const editRating = useCallback(async (id, updates) => {
+    const result = await updateRating(id, updates);
+    if (result.ok) {
+      setRatings((prev) => prev.map((r) => (r.id === id ? result.rating : r)));
+    }
+    return result;
+  }, []);
+
+  const getOrderRating = useCallback((orderId) => {
+    return ratings.find((r) => r.orderId === orderId);
+  }, [ratings]);
+
+  const getSellerRatings = useCallback((sellerId) => {
+    return ratings.filter((r) => r.sellerId === sellerId);
+  }, [ratings]);
+
+  const getDriverRatings = useCallback((driverId) => {
+    return ratings.filter((r) => r.driverId === driverId);
+  }, [ratings]);
+
+  const getBuyerRatings = useCallback((buyerId) => {
+    return ratings.filter((r) => r.buyerId === buyerId);
+  }, [ratings]);
+
+  const checkHasRated = useCallback(async (buyerId, orderId) => {
+    return hasRatedOrder(buyerId, orderId);
+  }, []);
+
+  const getSellerSummary = useCallback((sellerId) => {
+    const sellerRatings = getSellerRatings(sellerId);
+    return {
+      averages: computeAverages(sellerRatings),
+      distribution: computeDistribution(sellerRatings),
+      count: sellerRatings.length,
+      ratings: sellerRatings,
+    };
+  }, [getSellerRatings]);
+
+  const getDriverSummary = useCallback((driverId) => {
+    const driverRatings = getDriverRatings(driverId);
+    return {
+      averages: computeAverages(driverRatings),
+      distribution: computeDistribution(driverRatings),
+      count: driverRatings.length,
+      ratings: driverRatings,
+    };
+  }, [getDriverRatings]);
+
+  const sync = useCallback(async () => {
+    const result = await syncRatingsFromServer();
+    if (result.ok) {
+      await load();
+    }
+    return result;
+  }, [load]);
+
+  return {
+    ratings,
+    loading,
+    error,
+    refresh,
+    submitRating,
+    editRating,
+    getOrderRating,
+    getSellerRatings,
+    getDriverRatings,
+    getBuyerRatings,
+    checkHasRated,
+    getSellerSummary,
+    getDriverSummary,
+    sync,
+  };
+}
+
+export function useSellerRatings(sellerId) {
+  const { getSellerSummary, loading, error, refresh } = useRatings();
+  const [summary, setSummary] = useState(null);
+
+  useEffect(() => {
+    if (sellerId) {
+      setSummary(getSellerSummary(sellerId));
+    }
+  }, [sellerId, getSellerSummary]);
+
+  return { summary, loading, error, refresh };
+}
+
+export function useDriverRatings(driverId) {
+  const { getDriverSummary, loading, error, refresh } = useRatings();
+  const [summary, setSummary] = useState(null);
+
+  useEffect(() => {
+    if (driverId) {
+      setSummary(getDriverSummary(driverId));
+    }
+  }, [driverId, getDriverSummary]);
+
+  return { summary, loading, error, refresh };
+}
+
+export function useOrderRating(orderId, buyerId) {
+  const { getOrderRating, checkHasRated, loading, error } = useRatings();
+  const [rating, setRating] = useState(null);
+  const [hasRated, setHasRated] = useState(false);
+
+  useEffect(() => {
+    if (orderId) {
+      setRating(getOrderRating(orderId));
+    }
+  }, [orderId, getOrderRating]);
+
+  useEffect(() => {
+    if (buyerId && orderId) {
+      checkHasRated(buyerId, orderId).then(setHasRated);
+    }
+  }, [buyerId, orderId, checkHasRated]);
+
+  return { rating, hasRated, loading, error };
+}

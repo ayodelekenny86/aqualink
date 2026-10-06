@@ -13,6 +13,7 @@ import {
 } from '../lib/driver';
 import { list, insert, update, findBy } from '../lib/collections';
 import { trackEvent, EVENTS } from '../lib/analytics';
+import { useDriverRatings } from '../hooks/useRatings';
 
 const STATUS_CLASS = {
   'Awaiting payment': 'status-awaiting',
@@ -27,6 +28,7 @@ const TAB_LABELS = [
   { id: 'active', label: 'Active', icon: '⇢' },
   { id: 'completed', label: 'History', icon: '✓' },
   { id: 'earnings', label: 'Earnings', icon: '₴' },
+  { id: 'ratings', label: 'Ratings', icon: '★' },
 ];
 
 function Stepper({ status }) {
@@ -276,6 +278,9 @@ export default function DriverDashboard({
   const mine = useMemo(() => driverOrders(driver, orders), [driver, orders]);
   const stats = useMemo(() => driverStats(driver, orders), [driver, orders]);
 
+  // Driver ratings
+  const { summary: driverRatingSummary, loading: ratingsLoading, refresh: refreshRatings } = useDriverRatings(driver?.id);
+
   const available = mine.filter((o) => o.status === 'Awaiting payment');
   const active = mine.filter((o) => ['Assigned', 'Picked Up', 'En Route'].includes(o.status));
   const completed = mine.filter((o) => o.status === 'Delivered');
@@ -317,7 +322,8 @@ export default function DriverDashboard({
     active: active.length,
     completed: completed.length,
     earnings: stats.completed,
-  }), [available, active, completed, stats.completed]);
+    ratings: driverRatingSummary?.count || 0,
+  }), [available, active, completed, stats.completed, driverRatingSummary?.count]);
 
   return (
     <div className="driver-workspace">
@@ -469,6 +475,90 @@ export default function DriverDashboard({
 
       {activeTab === 'earnings' && driver && (
         <EarningsBreakdown driver={driver} orders={orders} />
+      )}
+
+      {activeTab === 'ratings' && (
+        <section className="panel">
+          <div className="panel-toolbar">
+            <div className="panel-title">
+              <span className="section-kicker">YOUR RATING</span>
+              <h2>Reputation from buyer feedback</h2>
+            </div>
+            <button className="outline-button" type="button" onClick={refreshRatings} disabled={ratingsLoading}>
+              {ratingsLoading ? 'Refreshing…' : '↻ Refresh'}
+            </button>
+          </div>
+
+          {driverRatingSummary?.averages ? (
+            <>
+              <div className="rating-summary-grid">
+                <article className="rating-card overall">
+                  <span className="rating-card-label">Overall</span>
+                  <strong className="rating-card-value">{driverRatingSummary.averages.overall ?? '—'}</strong>
+                  <small>out of 5.0</small>
+                  <div className="rating-distribution">
+                    {driverRatingSummary.distribution && Object.entries(driverRatingSummary.distribution).map(([star, count]) => (
+                      <div key={star} className="dist-bar">
+                        <span>{star}★</span>
+                        <div className="dist-bar-fill" style={{ width: `${driverRatingSummary.count ? (count / driverRatingSummary.count * 100) : 0}%` }} />
+                        <span>{count}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <small className="rating-count">{driverRatingSummary.count} review{driverRatingSummary.count !== 1 ? 's' : ''}</small>
+                </article>
+
+                {Object.entries(driverRatingSummary.averages).filter(([k]) => k !== 'overall' && k !== 'total').map(([cat, value]) => (
+                  <article key={cat} className="rating-card category">
+                    <span className="rating-card-label">{cat.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}</span>
+                    <strong className="rating-card-value">{value ?? '—'}</strong>
+                    <small>out of 5.0</small>
+                  </article>
+                ))}
+              </div>
+
+              <div className="panel-divider" />
+
+              <div className="panel-title">
+                <span className="section-kicker">RECENT REVIEWS</span>
+                <h2>Latest buyer feedback</h2>
+              </div>
+
+              {driverRatingSummary.ratings.length === 0 ? (
+                <p className="empty-feed">No ratings yet. Complete deliveries to start building your reputation.</p>
+              ) : (
+                <div className="rating-list">
+                  {driverRatingSummary.ratings.slice(0, 10).map((rating) => (
+                    <article key={rating.id} className="rating-review panel">
+                      <div className="review-header">
+                        <div className="review-meta">
+                          <strong>Order {rating.orderId}</strong>
+                          <small>{new Date(rating.createdAt).toLocaleDateString()}</small>
+                        </div>
+                        <div className="review-stars">
+                          {[1,2,3,4,5].map(s => <span key={s} className={s <= (rating.overall || 0) ? 'filled' : ''}>★</span>)}
+                        </div>
+                      </div>
+                      <div className="review-categories">
+                        {Object.entries(rating).filter(([k, v]) => typeof v === 'number' && k !== 'overall' && k !== 'total').map(([cat, val]) => (
+                          <span key={cat} className="review-cat">
+                            <span className="cat-label">{cat.replace('_', ' ')}:</span>
+                            <span className="cat-value">{val}/5</span>
+                          </span>
+                        ))}
+                      </div>
+                      {rating.comment && (
+                        <p className="review-comment">{rating.comment}</p>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="empty-feed">No ratings yet. Complete deliveries to start building your reputation.</p>
+          )}
+        </section>
       )}
     </div>
   );

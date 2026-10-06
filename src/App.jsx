@@ -29,6 +29,8 @@ import MessagingPanel from './components/MessagingPanel';
 import ErrorBoundary from './components/ErrorBoundary';
 import { list, replaceAll } from './lib/collections';
 import { initWebVitals, trackEvent, EVENTS } from './lib/analytics';
+import RatingModal from './components/RatingModal';
+import { useRatings } from './hooks/useRatings';
 
 // Admin-only and overlay surfaces load on demand. A buyer who never opens the
 // admin console never downloads it, which keeps the initial bundle small.
@@ -205,6 +207,11 @@ function App() {
     onNotice: showNotice,
   });
 
+  // Ratings system for post-delivery feedback
+  const { submitRating, checkHasRated } = useRatings();
+  const [ratingOrderId, setRatingOrderId] = useState(null);
+  const [ratingOrder, setRatingOrder] = useState(null);
+
   // Seller performance is scored from real orders, so an empty workspace has
   // no sellers rather than a table of plausible-looking ratings.
   const { summary: sellerPerfSummary, ranked: sellerRanked } = useSellerPerformance({ orders });
@@ -273,6 +280,22 @@ function App() {
     trackEvent(EVENTS.DRIVER_JOB_ACCEPTED, { orderId, released: true });
     setBusyDriverOrderId(null);
   };
+
+  // Wrapped confirmDelivery that prompts for rating after successful delivery confirmation
+  const confirmDeliveryWithRating = useCallback(async (orderId, code) => {
+    const result = await confirmDelivery(orderId, code);
+    if (result?.ok && buyerAuthenticated) {
+      const order = orders.find((o) => o.id === orderId);
+      if (order) {
+        const hasRated = await checkHasRated(session?.identifier ?? email, orderId);
+        if (!hasRated) {
+          setRatingOrder(order);
+          setRatingOrderId(orderId);
+        }
+      }
+    }
+    return result;
+  }, [confirmDelivery, buyerAuthenticated, orders, session, email, checkHasRated]);
 
   const driverRefresh = useCallback(() => {
     // Re-read orders from localStorage so the driver feed picks up changes another
@@ -414,7 +437,7 @@ function App() {
             />
           </Suspense>
         )}
-        {ready && role === 'buyer' && (buyerAuthenticated ? <><BuyerView booking={booking} updateBooking={updateBooking} requestDelivery={requestDelivery} orders={orders} showNotice={showNotice} authStep={authStep} email={email} setEmail={setEmail} emailCode={emailCode} sendOtp={sendOtp} confirmEmailCode={confirmEmailCode} confirmDelivery={confirmDelivery} requestRefund={requestRefund} savedAddresses={savedAddresses} repeatBooking={repeatBooking} setSavedAddresses={setSavedAddresses} t={t} driverUpdate={driverUpdate} refreshDriverUpdate={refreshDriverUpdate} loyalty={loyaltySummary} loyaltyProfile={loyaltyProfile} estimateForOrder={estimateForOrder} /><BuyerFinance orders={orders} showNotice={showNotice} /></> : <BuyerAccessGate onSignedIn={() => {}} startSignIn={startPhoneSignIn} confirmCode={confirmPhoneCode} generatedCode={phoneCode} identifier={phoneIdentifier} error={signInError} onRegister={(value) => registerAccount({ identifier: value, role: 'buyer', displayName: 'Buyer' })} accountExists={accountExists} onGoogle={signInWithGoogleIdentity} onMeta={signInWithMetaIdentity} showNotice={showNotice} />)}
+        {ready && role === 'buyer' && (buyerAuthenticated ? <><BuyerView booking={booking} updateBooking={updateBooking} requestDelivery={requestDelivery} orders={orders} showNotice={showNotice} authStep={authStep} email={email} setEmail={setEmail} emailCode={emailCode} sendOtp={sendOtp} confirmEmailCode={confirmEmailCode} confirmDelivery={confirmDeliveryWithRating} requestRefund={requestRefund} savedAddresses={savedAddresses} repeatBooking={repeatBooking} setSavedAddresses={setSavedAddresses} t={t} driverUpdate={driverUpdate} refreshDriverUpdate={refreshDriverUpdate} loyalty={loyaltySummary} loyaltyProfile={loyaltyProfile} estimateForOrder={estimateForOrder} /><BuyerFinance orders={orders} showNotice={showNotice} /></> : <BuyerAccessGate onSignedIn={() => {}} startSignIn={startPhoneSignIn} confirmCode={confirmPhoneCode} generatedCode={phoneCode} identifier={phoneIdentifier} error={signInError} onRegister={(value) => registerAccount({ identifier: value, role: 'buyer', displayName: 'Buyer' })} accountExists={accountExists} onGoogle={signInWithGoogleIdentity} onMeta={signInWithMetaIdentity} showNotice={showNotice} />)}
         {detailOrder && (
           <Suspense fallback={null}>
             <OrderDetailModal
@@ -424,6 +447,30 @@ function App() {
               viewerRole={role}
             />
           </Suspense>
+        )}
+        {ratingOrderId && ratingOrder && (
+          <RatingModal
+            isOpen={true}
+            onClose={() => { setRatingOrderId(null); setRatingOrder(null); }}
+            onSubmit={async (ratingData) => {
+              const result = await submitRating(
+                ratingOrderId,
+                session?.identifier ?? email,
+                ratingOrder.sellerId ?? 'unknown',
+                ratingOrder.driverId ?? 'unknown',
+                ratingData
+              );
+              if (result?.ok) {
+                setRatingOrderId(null);
+                setRatingOrder(null);
+                showNotice('Thank you for your feedback!');
+              }
+              return result;
+            }}
+            order={ratingOrder}
+            sellerName={ratingOrder.sellerName}
+            driverName={ratingOrder.driverName}
+          />
         )}
         {ready && role === 'buyer' && buyerAuthenticated && (
           <Suspense fallback={<div className="panel lazy-fallback" aria-hidden="true" />}>

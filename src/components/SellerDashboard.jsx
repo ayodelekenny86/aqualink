@@ -7,6 +7,7 @@ import usePredictiveAnalytics from '../hooks/usePredictiveAnalytics';
 import useDynamicPricing from '../hooks/useDynamicPricing';
 import useSellerInventory from '../hooks/useSellerInventory';
 import useLoadBalancing from '../hooks/useLoadBalancing';
+import { useSellerRatings } from '../hooks/useRatings';
 
 function JobCard({ order, driver, onAccept, onStart, onComplete, onView }) {
   const statusColors = {
@@ -193,6 +194,10 @@ export function SellerDashboard({
   const [activeTab, setActiveTab] = useState('jobs');
   const [smartTab, setSmartTab] = useState('forecast');
 
+  // Seller ratings
+  const sellerId = sellerProfile?.identifier;
+  const { summary: sellerRatingSummary, loading: ratingsLoading, refresh: refreshRatings } = useSellerRatings(sellerId);
+
   // Record deliveries for inventory tracking
   useEffect(() => {
     completedJobs.forEach(job => {
@@ -228,6 +233,7 @@ export function SellerDashboard({
         <button className={activeTab === 'earnings' ? 'active' : ''} onClick={() => setActiveTab('earnings')}>Earnings</button>
         <button className={activeTab === 'inventory' ? 'active' : ''} onClick={() => setActiveTab('inventory')}>Inventory</button>
         <button className={activeTab === 'smart' ? 'active' : ''} onClick={() => setActiveTab('smart')}>Smart Hub</button>
+        <button className={activeTab === 'ratings' ? 'active' : ''} onClick={() => setActiveTab('ratings')}>Ratings</button>
         <button className={activeTab === 'profile' ? 'active' : ''} onClick={() => setActiveTab('profile')}>Profile</button>
       </div>
 
@@ -863,6 +869,90 @@ export function SellerDashboard({
               <div><dt>Documents</dt><dd>{vehicleInfo.document}</dd></div>
             </dl>
           </div>
+        </section>
+      )}
+
+      {activeTab === 'ratings' && (
+        <section className="panel">
+          <div className="panel-toolbar">
+            <div className="panel-title">
+              <span className="section-kicker">CUSTOMER RATINGS</span>
+              <h2>Your reputation from buyer feedback</h2>
+            </div>
+            <button className="outline-button" type="button" onClick={refreshRatings} disabled={ratingsLoading}>
+              {ratingsLoading ? 'Refreshing…' : '↻ Refresh'}
+            </button>
+          </div>
+
+          {sellerRatingSummary?.averages ? (
+            <>
+              <div className="rating-summary-grid">
+                <article className="rating-card overall">
+                  <span className="rating-card-label">Overall</span>
+                  <strong className="rating-card-value">{sellerRatingSummary.averages.overall ?? '—'}</strong>
+                  <small>out of 5.0</small>
+                  <div className="rating-distribution">
+                    {sellerRatingSummary.distribution && Object.entries(sellerRatingSummary.distribution).map(([star, count]) => (
+                      <div key={star} className="dist-bar">
+                        <span>{star}★</span>
+                        <div className="dist-bar-fill" style={{ width: `${sellerRatingSummary.count ? (count / sellerRatingSummary.count * 100) : 0}%` }} />
+                        <span>{count}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <small className="rating-count">{sellerRatingSummary.count} review{sellerRatingSummary.count !== 1 ? 's' : ''}</small>
+                </article>
+
+                {Object.entries(sellerRatingSummary.averages).filter(([k]) => k !== 'overall' && k !== 'total').map(([cat, value]) => (
+                  <article key={cat} className="rating-card category">
+                    <span className="rating-card-label">{cat.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}</span>
+                    <strong className="rating-card-value">{value ?? '—'}</strong>
+                    <small>out of 5.0</small>
+                  </article>
+                ))}
+              </div>
+
+              <div className="panel-divider" />
+
+              <div className="panel-title">
+                <span className="section-kicker">RECENT REVIEWS</span>
+                <h2>Latest buyer feedback</h2>
+              </div>
+
+              {sellerRatingSummary.ratings.length === 0 ? (
+                <p className="empty-feed">No ratings yet. Complete deliveries to start building your reputation.</p>
+              ) : (
+                <div className="rating-list">
+                  {sellerRatingSummary.ratings.slice(0, 10).map((rating) => (
+                    <article key={rating.id} className="rating-review panel">
+                      <div className="review-header">
+                        <div className="review-meta">
+                          <strong>Order {rating.orderId}</strong>
+                          <small>{new Date(rating.createdAt).toLocaleDateString()}</small>
+                        </div>
+                        <div className="review-stars">
+                          {[1,2,3,4,5].map(s => <span key={s} className={s <= (rating.overall || 0) ? 'filled' : ''}>★</span>)}
+                        </div>
+                      </div>
+                      <div className="review-categories">
+                        {Object.entries(rating).filter(([k, v]) => typeof v === 'number' && k !== 'overall' && k !== 'total').map(([cat, val]) => (
+                          <span key={cat} className="review-cat">
+                            <span className="cat-label">{cat.replace('_', ' ')}:</span>
+                            <span className="cat-value">{val}/5</span>
+                          </span>
+                        ))}
+                      </div>
+                      {rating.comment && (
+                        <p className="review-comment">{rating.comment}</p>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="empty-feed">No ratings yet. Complete deliveries to start building your reputation.</p>
+          )}
         </section>
       )}
     </>
