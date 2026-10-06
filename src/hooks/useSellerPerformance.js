@@ -16,11 +16,12 @@ import { summarise } from '../lib/summary';
  */
 
 const WEIGHTS = {
-  completion: 0.30,
-  onTime: 0.25,
-  cancellation: 0.20,
-  volume: 0.15,
+  completion: 0.26,
+  onTime: 0.22,
+  cancellation: 0.18,
+  volume: 0.14,
   revenue: 0.10,
+  rating: 0.10,
 };
 
 const HEALTH_BANDS = [
@@ -72,6 +73,13 @@ export function scoreSeller(orders, sellerId) {
   const volumeDelivered = completed.reduce((s, o) => s + parseFloat(o.volume?.replace(/[^0-9.]/g, '') || '0'), 0);
   const revenue = completed.reduce((s, o) => s + (Number(o.sellerReceives) || 0), 0) / 100;
 
+  // Buyer ratings attached to delivered orders. A 1-5 score maps to 0-100.
+  const rated = completed.filter(o => typeof o.rating === 'number' && o.rating >= 1 && o.rating <= 5);
+  const averageRating = rated.length
+    ? rated.reduce((s, o) => s + o.rating, 0) / rated.length
+    : null;
+  const ratingScore = averageRating != null ? (averageRating / 5) * 100 : 0;
+
   // Normalise volume and revenue against the best performer so a 0..1 scale
   // emerges from the actual fleet rather than from invented ceilings.
   const allSellers = new Set(orders.map(sellerIdOf)).size;
@@ -86,7 +94,8 @@ export function scoreSeller(orders, sellerId) {
     onTimeRate * WEIGHTS.onTime +
     (1 - cancellationRate) * WEIGHTS.cancellation +
     volumeScore * WEIGHTS.volume +
-    revenueScore * WEIGHTS.revenue
+    revenueScore * WEIGHTS.revenue +
+    (averageRating != null ? ratingScore : completionRate) * WEIGHTS.rating
   );
   const score = Math.round(raw * 100);
 
@@ -102,6 +111,8 @@ export function scoreSeller(orders, sellerId) {
     cancellationRate: Math.round(cancellationRate * 100),
     volumeDelivered: Math.round(volumeDelivered),
     revenue: Math.round(revenue),
+    averageRating: averageRating != null ? Number(averageRating.toFixed(1)) : null,
+    ratedCount: rated.length,
     score,
     band: bandFor(score),
   };

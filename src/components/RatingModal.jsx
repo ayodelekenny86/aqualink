@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, forwardRef } from 'react';
 import { RATING_CATEGORIES, getCategoryLabel } from '../lib/ratings';
 import { trackEvent, EVENTS } from '../lib/analytics';
 
 const STAR_SIZE = 36;
 const STAR_GAP = 4;
 
-function Star({ filled, onClick, onKeyDown, index, disabled, 'aria-label': ariaLabel }) {
+function Star({ filled, onClick, onKeyDown, index, disabled, forwardedRef, 'aria-label': ariaLabel }) {
   return (
     <button
       type="button"
@@ -22,6 +22,7 @@ function Star({ filled, onClick, onKeyDown, index, disabled, 'aria-label': ariaL
       aria-pressed={filled}
       role="radio"
       tabIndex={disabled ? -1 : 0}
+      ref={forwardedRef}
       style={{ fontSize: STAR_SIZE, lineHeight: STAR_SIZE }}
     >
       ★
@@ -29,7 +30,7 @@ function Star({ filled, onClick, onKeyDown, index, disabled, 'aria-label': ariaL
   );
 }
 
-function StarRow({ label, value, onChange, disabled, hoverValue, max = 5 }) {
+const StarRow = forwardRef(function StarRow({ label, value, onChange, disabled, hoverValue, max = 5 }, ref) {
   const stars = Array.from({ length: max }, (_, i) => i + 1);
   return (
     <div className="rating-row">
@@ -43,6 +44,7 @@ function StarRow({ label, value, onChange, disabled, hoverValue, max = 5 }) {
             onClick={(idx, isHover) => onChange(idx, isHover)}
             disabled={disabled}
             aria-label={`${label}: ${n} star${n > 1 ? 's' : ''}`}
+            forwardedRef={n === 1 ? ref : undefined}
           />
         ))}
       </div>
@@ -51,7 +53,7 @@ function StarRow({ label, value, onChange, disabled, hoverValue, max = 5 }) {
       </output>
     </div>
   );
-}
+});
 
 export default function RatingModal({
   isOpen,

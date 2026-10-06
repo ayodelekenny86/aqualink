@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   getRatings,
   getRatingsForOrder,
@@ -172,4 +172,38 @@ export function useOrderRating(orderId, buyerId) {
   }, [buyerId, orderId, checkHasRated]);
 
   return { rating, hasRated, loading, error };
+}
+
+/**
+ * Returns orders with their rating stamped on, plus helpers for opening the
+ * rating modal for a specific order. Used by the buyer's order list so a
+ * delivered order shows "Rate delivery" or the score it already got.
+ */
+export function useRatedOrders(orders, buyerId) {
+  const { ratings, loading } = useRatings();
+  const [modalOrderId, setModalOrderId] = useState(null);
+
+  const enriched = useMemo(() => {
+    const byOrder = new Map(ratings.map((r) => [r.orderId, r]));
+    return (orders ?? []).map((order) => {
+      const r = byOrder.get(order.id);
+      return r ? { ...order, rating: r.overall ?? null, ratingId: r.id } : { ...order, rating: null };
+    });
+  }, [orders, ratings]);
+
+  const openRating = useCallback((order) => {
+    setModalOrderId(order.id);
+  }, []);
+
+  const closeRating = useCallback(() => {
+    setModalOrderId(null);
+  }, []);
+
+  return {
+    orders: enriched,
+    loading,
+    modalOrderId,
+    openRating,
+    closeRating,
+  };
 }

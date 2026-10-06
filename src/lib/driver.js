@@ -139,7 +139,8 @@ export function advanceAction(status) {
  * `earningsMinor` is the driver's own configured share of each delivered order
  * — the same `driverReceives` figure the pricing split produces — summed over
  * delivered jobs only. Available counts jobs still to claim, active counts jobs
- * in progress.
+ * in progress. `averageRating` is the mean overall score across delivered orders
+ * that carry a rating; null when the driver has no rated deliveries.
  */
 export function driverStats(driver, orders) {
   const mine = driverOrders(driver, orders);
@@ -148,10 +149,17 @@ export function driverStats(driver, orders) {
   const completed = active.filter((order) => order.status !== 'Awaiting payment');
   const available = active.filter((order) => order.status === 'Awaiting payment');
 
+  const rated = delivered.filter((order) => typeof order.rating === 'number');
+  const averageRating = rated.length
+    ? Number((rated.reduce((sum, order) => sum + order.rating, 0) / rated.length).toFixed(1))
+    : null;
+
   return {
     available: available.length,
     active: completed.length,
     completed: delivered.length,
+    averageRating,
+    ratedCount: rated.length,
     earningsMinor: delivered.reduce((sum, order) => sum + (order.driverReceives ?? 0), 0),
   };
 }

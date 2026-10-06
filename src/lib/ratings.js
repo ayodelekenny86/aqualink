@@ -197,6 +197,29 @@ export async function syncRatingsFromServer() {
   }
 }
 
+/**
+ * Stamp each order with the rating it received, if any.
+ *
+ * `scoreSeller` and `driverStats` both want to know what buyers thought about a
+ * completed delivery, but those functions only see the order list. Rather than
+ * thread a second dataset through every caller, this returns a new array with
+ * a `rating` field (the overall score) and `ratingId` on each order. Orders with
+ * no rating keep `rating: null`.
+ */
+export async function enrichOrdersWithRatings(orders) {
+  if (!orders?.length) return orders ?? [];
+  try {
+    const ratings = await getRatings();
+    const byOrder = new Map(ratings.map((r) => [r.orderId, r]));
+    return orders.map((order) => {
+      const r = byOrder.get(order.id);
+      return r ? { ...order, rating: r.overall ?? null, ratingId: r.id } : { ...order, rating: null };
+    });
+  } catch {
+    return orders;
+  }
+}
+
 export function getCategoryLabel(categoryId) {
   const cat = RATING_CATEGORIES.find((c) => c.id === categoryId);
   return cat?.label ?? categoryId;
