@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, beforeEach } from 'vitest';
 import {
   validateRating,
   computeAverages,
@@ -8,6 +8,11 @@ import {
   createRating,
   getRatings,
 } from './ratings';
+import { replaceAll } from './collections';
+
+beforeEach(() => {
+  replaceAll('ratings', []);
+});
 
 const valid = (overrides = {}) => ({
   orderId: 'AQ-1',

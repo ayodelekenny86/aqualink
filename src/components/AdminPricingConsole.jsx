@@ -315,7 +315,7 @@ export default function AdminPricingConsole({ onNotice, onPricingChange, opsToke
           {ratingsLoading ? 'Refreshing…' : '↻ Refresh'}
         </button>
       </div>
-      {ratingsSummary ? (
+      {ratingsSummary && ratingsSummary.averages ? (
         <>
           <div className="rating-summary-grid">
             <article className="rating-card overall">
@@ -333,7 +333,7 @@ export default function AdminPricingConsole({ onNotice, onPricingChange, opsToke
               </div>
               <small className="rating-count">{ratingsSummary.count} review{ratingsSummary.count !== 1 ? 's' : ''}</small>
             </article>
-            {ratingsSummary.averages && Object.entries(ratingsSummary.averages).filter(([k]) => k !== 'overall' && k !== 'total').map(([cat, value]) => (
+            {Object.entries(ratingsSummary.averages).filter(([k]) => k !== 'overall' && k !== 'total').map(([cat, value]) => (
               <article key={cat} className="rating-card category">
                 <span className="rating-card-label">{cat.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}</span>
                 <strong className="rating-card-value">{value ?? '—'}</strong>

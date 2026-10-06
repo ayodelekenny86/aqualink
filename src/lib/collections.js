@@ -24,6 +24,7 @@ const COLLECTIONS = {
   institutionSchedules: 'db.institution_schedules',
   qualityRecords: 'db.quality_records',
   institutionBudget: 'db.institution_budget',
+  ratings: 'db.ratings',
 };
 
 export const COLLECTION_NAMES = Object.keys(COLLECTIONS);
