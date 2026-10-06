@@ -591,6 +591,7 @@ button { cursor: pointer; }
 .status-assigned { color: #9b6b16; background: #fff0d1; }
 .status-enroute { color: #286a8a; background: #dceef4; }
 .status-awaiting { color: #758982; background: #eef3f0; }
+.driver-rating-badge { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; padding: 2px 8px; color: #b8860b; background: #fff8e1; border-radius: 12px; font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 700; }
 
 /* Delivery stepper. Each step is a dot plus a label, and the connecting line is
    drawn by the list item rather than an SVG so it inherits colour from the

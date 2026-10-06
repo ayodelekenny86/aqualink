@@ -12,6 +12,11 @@ import { listSellerApplications, reviewSeller } from '../lib/payments';
  * Now it reads real applications from the server and records a real decision.
  * The approval itself is the same server endpoint the seller cannot reach, so a
  * decision made here is the one the seller's status check will report.
+ *
+ * Reputation for a returning seller lives on the seller performance page,
+ * which is keyed off the seller's approved identifier. A pending application
+ * has no identifier yet, so there is nothing to look up here — attempting to
+ * would only ever show a blank.
  */
 export default function SellerApprovalQueue({ opsToken, onNotice }) {
   const [applications, setApplications] = useState([]);

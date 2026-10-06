@@ -223,6 +223,38 @@ export function useOrderRating(orderId, buyerId) {
  * rating modal for a specific order. Used by the buyer's order list so a
  * delivered order shows "Rate delivery" or the score it already got.
  */
+export function useRatingsByBuyer(buyerId) {
+  const [ratings, setRatings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const load = useCallback(async () => {
+    if (!buyerId) {
+      setRatings([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getRatingsByBuyer(buyerId);
+      setRatings(data);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [buyerId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const refresh = useCallback(() => load(), [load]);
+
+  return { ratings, loading, error, refresh };
+}
+
 export function useRatedOrders(orders, buyerId) {
   const { ratings, loading } = useRatings();
   const [modalOrderId, setModalOrderId] = useState(null);
