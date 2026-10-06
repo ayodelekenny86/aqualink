@@ -59,173 +59,199 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
 
   return {
-  plugins: [
-    react(),
-    buildStamp(),
-    VitePWA({
-      registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'robots.txt', 'Octocat.png'],
-      manifest: {
-        name: 'AquaLink',
-        short_name: 'AquaLink',
-        description: 'Reliable water delivery in Ghana',
-        theme_color: '#006064',
-        background_color: '#ffffff',
-        display: 'standalone',
-        orientation: 'portrait-primary',
-        scope: '/',
-        start_url: '/',
-        icons: [
-          {
-            src: '/logo192.png',
-            sizes: '192x192',
-            type: 'image/png',
-            purpose: 'any maskable',
-          },
-          {
-            src: '/logo512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any maskable',
-          },
-        ],
-      },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/accounts\.google\.com\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'google-auth',
-              expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24,
-              },
-              networkTimeoutSeconds: 10,
+    plugins: [
+      react(),
+      buildStamp(),
+      VitePWA({
+        registerType: 'autoUpdate',
+        includeAssets: ['favicon.ico', 'robots.txt', 'Octocat.png'],
+        manifest: {
+          name: 'AquaLink',
+          short_name: 'AquaLink',
+          description: 'Reliable water delivery in Ghana',
+          theme_color: '#006064',
+          background_color: '#ffffff',
+          display: 'standalone',
+          orientation: 'portrait-primary',
+          scope: '/',
+          start_url: '/',
+          icons: [
+            {
+              src: '/logo192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'any maskable',
             },
-          },
-          {
-            urlPattern: /^https:\/\/connect\.facebook\.net\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'facebook-sdk',
-              expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24,
-              },
-              networkTimeoutSeconds: 10,
+            {
+              src: '/logo512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'any maskable',
             },
-          },
-          {
-            urlPattern: /^https:\/\/www\.googleapis\.com\/.*/i,
-            handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'google-apis',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 7,
+          ],
+        },
+        workbox: {
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+          runtimeCaching: [
+            {
+              urlPattern: /^https:\/\/accounts\.google\.com\/.*/i,
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'google-auth',
+                expiration: {
+                  maxEntries: 10,
+                  maxAgeSeconds: 60 * 60 * 24,
+                },
+                networkTimeoutSeconds: 10,
               },
             },
-          },
-          {
-            urlPattern: /^https:\/\/firebasestorage\.googleapis\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'firebase-storage',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 * 30,
+            {
+              urlPattern: /^https:\/\/connect\.facebook\.net\/.*/i,
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'facebook-sdk',
+                expiration: {
+                  maxEntries: 10,
+                  maxAgeSeconds: 60 * 60 * 24,
+                },
+                networkTimeoutSeconds: 10,
               },
             },
+            {
+              urlPattern: /^https:\/\/www\.googleapis\.com\/.*/i,
+              handler: 'StaleWhileRevalidate',
+              options: {
+                cacheName: 'google-apis',
+                expiration: {
+                  maxEntries: 100,
+                  maxAgeSeconds: 60 * 60 * 24 * 7,
+                },
+              },
+            },
+            {
+              urlPattern: /^https:\/\/firebasestorage\.googleapis\.com\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'firebase-storage',
+                expiration: {
+                  maxEntries: 50,
+                  maxAgeSeconds: 60 * 60 * 24 * 30,
+                },
+              },
+            },
+          ],
+        },
+        devOptions: {
+          enabled: true,
+          type: 'module',
+        },
+      }),
+    ],
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: (id) => {
+            if (id.includes('node_modules')) {
+              if (id.includes('react') || id.includes('react-dom')) return 'vendor-react';
+              if (id.includes('react-router-dom')) return 'vendor-router';
+              if (id.includes('idb') || id.includes('js-cookie')) return 'vendor-utils';
+            }
+            if (id.includes('/hooks/useAuth')) return 'hooks-auth';
+            if (id.includes('/hooks/useBooking')) return 'hooks-booking';
+            if (id.includes('/hooks/useAquaAi')) return 'hooks-ai';
+            if (id.includes('/hooks/useNotifications') || id.includes('/hooks/usePushNotifications')) return 'hooks-notifications';
+            if (id.includes('/hooks/useReports')) return 'hooks-reports';
+            if (id.includes('/hooks/useLoyalty')) return 'hooks-loyalty';
+            if (id.includes('/hooks/useSellerPerformance')) return 'hooks-seller-perf';
+            if (id.includes('/lib/money')) return 'lib-money';
+            if (id.includes('/lib/accounts')) return 'lib-accounts';
+            if (id.includes('/lib/collections')) return 'lib-collections';
+            if (id.includes('/lib/payments')) return 'lib-payments';
+            if (id.includes('/lib/reliability')) return 'lib-reliability';
+            if (id.includes('/lib/summary')) return 'lib-summary';
           },
-        ],
-      },
-      devOptions: {
-        enabled: true,
-        type: 'module',
-      },
-    }),
-  ],
-  server: {
-    host: '127.0.0.1',
-    port: 3000,
-    strictPort: true,
-    open: false,
-    proxy: {
-      // Supabase Edge Functions, when running locally (`supabase start` serves
-      // them at http://127.0.0.1:54321/functions/v1/<fn>/<action>). The client
-      // builds these absolute URLs itself when VITE_SUPABASE_* is set, so this
-      // entry only matters for a developer who has the local stack up but has
-      // not set the env vars — it keeps the same `/functions/v1/...` paths
-      // reachable from the dev server's origin.
-      '/functions': {
-        target: loadEnv(mode, process.cwd(), '').AQUALINK_SUPABASE_TARGET || 'http://127.0.0.1:54321',
-        changeOrigin: true,
-        secure: false,
-      },
-      // Without this, `fetch('/api/orders')` in dev hits the Vite dev server
-      // itself, which answers with the SPA fallback: an HTML document where the
-      // client expected JSON. Booking then failed with "returned an unreadable
-      // response" and the Paystack redirect could never be initialised, so
-      // payments were impossible to exercise locally.
-      '/api': {
-        target: loadEnv(mode, process.cwd(), '').AQUALINK_API_TARGET || DEFAULT_API_TARGET,
-        changeOrigin: true,
-        // Never buffer or rewrite the body. The Paystack webhook is validated
-        // against the exact bytes received, and the emulator's own routing
-        // already handles the path.
-        secure: false,
+        },
       },
     },
-  },
-  preview: {
-    host: '127.0.0.1',
-    port: 3000,
-    strictPort: true,
-    proxy: {
-      '/functions': {
-        target: process.env.AQUALINK_SUPABASE_TARGET || 'http://127.0.0.1:54321',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api': {
-        target: process.env.AQUALINK_API_TARGET || DEFAULT_API_TARGET,
-        changeOrigin: true,
-        secure: false,
-      },
-    },
-  },
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: ['./src/setupTests.js'],
-    exclude: ['**/node_modules/**', '**/dist/**', '.kilo/**', '**/.kilo/**', 'functions/**'],
-    // Signing in hashes a password with 210k PBKDF2 iterations on the main
-    // thread, several times per test. That is comfortably inside vitest's 5s
-    // default when a file runs alone and well outside it when the suite runs
-    // every file in parallel and saturates the CPU, so sign-in tests failed
-    // intermittently as a group. The budget has to cover the crypto, not just
-    // the assertions.
-    testTimeout: 60000,
-    hookTimeout: 60000,
-    pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true,
+    server: {
+      host: '127.0.0.1',
+      port: 3000,
+      strictPort: true,
+      open: false,
+      proxy: {
+        // Supabase Edge Functions, when running locally (`supabase start` serves
+        // them at http://127.0.0.1:54321/functions/v1/<fn>/<action>). The client
+        // builds these absolute URLs itself when VITE_SUPABASE_* is set, so this
+        // entry only matters for a developer who has the local stack up but has
+        // not set the env vars — it keeps the same `/functions/v1/...` paths
+        // reachable from the dev server's origin.
+        '/functions': {
+          target: loadEnv(mode, process.cwd(), '').AQUALINK_SUPABASE_TARGET || 'http://127.0.0.1:54321',
+          changeOrigin: true,
+          secure: false,
+        },
+        // Without this, `fetch('/api/orders')` in dev hits the Vite dev server
+        // itself, which answers with the SPA fallback: an HTML document where the
+        // client expected JSON. Booking then failed with "returned an unreadable
+        // response" and the Paystack redirect could never be initialised, so
+        // payments were impossible to exercise locally.
+        '/api': {
+          target: loadEnv(mode, process.cwd(), '').AQUALINK_API_TARGET || DEFAULT_API_TARGET,
+          changeOrigin: true,
+          // Never buffer or rewrite the body. The Paystack webhook is validated
+          // against the exact bytes received, and the emulator's own routing
+          // already handles the path.
+          secure: false,
+        },
       },
     },
-    // Vitest does not load .env files, so `import.meta.env` is empty in tests
-    // and the client thinks no server is configured. Inject the configured
-    // values so tests exercise the same code path as production — the fetch
-    // mock then intercepts the absolute Supabase URLs instead of hitting the
-    // real backend.
-    define: {
-      'import.meta.env.VITE_SUPABASE_PROJECT_REF': JSON.stringify(env.VITE_SUPABASE_PROJECT_REF || ''),
-      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL || ''),
-      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY || ''),
+    preview: {
+      host: '127.0.0.1',
+      port: 3000,
+      strictPort: true,
+      proxy: {
+        '/functions': {
+          target: process.env.AQUALINK_SUPABASE_TARGET || 'http://127.0.0.1:54321',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/api': {
+          target: process.env.AQUALINK_API_TARGET || DEFAULT_API_TARGET,
+          changeOrigin: true,
+          secure: false,
+        },
+      },
     },
-  },
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      setupFiles: ['./src/setupTests.js'],
+      exclude: ['**/node_modules/**', '**/dist/**', '.kilo/**', '**/.kilo/**', 'functions/**'],
+      // Signing in hashes a password with 210k PBKDF2 iterations on the main
+      // thread, several times per test. That is comfortably inside vitest's 5s
+      // default when a file runs alone and well outside it when the suite runs
+      // every file in parallel and saturates the CPU, so sign-in tests failed
+      // intermittently as a group. The budget has to cover the crypto, not just
+      // the assertions.
+      testTimeout: 60000,
+      hookTimeout: 60000,
+      pool: 'forks',
+      poolOptions: {
+        forks: {
+          singleFork: true,
+        },
+      },
+      // Vitest does not load .env files, so `import.meta.env` is empty in tests
+      // and the client thinks no server is configured. Inject the configured
+      // values so tests exercise the same code path as production — the fetch
+      // mock then intercepts the absolute Supabase URLs instead of hitting the
+      // real backend.
+      define: {
+        'import.meta.env.VITE_SUPABASE_PROJECT_REF': JSON.stringify(env.VITE_SUPABASE_PROJECT_REF || ''),
+        'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL || ''),
+        'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY || ''),
+      },
+    },
   };
 })

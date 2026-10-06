@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import useMessaging from '../hooks/useMessaging';
 import ConversationList from './ConversationList';
 import ChatPanel from './ChatPanel';
@@ -32,16 +32,33 @@ export default function MessagingPanel({
     startBuyerChat,
     startSellerChat,
     sendTemplate,
-  } = useMessaging({ currentUser, currentRole, onNotice });
+} = useMessaging({ currentUser, currentRole, onNotice });
 
   const [showList, setShowList] = useState(true);
   const [newConvRole, setNewConvRole] = useState(null);
   const [newConvSearch, setNewConvSearch] = useState('');
+  const listRef = useRef(null);
+  const chatRef = useRef(null);
+  const searchInputRef = useRef(null);
 
   const activeConversation = conversations.find(c => c.id === activeConversationId);
-  const activeMessages = activeConversationId 
+  const activeMessages = activeConversationId
     ? messages.filter(m => m.conversationId === activeConversationId).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
     : [];
+
+  // Focus management for mobile view transitions
+  useEffect(() => {
+    if (isMobile && !showList && chatRef.current) {
+      const input = chatRef.current.querySelector('textarea[aria-label="Message"]');
+      if (input) input.focus();
+    }
+  }, [showList, isMobile]);
+
+  useEffect(() => {
+    if (newConvRole !== null && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [newConvRole]);
 
   // On mobile, show list by default, switch to chat when conversation selected
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
@@ -239,6 +256,7 @@ export default function MessagingPanel({
         </header>
         <div className="contact-search">
           <input
+            ref={searchInputRef}
             type="search"
             placeholder="Search contacts…"
             value={newConvSearch}
@@ -275,10 +293,10 @@ export default function MessagingPanel({
   }
 
   return (
-    <div className={`messaging-panel ${className} ${isMobile ? 'mobile' : ''} ${embedded ? 'embedded' : ''}`}>
+    <div className={`messaging-panel ${className} ${isMobile ? 'mobile' : ''} ${embedded ? 'embedded' : ''}`} role="region" aria-label="Messages">
       {/* Conversation List */}
       {(isMobile || embedded) && showList && (
-        <div className="msg-list-pane">
+        <div className="msg-list-pane" ref={listRef}>
           <ConversationList
             conversations={conversations}
             activeConversationId={activeConversationId}
@@ -296,7 +314,7 @@ export default function MessagingPanel({
 
       {/* Chat View */}
       {(!isMobile && !embedded) || activeConversationId ? (
-        <div className="msg-chat-pane">
+        <div className="msg-chat-pane" ref={chatRef}>
           {!isMobile && !embedded && (
             <ConversationList
               conversations={conversations}
