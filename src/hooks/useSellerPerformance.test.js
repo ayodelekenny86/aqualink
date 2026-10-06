@@ -70,6 +70,31 @@ describe('scoreSeller', () => {
     expect(s).not.toBe(null);
     expect(s.sellerId).toBe(name);
   });
+
+  test('buyer ratings raise the score', () => {
+    const rated = { ...delivered('rated'), rating: 5 };
+    const unrated = { ...delivered('unrated') };
+    const ratedScore = scoreSeller([rated, unrated], 'rated').score;
+    const unratedScore = scoreSeller([unrated], 'unrated').score;
+    expect(ratedScore).toBeGreaterThan(unratedScore);
+  });
+
+  test('averageRating is null when no orders carry a rating', () => {
+    const s = scoreSeller([delivered('s1')], 's1');
+    expect(s.averageRating).toBe(null);
+    expect(s.ratedCount).toBe(0);
+  });
+
+  test('averageRating is the mean of delivered orders with a rating', () => {
+    const orders = [
+      { ...delivered('s1'), rating: 4 },
+      { ...delivered('s1'), rating: 5 },
+      { ...delivered('s1') },
+    ];
+    const s = scoreSeller(orders, 's1');
+    expect(s.averageRating).toBe(4.5);
+    expect(s.ratedCount).toBe(2);
+  });
 });
 
 describe('useSellerPerformance', () => {
