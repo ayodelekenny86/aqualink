@@ -68,13 +68,13 @@ export default function SellerApprovalQueue({ opsToken, onNotice }) {
     <div className="section-heading">
       <div><span className="section-kicker">SELLER APPROVAL QUEUE</span><h2>Manual reviews</h2></div>
       <span className="queue-count">
-        {loading ? 'Loading…' : `${applications.length} pending`}
+        {loading ? 'Loading' : `${applications.length} pending`}
       </span>
     </div>
 
     {error && <p className="form-error" role="alert">{error}</p>}
 
-    {!error && !loaded && <p className="empty-feed">Loading applications…</p>}
+    {!error && !loaded && <div className="loading-state"><div className="loading-spinner" /></div>}
 
     {loaded && !error && applications.length === 0 && (
       <p className="empty-feed">No seller applications are waiting. This queue is empty until a seller applies.</p>

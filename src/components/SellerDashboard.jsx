@@ -441,19 +441,19 @@ export function SellerDashboard({
                     <>
                       <div><span>KM:</span> <strong>{eq.usage.km?.toLocaleString() || 0}</strong></div>
                       <div><span>Hours:</span> <strong>{eq.usage.hours?.toLocaleString() || 0}</strong></div>
-                      <div><span>KM to Service:</span> <strong>{eq.maintenance.kmRemaining?.toLocaleString() || 'N/A'}</strong></div>
+                      <div><span>KM to Service:</span> <strong>{eq.maintenance.kmRemaining?.toLocaleString() || '—'}</strong></div>
                     </>
                   )}
                   {eq.type === 'pump' && (
                     <>
                       <div><span>Hours:</span> <strong>{eq.usage.hours?.toLocaleString() || 0}</strong></div>
-                      <div><span>Hours to Service:</span> <strong>{eq.maintenance.hoursRemaining?.toLocaleString() || 'N/A'}</strong></div>
+                      <div><span>Hours to Service:</span> <strong>{eq.maintenance.hoursRemaining?.toLocaleString() || '—'}</strong></div>
                     </>
                   )}
                   {eq.type === 'filter' && (
                     <>
                       <div><span>Volume Processed:</span> <strong>{eq.usage.volume?.toLocaleString() || 0} gal</strong></div>
-                      <div><span>Volume to Replace:</span> <strong>{eq.maintenance.daysRemaining || 'N/A'} days</strong></div>
+                      <div><span>Volume to Replace:</span> <strong>{eq.maintenance.daysRemaining || '—'} days</strong></div>
                     </>
                   )}
                   <div><span>Total Maint. Cost:</span> <strong>{formatCedi(eq.totalMaintenanceCost * 100)}</strong></div>

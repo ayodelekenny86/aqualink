@@ -213,7 +213,7 @@ export default function MessagingPanel({
   if (loading) {
     return (
       <div className={`messaging-panel ${className} loading`}>
-        <div className="msg-loading">Loading messages…</div>
+        <div className="loading-state"><div className="loading-spinner" /></div>
       </div>
     );
   }

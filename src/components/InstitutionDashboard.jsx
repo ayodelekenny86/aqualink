@@ -479,7 +479,7 @@ export function InstitutionDashboard({ orders, showNotice }) {
             </article>
             <article className="analytics-card">
               <h3>Cost per Unit</h3>
-              <p className="analytics-placeholder">Average cost per gallon across all deliveries: {analytics.avgOrderValue} / {analytics.monthlyVolume || 'N/A'}.</p>
+              <p className="analytics-placeholder">Average cost per gallon across all deliveries: {analytics.avgOrderValue} / {analytics.monthlyVolume || '—'}.</p>
             </article>
             <article className="analytics-card">
               <h3>Supplier Performance</h3>
@@ -585,7 +585,7 @@ export function InstitutionDashboard({ orders, showNotice }) {
 
           {smartTab === 'analytics' && (
             <div className="smart-panel">
-              {analyticsLoading ? <p>Loading analytics…</p> : (
+              {analyticsLoading ? <div className="loading-state"><div className="loading-spinner" /></div> : (
                 <>
                   <div className="analytics-summary">
                     <article className="analytics-card">
@@ -641,7 +641,7 @@ export function InstitutionDashboard({ orders, showNotice }) {
 
           {smartTab === 'pricing' && (
             <div className="smart-panel">
-              {pricingLoading ? <p>Loading pricing…</p> : (
+              {pricingLoading ? <div className="loading-state"><div className="loading-spinner" /></div> : (
                 <>
                   <div className="pricing-summary">
                     <article className="pricing-card">
@@ -686,7 +686,7 @@ export function InstitutionDashboard({ orders, showNotice }) {
 
           {smartTab === 'waterquality' && (
             <div className="smart-panel">
-              {qualityLoading ? <p>Loading water quality data…</p> : (
+              {qualityLoading ? <div className="loading-state"><div className="loading-spinner" /></div> : (
                 <>
                   <div className="quality-summary">
                     <article className="quality-stat-card">
