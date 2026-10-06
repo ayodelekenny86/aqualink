@@ -151,6 +151,12 @@ function App() {
   const t = translations[language] ?? translations.en;
   seedProducts();
 
+  // Initialize Web Vitals tracking
+  useEffect(() => {
+    initWebVitals();
+    trackEvent(EVENTS.BOOKING_STARTED); // App load as baseline
+  }, []);
+
   const {
     role, selectRole, notice, showNotice, dismissNotice,
     session, signOut, accountExists,
