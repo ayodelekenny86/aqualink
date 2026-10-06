@@ -221,7 +221,6 @@ function App() {
   const roleUnread = unreadCount(role);
 
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [detailOrderId, setDetailOrderId] = useState(null);
 
   // The driver workspace resolves the signed-in account against the fleet
   // roster by phone number, so the driver's jobs are the ones dispatch actually
@@ -379,6 +378,7 @@ function App() {
             />
           </Suspense>
         )}
+        {ready && role === 'buyer' && (buyerAuthenticated ? <><BuyerView booking={booking} updateBooking={updateBooking} requestDelivery={requestDelivery} orders={orders} showNotice={showNotice} authStep={authStep} email={email} setEmail={setEmail} emailCode={emailCode} sendOtp={sendOtp} confirmEmailCode={confirmEmailCode} confirmDelivery={confirmDelivery} requestRefund={requestRefund} savedAddresses={savedAddresses} repeatBooking={repeatBooking} setSavedAddresses={setSavedAddresses} t={t} driverUpdate={driverUpdate} refreshDriverUpdate={refreshDriverUpdate} loyalty={loyaltySummary} loyaltyProfile={loyaltyProfile} estimateForOrder={estimateForOrder} /><BuyerFinance orders={orders} showNotice={showNotice} /></> : <BuyerAccessGate onSignedIn={() => {}} startSignIn={startPhoneSignIn} confirmCode={confirmPhoneCode} generatedCode={phoneCode} identifier={phoneIdentifier} error={signInError} onRegister={(value) => registerAccount({ identifier: value, role: 'buyer', displayName: 'Buyer' })} accountExists={accountExists} onGoogle={signInWithGoogleIdentity} onMeta={signInWithMetaIdentity} showNotice={showNotice} />)}
         {detailOrder && (
           <Suspense fallback={null}>
             <OrderDetailModal
@@ -467,6 +467,17 @@ function App() {
         ))}
         {role === 'ops' && adminAuthenticated && (
           <DriverTrackingView orders={orders} showNotice={showNotice} />
+        )}
+        {ready && role === 'ops' && adminAuthenticated && (
+          <Suspense fallback={null}>
+            <SmartDispatchView
+              orders={orders}
+              sellerRanked={sellerRanked}
+              reliabilityRanked={reliabilityRanked}
+              fleetDrivers={fleetDrivers}
+              onNotice={showNotice}
+            />
+          </Suspense>
         )}
         {role === 'institution' && (
           <InstitutionDashboard orders={orders} showNotice={showNotice} />
