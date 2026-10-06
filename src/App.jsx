@@ -28,6 +28,7 @@ import DriverTrackingView from './components/DriverTrackingView';
 import MessagingPanel from './components/MessagingPanel';
 import ErrorBoundary from './components/ErrorBoundary';
 import { list, replaceAll } from './lib/collections';
+import { initWebVitals, trackEvent, EVENTS } from './lib/analytics';
 
 // Admin-only and overlay surfaces load on demand. A buyer who never opens the
 // admin console never downloads it, which keeps the initial bundle small.
