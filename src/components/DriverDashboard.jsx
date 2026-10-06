@@ -372,6 +372,9 @@ export default function DriverDashboard({
         <article><span>ACTIVE</span><strong>{stats.active}</strong><small>Jobs in progress</small></article>
         <article><span>COMPLETED</span><strong>{stats.completed}</strong><small>Delivered all time</small></article>
         <article className="driver-earnings"><span>EARNED</span><strong>{formatCedi(stats.earningsMinor)}</strong><small>Your share of delivered jobs</small></article>
+        {stats.averageRating != null && (
+          <article className="driver-rating"><span>RATING</span><strong>★ {stats.averageRating}/5</strong><small>{stats.ratedCount} review{stats.ratedCount !== 1 ? 's' : ''}</small></article>
+        )}
       </div>
 
       {/* GPS Tracker - only on mobile or when active */}

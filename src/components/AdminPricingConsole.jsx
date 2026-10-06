@@ -207,16 +207,17 @@ export default function AdminPricingConsole({ onNotice, onPricingChange, opsToke
   }
 
   return (
-    <section className="admin-pricing panel" aria-label="Pricing and revenue control">
-      <div className="panel-title">
-        <div>
-          <span className="section-kicker">PRICING &amp; REVENUE CONTROL</span>
-          <h2>You set the price and the split.</h2>
-          <p>Buyers always see the discounted price. Surge and revenue shares apply underneath it.</p>
-        </div>
-        <div className="admin-pricing-actions">
-          <button className="outline-button" type="button" onClick={reset}>Load defaults</button>
-          <button className="primary-button" type="button" onClick={save} disabled={saving}>
+    <>
+      <section className="admin-pricing panel" aria-label="Pricing and revenue control">
+        <div className="panel-title">
+          <div>
+            <span className="section-kicker">PRICING &amp; REVENUE CONTROL</span>
+            <h2>You set the price and the split.</h2>
+            <p>Buyers always see the discounted price. Surge and revenue shares apply underneath it.</p>
+          </div>
+          <div className="admin-pricing-actions">
+            <button className="outline-button" type="button" onClick={reset}>Load defaults</button>
+            <button className="primary-button" type="button" onClick={save} disabled={saving}>
             {saving ? 'Publishing…' : 'Publish pricing'}
           </button>
         </div>
@@ -363,6 +364,7 @@ export default function AdminPricingConsole({ onNotice, onPricingChange, opsToke
         <p className="empty-feed">No ratings have been submitted yet.</p>
       )}
     </section>
+    </>
   );
 }
 

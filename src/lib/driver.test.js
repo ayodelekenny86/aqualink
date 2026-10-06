@@ -176,7 +176,7 @@ describe('the driver stats bar', () => {
   });
 
   test('reports zeroes rather than throwing for an unrostered driver', () => {
-    expect(driverStats(null, orders)).toEqual({ available: 0, active: 0, completed: 0, earningsMinor: 0 });
+    expect(driverStats(null, orders)).toEqual({ available: 0, active: 0, completed: 0, averageRating: null, ratedCount: 0, earningsMinor: 0 });
   });
 
   test('ignores cancelled orders', () => {
