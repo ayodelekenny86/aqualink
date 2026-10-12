@@ -198,6 +198,9 @@ function App() {
 
   const { downloadReport } = useReports({ region, orders, onNotice: showNotice });
 
+  // Ratings system for post-delivery feedback
+  const { ratings, submitRating, checkHasRated } = useRatings();
+
   const downloadRatings = useCallback((label = 'Ratings export') => {
     const blob = new Blob([JSON.stringify(ratings, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -218,8 +221,6 @@ function App() {
     onNotice: showNotice,
   });
 
-  // Ratings system for post-delivery feedback
-  const { ratings, submitRating, checkHasRated } = useRatings();
   const [ratingOrderId, setRatingOrderId] = useState(null);
   const [ratingOrder, setRatingOrder] = useState(null);
   const { orders: ratedOrders, openRating } = useRatedOrders(orders, session?.identifier ?? email);
