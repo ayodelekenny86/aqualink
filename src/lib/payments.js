@@ -218,7 +218,13 @@ export function referenceFromLocation(location = globalThis.location) {
   const hash = String(location.hash ?? '');
   const fromHash = hash.includes('?') ? hash.slice(hash.indexOf('?') + 1) : '';
   const params = new URLSearchParams(fromHash || String(location.search ?? ''));
-  return String(params.get('reference') ?? params.get('tx_ref') ?? '').trim();
+  return String(
+    params.get('reference')
+    ?? params.get('trxref')
+    ?? params.get('tx_ref')
+    ?? params.get('txref')
+    ?? ''
+  ).trim();
 }
 
 export function listReceipts() {
