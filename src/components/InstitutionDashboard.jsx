@@ -7,6 +7,7 @@ import useDynamicPricing from '../hooks/useDynamicPricing';
 import useWaterQuality from '../hooks/useWaterQuality';
 import usePredictiveInventory from '../hooks/usePredictiveInventory';
 import useCustomerIntelligence from '../hooks/useCustomerIntelligence';
+import useNotifications from '../hooks/useNotifications';
 import SmartSchedulingPanel from './SmartSchedulingPanel';
 import PredictiveInventoryPanel from './PredictiveInventoryPanel';
 import CustomerIntelligencePanel from './CustomerIntelligencePanel';
@@ -177,6 +178,11 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
       active: true,
     });
   }
+
+  // Notifications for Smart Hub
+  const { unreadCount: unreadCountFn, items: notifications } = useNotifications();
+  const unreadCount = unreadCountFn('institution');
+  const preferences = { pushEnabled: true, quietHoursEnabled: false };
 
   return (
     <>

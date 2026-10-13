@@ -11,6 +11,7 @@ import usePredictiveInventory from '../hooks/usePredictiveInventory';
 import useRouteOptimization from '../hooks/useRouteOptimization';
 import useCustomerIntelligence from '../hooks/useCustomerIntelligence';
 import { useSellerRatings } from '../hooks/useRatings';
+import useNotifications from '../hooks/useNotifications';
 import WaterQualityPanel from './WaterQualityPanel';
 import PredictiveInventoryPanel from './PredictiveInventoryPanel';
 import RouteOptimizationPanel from './RouteOptimizationPanel';
@@ -212,6 +213,11 @@ export function SellerDashboard({
   // Seller ratings
   const sellerId = sellerProfile?.identifier;
   const { summary: sellerRatingSummary, loading: ratingsLoading, refresh: refreshRatings } = useSellerRatings(sellerId);
+
+  // Notifications for Smart Hub
+  const { unreadCount: unreadCountFn, items: notifications } = useNotifications();
+  const unreadCount = unreadCountFn('seller');
+  const preferences = { pushEnabled: true, quietHoursEnabled: false };
 
   // Record deliveries for inventory tracking
   useEffect(() => {
