@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { list, insert, update, remove, replaceAll } from '../lib/collections';
 
-const STORAGE_KEY = 'water_quality_records';
+const STORAGE_KEY = 'waterQualityRecords';
 
 /**
  * Water Quality Tracking hook: manages water quality certificates, test results,

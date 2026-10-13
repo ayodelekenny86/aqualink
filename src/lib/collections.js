@@ -27,6 +27,8 @@ const COLLECTIONS = {
   ratings: 'db.ratings',
   dynamicPricingRules: 'db.dynamic_pricing_rules',
   dynamic_pricing_rules: 'db.dynamic_pricing_rules',
+  smartSchedules: 'db.smart_schedules',
+  waterQualityRecords: 'db.water_quality_records',
 };
 
 export const COLLECTION_NAMES = Object.keys(COLLECTIONS);

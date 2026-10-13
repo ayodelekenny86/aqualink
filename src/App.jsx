@@ -305,6 +305,36 @@ function App() {
   const { records: waterQualityRecords } = useWaterQuality({ orders, onNotice: showNotice, sellers: sellerRanked });
   const { rules: pricingRules, activeSurge } = useDynamicPricing({ orders, sellerRanked, onNotice: showNotice });
 
+  // Fleet drivers data - must be defined before AI feature hooks that depend on it
+  const fleetDrivers = useMemo(() => list('drivers'), []);
+  
+  // Build driver locations map from fleet drivers for AI features
+  const driverLocations = useMemo(() => {
+    const locations = {};
+    fleetDrivers.forEach(driver => {
+      if (driver.lat && driver.lng) {
+        locations[driver.id] = {
+          lat: driver.lat,
+          lng: driver.lng,
+          lastOrderTime: driver.lastOrderTime,
+          fuelUsed: driver.fuelUsed,
+          currentOrders: driver.currentOrders || 0,
+        };
+      }
+    });
+    return locations;
+  }, [fleetDrivers]);
+  
+  // Build zone loads from orders for dispatch optimization
+  const zoneLoads = useMemo(() => {
+    const loads = {};
+    orders.filter(o => ['Pending', 'Confirmed', 'Assigned', 'En Route'].includes(o.status)).forEach(order => {
+      const zone = order.zone || 'zone_1';
+      loads[zone] = (loads[zone] || 0) + 1;
+    });
+    return loads;
+  }, [orders]);
+
   // Advanced AI feature hooks
   const { 
     weeklyForecast: demandForecast, 
@@ -667,39 +697,6 @@ function App() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [messagesOpen, setMessagesOpen] = useState(false);
 
-  // The driver workspace resolves the signed-in account against the fleet
-  // roster by phone number, so the driver's jobs are the ones dispatch actually
-  // stamped with their number. `driverCodeOrder` is the order whose delivery is
-  // being closed, so the handover dialog has somewhere to point.
-  const fleetDrivers = useMemo(() => list('drivers'), []);
-  
-  // Build driver locations map from fleet drivers for AI features
-  const driverLocations = useMemo(() => {
-    const locations = {};
-    fleetDrivers.forEach(driver => {
-      if (driver.lat && driver.lng) {
-        locations[driver.id] = {
-          lat: driver.lat,
-          lng: driver.lng,
-          lastOrderTime: driver.lastOrderTime,
-          fuelUsed: driver.fuelUsed,
-          currentOrders: driver.currentOrders || 0,
-        };
-      }
-    });
-    return locations;
-  }, [fleetDrivers]);
-  
-  // Build zone loads from orders for dispatch optimization
-  const zoneLoads = useMemo(() => {
-    const loads = {};
-    orders.filter(o => ['Pending', 'Confirmed', 'Assigned', 'En Route'].includes(o.status)).forEach(order => {
-      const zone = order.zone || 'zone_1';
-      loads[zone] = (loads[zone] || 0) + 1;
-    });
-    return loads;
-  }, [orders]);
-  
   const [driverCodeOrderId, setDriverCodeOrderId] = useState(null);
   const [busyDriverOrderId, setBusyDriverOrderId] = useState(null);
   const driverCodeOrder = driverCodeOrderId

@@ -116,7 +116,7 @@ export function useDriverBehavior({
     getDriverAnalysis,
     getCoachingCandidates,
     acknowledgeAlert,
-    summary,
+    summary: analysis?.summary,
     criticalAlerts: coachingAlerts.filter(a => a.severity === 'critical'),
     highAlerts: coachingAlerts.filter(a => a.severity === 'high')
   };

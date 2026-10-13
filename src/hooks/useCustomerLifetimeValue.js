@@ -10,6 +10,7 @@ export function useCustomerLifetimeValue({
 }) {
   const [segments, setSegments] = useState([]);
   const [clvAnalysis, setClvAnalysis] = useState([]);
+  const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -94,6 +95,7 @@ export function useCustomerLifetimeValue({
 
       setSegments(segmentList);
       setClvAnalysis(mockCustomers);
+      setSummary(summary);
     } catch (err) {
       setError(err.message);
     } finally {

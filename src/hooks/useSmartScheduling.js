@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { list, insert, update, remove } from '../lib/collections';
+import { list, insert, update, remove, replaceAll } from '../lib/collections';
 import { formatCedi } from '../lib/money';
 
-const STORAGE_KEY = 'smart_schedules';
+const STORAGE_KEY = 'smartSchedules';
 
 /**
  * Smart Scheduling hook: manages recurring delivery schedules for institutional
@@ -195,13 +195,6 @@ export function useSmartScheduling({ orders = [], onNotice }) {
     getNextDelivery,
     isDueToday,
   };
-}
-
-// Helper to replace all in localStorage
-function replaceAll(key, data) {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(key, JSON.stringify(data));
-  }
 }
 
 export default useSmartScheduling;
