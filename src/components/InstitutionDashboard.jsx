@@ -24,6 +24,14 @@ import MarketIntelligencePanel from './MarketIntelligencePanel';
 import EnergyOptimizationPanel from './EnergyOptimizationPanel';
 import SubscriptionManagementPanel from './SubscriptionManagementPanel';
 import SustainabilityTrackingPanel from './SustainabilityTrackingPanel';
+import WaterSourceOptimizationPanel from './WaterSourceOptimizationPanel';
+import ComplianceMonitoringPanel from './ComplianceMonitoringPanel';
+import EmergencyResponsePanel from './EmergencyResponsePanel';
+import CarbonFootprintPanel from './CarbonFootprintPanel';
+import SmartDeliverySchedulingPanel from './SmartDeliverySchedulingPanel';
+import WaterQualityPredictionPanel from './WaterQualityPredictionPanel';
+import CustomerSentimentPanel from './CustomerSentimentPanel';
+import RevenueLeakDetectionPanel from './RevenueLeakDetectionPanel';
 
 function ScheduleCard({ schedule, onToggle, onDelete, onEdit }) {
   const freqLabels = {
@@ -599,6 +607,14 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
             <button className={smartTab === 'energy-optimization' ? 'active' : ''} onClick={() => setSmartTab('energy-optimization')}>Energy Optimization</button>
             <button className={smartTab === 'subscription-management' ? 'active' : ''} onClick={() => setSmartTab('subscription-management')}>Subscription Mgmt</button>
             <button className={smartTab === 'sustainability-tracking' ? 'active' : ''} onClick={() => setSmartTab('sustainability-tracking')}>Sustainability</button>
+            <button className={smartTab === 'water-source' ? 'active' : ''} onClick={() => setSmartTab('water-source')}>Water Source</button>
+            <button className={smartTab === 'compliance' ? 'active' : ''} onClick={() => setSmartTab('compliance')}>Compliance</button>
+            <button className={smartTab === 'emergency' ? 'active' : ''} onClick={() => setSmartTab('emergency')}>Emergency</button>
+            <button className={smartTab === 'carbon' ? 'active' : ''} onClick={() => setSmartTab('carbon')}>Carbon Footprint</button>
+            <button className={smartTab === 'smart-scheduling' ? 'active' : ''} onClick={() => setSmartTab('smart-scheduling')}>Smart Scheduling</button>
+            <button className={smartTab === 'quality-prediction' ? 'active' : ''} onClick={() => setSmartTab('quality-prediction')}>Quality Prediction</button>
+            <button className={smartTab === 'sentiment' ? 'active' : ''} onClick={() => setSmartTab('sentiment')}>Sentiment</button>
+            <button className={smartTab === 'revenue-leaks' ? 'active' : ''} onClick={() => setSmartTab('revenue-leaks')}>Revenue Leaks</button>
           </div>
 
           {smartTab === 'forecast' && (
@@ -1006,6 +1022,92 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
               sources={[]}
               fleetDrivers={fleetDrivers}
               vehicles={[]}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'water-source' && (
+            <WaterSourceOptimizationPanel 
+              sources={[]}
+              orders={orders} 
+              qualityRecords={[]}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'compliance' && (
+            <ComplianceMonitoringPanel 
+              permits={[]}
+              inspections={[]}
+              regulations={[]}
+              facilities={[]}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'emergency' && (
+            <EmergencyResponsePanel 
+              orders={orders} 
+              drivers={fleetDrivers} 
+              facilities={[]}
+              customers={[]}
+              weatherAlerts={[]}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'carbon' && (
+            <CarbonFootprintPanel 
+              orders={orders} 
+              drivers={fleetDrivers} 
+              vehicles={[]}
+              routes={[]}
+              facilities={[]}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'smart-scheduling' && (
+            <SmartDeliverySchedulingPanel 
+              orders={orders} 
+              drivers={fleetDrivers} 
+              vehicles={[]}
+              facilities={[]}
+              trafficData={[]}
+              weatherData={[]}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'quality-prediction' && (
+            <WaterQualityPredictionPanel 
+              qualityRecords={[]} 
+              sources={[]}
+              weatherData={[]}
+              treatmentRecords={[]}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'sentiment' && (
+            <CustomerSentimentPanel 
+              customers={[]} 
+              orders={orders} 
+              ratings={[]}
+              messages={[]}
+              supportTickets={[]}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'revenue-leaks' && (
+            <RevenueLeakDetectionPanel 
+              orders={orders} 
+              payments={[]} 
+              invoices={[]}
+              pricing={{}}
+              drivers={fleetDrivers} 
+              facilities={[]}
               onNotice={showNotice}
             />
           )}

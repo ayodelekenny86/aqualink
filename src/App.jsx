@@ -49,6 +49,14 @@ import MarketIntelligencePanel from './components/MarketIntelligencePanel';
 import EnergyOptimizationPanel from './components/EnergyOptimizationPanel';
 import SubscriptionManagementPanel from './components/SubscriptionManagementPanel';
 import SustainabilityTrackingPanel from './components/SustainabilityTrackingPanel';
+import WaterSourceOptimizationPanel from './components/WaterSourceOptimizationPanel';
+import ComplianceMonitoringPanel from './components/ComplianceMonitoringPanel';
+import EmergencyResponsePanel from './components/EmergencyResponsePanel';
+import CarbonFootprintPanel from './components/CarbonFootprintPanel';
+import SmartDeliverySchedulingPanel from './components/SmartDeliverySchedulingPanel';
+import WaterQualityPredictionPanel from './components/WaterQualityPredictionPanel';
+import CustomerSentimentPanel from './components/CustomerSentimentPanel';
+import RevenueLeakDetectionPanel from './components/RevenueLeakDetectionPanel';
 
 // Smart feature hooks
 import useSmartScheduling from './hooks/useSmartScheduling';
@@ -67,6 +75,14 @@ import { useMarketIntelligence } from './hooks/useMarketIntelligence';
 import { useEnergyOptimization } from './hooks/useEnergyOptimization';
 import { useSubscriptionManagement } from './hooks/useSubscriptionManagement';
 import { useSustainabilityTracking } from './hooks/useSustainabilityTracking';
+import { useWaterSourceOptimization } from './hooks/useWaterSourceOptimization';
+import { useComplianceMonitoring } from './hooks/useComplianceMonitoring';
+import { useEmergencyResponse } from './hooks/useEmergencyResponse';
+import { useCarbonFootprintTracking } from './hooks/useCarbonFootprintTracking';
+import { useSmartDeliveryScheduling } from './hooks/useSmartDeliveryScheduling';
+import { useWaterQualityPrediction } from './hooks/useWaterQualityPrediction';
+import { useCustomerSentimentAnalysis } from './hooks/useCustomerSentimentAnalysis';
+import { useRevenueLeakDetection } from './hooks/useRevenueLeakDetection';
 
 // Admin-only and overlay surfaces load on demand. A buyer who never opens the
 // admin console never downloads it, which keeps the initial bundle small.
@@ -359,6 +375,131 @@ function App() {
     certifications, 
     summary: sustainabilitySummary 
   } = useSustainabilityTracking({ orders, qualityRecords: waterQualityRecords, sources: [], fleetDrivers, vehicles: [], onNotice: showNotice });
+
+  // New advanced AI features - Water Source, Compliance, Emergency, Carbon, Smart Scheduling, Quality Prediction, Sentiment, Revenue Leaks
+  const { 
+    analysis: waterSourceAnalysis, 
+    primarySource, 
+    secondarySource, 
+    backupSources, 
+    alerts: sourceAlerts,
+    optimalMix 
+  } = useWaterSourceOptimization({ sources: [], orders, qualityRecords: waterQualityRecords });
+  
+  const { 
+    status: complianceStatus, 
+    overallScore: complianceScore, 
+    criticalAlerts: complianceCriticalAlerts, 
+    highAlerts: complianceHighAlerts,
+    summary: complianceSummary 
+  } = useComplianceMonitoring({ 
+    permits: [], 
+    inspections: [], 
+    regulations: [],
+    facilities: [],
+    onNotice: showNotice 
+  });
+  
+  const { 
+    emergencies, 
+    activeEmergency, 
+    responsePlans, 
+    activeCount: emergencyActiveCount, 
+    criticalCount: emergencyCriticalCount,
+    generateResponsePlan,
+    executeResponsePlan,
+    resolveEmergency
+  } = useEmergencyResponse({ 
+    orders, 
+    drivers: fleetDrivers, 
+    facilities: [], 
+    customers: [], 
+    weatherAlerts: [],
+    onNotice: showNotice 
+  });
+  
+  const { 
+    footprint: carbonFootprintData, 
+    totalEmissions, 
+    emissionsPerGallon, 
+    progressToTarget: carbonProgress,
+    reductionOpportunities,
+    monthlyTrend: carbonTrend
+  } = useCarbonFootprintTracking({ 
+    orders, 
+    drivers: fleetDrivers, 
+    vehicles: [], 
+    routes: [], 
+    facilities: [],
+    onNotice: showNotice 
+  });
+  
+  const { 
+    schedule: smartSchedule, 
+    optimization: scheduleOptimization, 
+    scheduledCount, 
+    conflictCount, 
+    efficiency: scheduleEfficiency,
+    distanceSaved 
+  } = useSmartDeliveryScheduling({ 
+    orders, 
+    drivers: fleetDrivers, 
+    vehicles: [], 
+    facilities: [], 
+    trafficData: [], 
+    weatherData: [],
+    onNotice: showNotice 
+  });
+  
+  const { 
+    predictions: qualityPredictions, 
+    anomalies: qualityAnomalies, 
+    criticalCount: qualityCriticalCount, 
+    highRiskCount: qualityHighRiskCount,
+    avgPredictedScore,
+    overallTrend: qualityTrend,
+    alerts: qualityPredictionAlerts
+  } = useWaterQualityPrediction({ 
+    qualityRecords: waterQualityRecords, 
+    sources: [],
+    weatherData: [],
+    treatmentRecords: [],
+    onNotice: showNotice 
+  });
+  
+  const { 
+    analysis: sentimentAnalysis, 
+    overallSentiment, 
+    nps, 
+    churnRiskCount, 
+    criticalAlerts: sentimentCriticalAlerts,
+    insights: sentimentInsights,
+    segments: sentimentSegments
+  } = useCustomerSentimentAnalysis({ 
+    customers: [], 
+    orders, 
+    ratings: [], 
+    messages: [], 
+    supportTickets: [],
+    onNotice: showNotice 
+  });
+  
+  const { 
+    leaks: revenueLeaks, 
+    summary: leakSummary, 
+    totalLeakAmount, 
+    netLeak, 
+    criticalCount: leakCriticalCount, 
+    highCount: leakHighCount 
+  } = useRevenueLeakDetection({ 
+    orders, 
+    payments: [], 
+    invoices: [], 
+    pricing: pricingRules, 
+    drivers: fleetDrivers, 
+    facilities: [],
+    onNotice: showNotice 
+  });
 
   // Reliability is a second opinion on seller performance, aimed at the
   // operator question "how dependable is this seller, and how long do they
@@ -723,6 +864,57 @@ function App() {
             sdgAlignment={sdgAlignment}
             certifications={certifications}
             sustainabilitySummary={sustainabilitySummary}
+            waterSourceAnalysis={waterSourceAnalysis}
+            primarySource={primarySource}
+            secondarySource={secondarySource}
+            backupSources={backupSources}
+            sourceAlerts={sourceAlerts}
+            optimalMix={optimalMix}
+            complianceStatus={complianceStatus}
+            complianceScore={complianceScore}
+            complianceCriticalAlerts={complianceCriticalAlerts}
+            complianceHighAlerts={complianceHighAlerts}
+            complianceSummary={complianceSummary}
+            emergencies={emergencies}
+            activeEmergency={activeEmergency}
+            responsePlans={responsePlans}
+            emergencyActiveCount={emergencyActiveCount}
+            emergencyCriticalCount={emergencyCriticalCount}
+            generateResponsePlan={generateResponsePlan}
+            executeResponsePlan={executeResponsePlan}
+            resolveEmergency={resolveEmergency}
+            carbonFootprintData={carbonFootprintData}
+            totalEmissions={totalEmissions}
+            emissionsPerGallon={emissionsPerGallon}
+            carbonProgress={carbonProgress}
+            reductionOpportunities={reductionOpportunities}
+            carbonTrend={carbonTrend}
+            smartSchedule={smartSchedule}
+            scheduleOptimization={scheduleOptimization}
+            scheduledCount={scheduledCount}
+            conflictCount={conflictCount}
+            scheduleEfficiency={scheduleEfficiency}
+            distanceSaved={distanceSaved}
+            qualityPredictions={qualityPredictions}
+            qualityAnomalies={qualityAnomalies}
+            qualityCriticalCount={qualityCriticalCount}
+            qualityHighRiskCount={qualityHighRiskCount}
+            avgPredictedScore={avgPredictedScore}
+            qualityTrend={qualityTrend}
+            qualityPredictionAlerts={qualityPredictionAlerts}
+            sentimentAnalysis={sentimentAnalysis}
+            overallSentiment={overallSentiment}
+            nps={nps}
+            churnRiskCount={churnRiskCount}
+            sentimentCriticalAlerts={sentimentCriticalAlerts}
+            sentimentInsights={sentimentInsights}
+            sentimentSegments={sentimentSegments}
+            revenueLeaks={revenueLeaks}
+            leakSummary={leakSummary}
+            totalLeakAmount={totalLeakAmount}
+            netLeak={netLeak}
+            leakCriticalCount={leakCriticalCount}
+            leakHighCount={leakHighCount}
           />
         ) : (
           <SellerAccessGate
@@ -847,6 +1039,57 @@ function App() {
             sdgAlignment={sdgAlignment}
             certifications={certifications}
             sustainabilitySummary={sustainabilitySummary}
+            waterSourceAnalysis={waterSourceAnalysis}
+            primarySource={primarySource}
+            secondarySource={secondarySource}
+            backupSources={backupSources}
+            sourceAlerts={sourceAlerts}
+            optimalMix={optimalMix}
+            complianceStatus={complianceStatus}
+            complianceScore={complianceScore}
+            complianceCriticalAlerts={complianceCriticalAlerts}
+            complianceHighAlerts={complianceHighAlerts}
+            complianceSummary={complianceSummary}
+            emergencies={emergencies}
+            activeEmergency={activeEmergency}
+            responsePlans={responsePlans}
+            emergencyActiveCount={emergencyActiveCount}
+            emergencyCriticalCount={emergencyCriticalCount}
+            generateResponsePlan={generateResponsePlan}
+            executeResponsePlan={executeResponsePlan}
+            resolveEmergency={resolveEmergency}
+            carbonFootprintData={carbonFootprintData}
+            totalEmissions={totalEmissions}
+            emissionsPerGallon={emissionsPerGallon}
+            carbonProgress={carbonProgress}
+            reductionOpportunities={reductionOpportunities}
+            carbonTrend={carbonTrend}
+            smartSchedule={smartSchedule}
+            scheduleOptimization={scheduleOptimization}
+            scheduledCount={scheduledCount}
+            conflictCount={conflictCount}
+            scheduleEfficiency={scheduleEfficiency}
+            distanceSaved={distanceSaved}
+            qualityPredictions={qualityPredictions}
+            qualityAnomalies={qualityAnomalies}
+            qualityCriticalCount={qualityCriticalCount}
+            qualityHighRiskCount={qualityHighRiskCount}
+            avgPredictedScore={avgPredictedScore}
+            qualityTrend={qualityTrend}
+            qualityPredictionAlerts={qualityPredictionAlerts}
+            sentimentAnalysis={sentimentAnalysis}
+            overallSentiment={overallSentiment}
+            nps={nps}
+            churnRiskCount={churnRiskCount}
+            sentimentCriticalAlerts={sentimentCriticalAlerts}
+            sentimentInsights={sentimentInsights}
+            sentimentSegments={sentimentSegments}
+            revenueLeaks={revenueLeaks}
+            leakSummary={leakSummary}
+            totalLeakAmount={totalLeakAmount}
+            netLeak={netLeak}
+            leakCriticalCount={leakCriticalCount}
+            leakHighCount={leakHighCount}
           />
         )}
         {ready && role === 'ops' && (adminAuthenticated ? <Suspense fallback={null}><OpsView orders={orders} downloadReport={downloadReport} opsToken={opsToken} showNotice={showNotice} sellerPerfSummary={sellerPerfSummary} sellerRanked={sellerRanked} reliabilitySummary={reliabilitySummaryData} reliabilityRanked={reliabilityRanked} driverRatingsSummary={driverRatingsSummary} /></Suspense> : <AdminAccessGate onSignIn={signInWithPassword} error={signInError} onGoogle={signInWithGoogleIdentity} onMeta={signInWithMetaIdentity} showNotice={showNotice} />)}
