@@ -1,4 +1,4 @@
-# AquaLink
+﻿# Nautica
 
 A water-delivery marketplace for Ghana: buyers book, sellers deliver, drivers
 transport, and operators manage the network.
@@ -71,11 +71,11 @@ it, and an empty workspace says it has no data. Invented figures ("124 orders",
 "GH₵18,540 GMV", a 4.8★ seller rating, a "100% — certificates up to date" water
 quality score, a GH₵3,500/month subscription) have been removed rather than
 kept as sample data, because a business cannot tell invented numbers from
-measured ones. The Aqua panel says it cannot forecast demand rather than
+measured ones. The Naut panel says it cannot forecast demand rather than
 inventing a forecast.
 
 There is no escrow and no pending-payout queue. Paystack collects money
-directly into the AquaLink account, so confirming delivery marks an order
+directly into the Nautica account, so confirming delivery marks an order
 delivered and records that the seller payout is handled separately by
 operations.
 

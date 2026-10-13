@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+﻿import { useMemo } from 'react';
 import { allocate, formatCedi, toMinor, validateSplit, DEFAULT_SPLIT } from '../lib/money';
 
 /**
@@ -42,7 +42,7 @@ export default function RevenueBreakdown({ amountCedi = 250, split = DEFAULT_SPL
           <span className="section-kicker">REVENUE SPLIT</span>
           <h2>{title}</h2>
         </div>
-        <span className="verified-pill">{formatCedi(companyTake)} to AquaLink</span>
+        <span className="verified-pill">{formatCedi(companyTake)} to Nautica</span>
       </div>
 
       <div className="revenue-bar" role="img" aria-label="Revenue distribution">
@@ -62,7 +62,7 @@ export default function RevenueBreakdown({ amountCedi = 250, split = DEFAULT_SPL
         <Row label="Total charged to you" amountMinor={buyerPays} />
         <Row label="Water seller receives" amountMinor={sellerReceives} share={split.seller} />
         <Row label="Driver receives" amountMinor={driverReceives} share={split.driver} />
-        <Row label="AquaLink keeps" amountMinor={companyTake} share={companyShare} tone="company" />
+        <Row label="Nautica keeps" amountMinor={companyTake} share={companyShare} tone="company" />
       </div>
 
       <small className="revenue-note">
@@ -75,3 +75,4 @@ export default function RevenueBreakdown({ amountCedi = 250, split = DEFAULT_SPL
     </section>
   );
 }
+

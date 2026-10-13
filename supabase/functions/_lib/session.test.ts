@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+﻿import { describe, expect, test } from 'vitest';
 import {
   checkFlutterwaveSettlement,
   checkSettlement,
@@ -20,7 +20,7 @@ import {
  */
 
 const ORDER = {
-  id: 'AQ-1A2B3C',
+  id: 'NAUT-1A2B3C',
   charged_minor: 30000,
   paystack_reference: 'aq1a2b3c-0123456789abcdef',
   flutterwave_reference: null,
@@ -224,13 +224,13 @@ describe('payment references', () => {
     // suffix is the only thing standing between them and someone else's
     // receipt. The handlers previously used `crypto.randomUUID().slice(0, 8)`,
     // which is 32 bits.
-    const reference = newReference('AQ-1A2B3C');
+    const reference = newReference('NAUT-1A2B3C');
     expect(reference).toMatch(/^aq1a2b3c-[0-9a-f]{16}$/);
-    expect(new Set(Array.from({ length: 1000 }, () => newReference('AQ-1A2B3C'))).size).toBe(1000);
+    expect(new Set(Array.from({ length: 1000 }, () => newReference('NAUT-1A2B3C'))).size).toBe(1000);
   });
 
   test('sanitises an order code that cannot be used verbatim', () => {
-    expect(newReference('---///')).toMatch(/^aq-[0-9a-f]{16}$/);
+    expect(newReference('---///')).toMatch(/^naut-[0-9a-f]{16}$/);
   });
 });
 
@@ -249,9 +249,9 @@ describe('the reference allowlist', () => {
 
   test('accepts every reference the server actually issues', () => {
     for (let i = 0; i < 200; i += 1) {
-      expect(REFERENCE_PATTERN.test(newReference(`AQ-1A2B3C${i}`))).toBe(true);
+      expect(REFERENCE_PATTERN.test(newReference(`NAUT-1A2B3C${i}`))).toBe(true);
     }
-    expect(REFERENCE_PATTERN.test(newReference('AQ-1048-2'))).toBe(true);
+    expect(REFERENCE_PATTERN.test(newReference('NAUT-1048-2'))).toBe(true);
     expect(REFERENCE_PATTERN.test(newReference('---///'))).toBe(true);
   });
 
@@ -269,7 +269,7 @@ describe('the reference allowlist', () => {
   });
 
   test('rejects shapes that were never issued', () => {
-    for (const value of ['', 'r1', 'AQ-1A2B3C', 'aq1a2b3c', 'aq1a2b3c-short', 'aq-1A2B3C-0123456789abcdef']) {
+    for (const value of ['', 'r1', 'NAUT-1A2B3C', 'aq1a2b3c', 'aq1a2b3c-short', 'naut-1A2B3C-0123456789abcdef']) {
       expect(REFERENCE_PATTERN.test(value)).toBe(false);
     }
   });

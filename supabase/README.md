@@ -1,6 +1,6 @@
-# AquaLink Supabase Backend
+﻿# Nautica Supabase Backend
 
-This directory contains the Supabase backend for AquaLink, including:
+This directory contains the Supabase backend for Nautica, including:
 - Database migrations
 - Edge Functions (API endpoints)
 - Local development configuration

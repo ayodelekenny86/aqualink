@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+﻿import { execFileSync } from "node:child_process";
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from 'vite-plugin-pwa';
@@ -73,8 +73,8 @@ export default defineConfig(({ mode }) => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'robots.txt', 'Octocat.png'],
         manifest: {
-          name: 'AquaLink',
-          short_name: 'AquaLink',
+          name: 'Nautica',
+          short_name: 'Nautica',
           description: 'Reliable water delivery in Ghana',
           theme_color: '#006064',
           background_color: '#ffffff',
@@ -166,7 +166,7 @@ export default defineConfig(({ mode }) => {
             }
             if (id.includes('/hooks/useAuth')) return 'hooks-auth';
             if (id.includes('/hooks/useBooking')) return 'hooks-booking';
-            if (id.includes('/hooks/useAquaAi')) return 'hooks-ai';
+            if (id.includes('/hooks/useNautAi')) return 'hooks-ai';
             if (id.includes('/hooks/useNotifications') || id.includes('/hooks/usePushNotifications')) return 'hooks-notifications';
             if (id.includes('/hooks/useReports')) return 'hooks-reports';
             if (id.includes('/hooks/useLoyalty')) return 'hooks-loyalty';
@@ -194,7 +194,7 @@ export default defineConfig(({ mode }) => {
         // not set the env vars — it keeps the same `/functions/v1/...` paths
         // reachable from the dev server's origin.
         '/functions': {
-          target: loadEnv(mode, process.cwd(), '').AQUALINK_SUPABASE_TARGET || 'http://127.0.0.1:54321',
+          target: loadEnv(mode, process.cwd(), '').NAUTLINK_SUPABASE_TARGET || 'http://127.0.0.1:54321',
           changeOrigin: true,
           secure: false,
         },
@@ -204,7 +204,7 @@ export default defineConfig(({ mode }) => {
         // response" and the Paystack redirect could never be initialised, so
         // payments were impossible to exercise locally.
         '/api': {
-          target: loadEnv(mode, process.cwd(), '').AQUALINK_API_TARGET || DEFAULT_API_TARGET,
+          target: loadEnv(mode, process.cwd(), '').NAUTLINK_API_TARGET || DEFAULT_API_TARGET,
           changeOrigin: true,
           // Never buffer or rewrite the body. The Paystack webhook is validated
           // against the exact bytes received, and the emulator's own routing
@@ -219,12 +219,12 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       proxy: {
         '/functions': {
-          target: process.env.AQUALINK_SUPABASE_TARGET || 'http://127.0.0.1:54321',
+          target: process.env.NAUTLINK_SUPABASE_TARGET || 'http://127.0.0.1:54321',
           changeOrigin: true,
           secure: false,
         },
         '/api': {
-          target: process.env.AQUALINK_API_TARGET || DEFAULT_API_TARGET,
+          target: process.env.NAUTLINK_API_TARGET || DEFAULT_API_TARGET,
           changeOrigin: true,
           secure: false,
         },

@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+﻿import { describe, expect, test } from 'vitest';
 import { createHmac } from 'node:crypto';
 import {
   DEFAULT_PRICING,
@@ -20,7 +20,7 @@ import {
  */
 
 const ORDER = {
-  id: 'AQ-1048-2',
+  id: 'NAUT-1048-2',
   // GH¢300.00: the discounted price, inclusive. The settlement checks are
   // amount-agnostic, so the fixture uses the real default order value.
   chargedMinor: 30000,
@@ -167,21 +167,21 @@ describe('settlement decision', () => {
 
 describe('references', () => {
   test('embeds a recognisable order code and stays unguessable', () => {
-    const reference = newReference('AQ-1048-2');
+    const reference = newReference('NAUT-1048-2');
     expect(reference.startsWith('aq10482-')).toBe(true);
     // 16 hex chars of entropy, so a reference cannot be enumerated.
     expect(reference.split('-')[1]).toMatch(/^[0-9a-f]{16}$/);
   });
 
   test('never repeats, even for the same order code', () => {
-    const seen = new Set(Array.from({ length: 500 }, () => newReference('AQ-1048-2')));
+    const seen = new Set(Array.from({ length: 500 }, () => newReference('NAUT-1048-2')));
     expect(seen.size).toBe(500);
   });
 
   test('survives a code made entirely of unusable characters', () => {
     expect(() => newReference('---///')).not.toThrow();
-    expect(newReference('---///').startsWith('aq-')).toBe(true);
-    expect(newReference(null)).toMatch(/^aq-[0-9a-f]{16}$/);
+    expect(newReference('---///').startsWith('naut-')).toBe(true);
+    expect(newReference(null)).toMatch(/^naut-[0-9a-f]{16}$/);
   });
 });
 
@@ -265,3 +265,5 @@ describe('server-side pricing', () => {
     expect(() => quotePrice({ ...DEFAULT_PRICING, discountPercent: 120 })).toThrow(/between 0% and 100%/);
   });
 });
+
+

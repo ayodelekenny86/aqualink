@@ -1,5 +1,5 @@
-/**
- * Account registry and authentication for AquaLink.
+﻿/**
+ * Account registry and authentication for Nautica.
  *
  * A sign-in only succeeds when the identifier resolves to a real, active
  * account in this registry and the presented credential verifies against that
@@ -405,3 +405,4 @@ export async function registerAccount({
 }) {
   return createAccount({ identifier, role, displayName, password });
 }
+

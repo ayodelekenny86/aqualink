@@ -1,4 +1,4 @@
-import { AsyncLocalStorage } from 'node:async_hooks';
+﻿import { AsyncLocalStorage } from 'node:async_hooks';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 export const CURRENCY = 'GHS';
@@ -99,7 +99,7 @@ export async function readJson(req: Request): Promise<Record<string, unknown>> {
  * handful of observed values, which makes that a real attack rather than a
  * theoretical one.
  */
-export function generateId(prefix = 'AQ'): string {
+export function generateId(prefix = 'NAUT'): string {
   const bytes = new Uint8Array(10);
   crypto.getRandomValues(bytes);
   const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -112,11 +112,11 @@ export function generateId(prefix = 'AQ'): string {
  * The reference is interpolated into a PostgREST `.or()` filter, so a comma or a
  * parenthesis in it would change what the query selects. An allowlist is the only
  * thing that prevents that, and it has to match what `newReference` actually
- * produces: `aq` plus the sanitised order code, then the random suffix.
+ * produces: `naut` plus the sanitised order code, then the random suffix.
  *
  * The order-code segment is `[a-z0-9]*` rather than `[a-z0-9]+` because
- * `newReference` falls back to the bare word `aq` when a code sanitises to
- * nothing, yielding a reference of exactly `aq-<suffix>`. A `+` there would
+ * `newReference` falls back to the bare word `naut` when a code sanitises to
+ * nothing, yielding a reference of exactly `naut-<suffix>`. A `+` there would
  * reject those and every such payment would fail to verify.
  *
  * Anchored at both ends, and the only characters permitted are lowercase
@@ -124,5 +124,6 @@ export function generateId(prefix = 'AQ'): string {
  * metacharacters (`,` `.` `(` `)` `*` `:`) rather than trying to strip them.
  */
 export function isPlausibleReference(value: string): boolean {
-  return /^aq[a-z0-9]{0,64}-[0-9a-f]{16,64}$/.test(String(value ?? ''));
+  return /^naut[a-z0-9]{0,64}-[0-9a-f]{16,64}$/.test(String(value ?? ''));
 }
+

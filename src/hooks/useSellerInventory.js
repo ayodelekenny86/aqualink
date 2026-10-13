@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import { list, insert, update, remove } from '../lib/collections';
 
 /**
@@ -21,14 +21,14 @@ const INITIAL_INVENTORY = [
 ];
 
 const INITIAL_EQUIPMENT = [
-  { id: 'eq-truck-1', name: 'Delivery Truck #1', type: 'vehicle', assetTag: 'AQ-TRK-001', usage: { km: 45000, hours: 1200 }, maintenance: { kmRemaining: 5000, hoursRemaining: 300, urgency: 'ok', lastService: '2025-01-15', nextService: '2025-07-15' }, totalMaintenanceCost: 12500 },
-  { id: 'eq-truck-2', name: 'Delivery Truck #2', type: 'vehicle', assetTag: 'AQ-TRK-002', usage: { km: 78000, hours: 2100 }, maintenance: { kmRemaining: 2000, hoursRemaining: 150, urgency: 'due_soon', lastService: '2024-10-20', nextService: '2025-04-20' }, totalMaintenanceCost: 28400 },
-  { id: 'eq-pump-1', name: 'Main Transfer Pump', type: 'pump', assetTag: 'AQ-PMP-001', usage: { hours: 3200 }, maintenance: { hoursRemaining: 800, urgency: 'ok', lastService: '2025-02-01', nextService: '2025-08-01' }, totalMaintenanceCost: 8200 },
-  { id: 'eq-pump-2', name: 'Backup Pump', type: 'pump', assetTag: 'AQ-PMP-002', usage: { hours: 1100 }, maintenance: { hoursRemaining: 100, urgency: 'due_soon', lastService: '2024-11-15', nextService: '2025-05-15' }, totalMaintenanceCost: 3100 },
-  { id: 'eq-filter-1', name: 'Primary Filtration System', type: 'filter', assetTag: 'AQ-FLT-001', usage: { volume: 500000 }, maintenance: { daysRemaining: 45, urgency: 'ok', lastService: '2025-01-10', nextService: '2025-04-10' }, totalMaintenanceCost: 15600 },
-  { id: 'eq-filter-2', name: 'Secondary Filter', type: 'filter', assetTag: 'AQ-FLT-002', usage: { volume: 750000 }, maintenance: { daysRemaining: 5, urgency: 'overdue', lastService: '2024-09-01', nextService: '2025-03-01' }, totalMaintenanceCost: 22800 },
-  { id: 'eq-tank-1', name: 'Storage Tank A (10k gal)', type: 'tank', assetTag: 'AQ-TNK-001', usage: { volume: 2000000 }, maintenance: { daysRemaining: 120, urgency: 'ok', lastService: '2024-12-01', nextService: '2025-06-01' }, totalMaintenanceCost: 5400 },
-  { id: 'eq-generator', name: 'Backup Generator', type: 'generator', assetTag: 'AQ-GEN-001', usage: { hours: 850 }, maintenance: { hoursRemaining: 150, urgency: 'ok', lastService: '2025-02-15', nextService: '2025-08-15' }, totalMaintenanceCost: 18900 },
+  { id: 'eq-truck-1', name: 'Delivery Truck #1', type: 'vehicle', assetTag: 'NAUT-TRK-001', usage: { km: 45000, hours: 1200 }, maintenance: { kmRemaining: 5000, hoursRemaining: 300, urgency: 'ok', lastService: '2025-01-15', nextService: '2025-07-15' }, totalMaintenanceCost: 12500 },
+  { id: 'eq-truck-2', name: 'Delivery Truck #2', type: 'vehicle', assetTag: 'NAUT-TRK-002', usage: { km: 78000, hours: 2100 }, maintenance: { kmRemaining: 2000, hoursRemaining: 150, urgency: 'due_soon', lastService: '2024-10-20', nextService: '2025-04-20' }, totalMaintenanceCost: 28400 },
+  { id: 'eq-pump-1', name: 'Main Transfer Pump', type: 'pump', assetTag: 'NAUT-PMP-001', usage: { hours: 3200 }, maintenance: { hoursRemaining: 800, urgency: 'ok', lastService: '2025-02-01', nextService: '2025-08-01' }, totalMaintenanceCost: 8200 },
+  { id: 'eq-pump-2', name: 'Backup Pump', type: 'pump', assetTag: 'NAUT-PMP-002', usage: { hours: 1100 }, maintenance: { hoursRemaining: 100, urgency: 'due_soon', lastService: '2024-11-15', nextService: '2025-05-15' }, totalMaintenanceCost: 3100 },
+  { id: 'eq-filter-1', name: 'Primary Filtration System', type: 'filter', assetTag: 'NAUT-FLT-001', usage: { volume: 500000 }, maintenance: { daysRemaining: 45, urgency: 'ok', lastService: '2025-01-10', nextService: '2025-04-10' }, totalMaintenanceCost: 15600 },
+  { id: 'eq-filter-2', name: 'Secondary Filter', type: 'filter', assetTag: 'NAUT-FLT-002', usage: { volume: 750000 }, maintenance: { daysRemaining: 5, urgency: 'overdue', lastService: '2024-09-01', nextService: '2025-03-01' }, totalMaintenanceCost: 22800 },
+  { id: 'eq-tank-1', name: 'Storage Tank A (10k gal)', type: 'tank', assetTag: 'NAUT-TNK-001', usage: { volume: 2000000 }, maintenance: { daysRemaining: 120, urgency: 'ok', lastService: '2024-12-01', nextService: '2025-06-01' }, totalMaintenanceCost: 5400 },
+  { id: 'eq-generator', name: 'Backup Generator', type: 'generator', assetTag: 'NAUT-GEN-001', usage: { hours: 850 }, maintenance: { hoursRemaining: 150, urgency: 'ok', lastService: '2025-02-15', nextService: '2025-08-15' }, totalMaintenanceCost: 18900 },
 ];
 
 export function useSellerInventory({ sellerProfile, orders, driverPositions = {}, forecast = [] }) {

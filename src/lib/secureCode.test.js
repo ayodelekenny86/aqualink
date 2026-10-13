@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+﻿import { describe, expect, test } from 'vitest';
 import {
   CODE_ALPHABET,
   checkCharacter,
@@ -69,36 +69,36 @@ describe('random source', () => {
 
 describe('booking codes', () => {
   test('increments past the highest existing reference', () => {
-    expect(generateBookingCode([])).toBe('AQ-1000-2');
-    expect(generateBookingCode(['AQ-1048-1', 'AQ-1051-2'])).toBe('AQ-1052-9');
+    expect(generateBookingCode([])).toBe('NAUT-1000-2');
+    expect(generateBookingCode(['NAUT-1048-1', 'NAUT-1051-2'])).toBe('NAUT-1052-9');
   });
 
   test('ignores malformed codes when finding the high water mark', () => {
-    expect(generateBookingCode(['garbage', null, 'AQ-3'])).toBe('AQ-1000-2');
+    expect(generateBookingCode(['garbage', null, 'NAUT-3'])).toBe('NAUT-1000-2');
   });
 
   test('checkCharacter always returns a real alphabet character', () => {
     // Regression: the modulus once exceeded the alphabet size, which could
     // produce `undefined` for some inputs.
     for (let n = 0; n < 5000; n += 1) {
-      const body = `AQ${n}`;
+      const body = `NAUT${n}`;
       expect(CODE_ALPHABET).toContain(checkCharacter(body));
     }
   });
 
   test('generated codes are well formed and detect single-character typos', () => {
-    const code = generateBookingCode(['AQ-1048-1']);
+    const code = generateBookingCode(['NAUT-1048-1']);
     expect(isBookingCodeWellFormed(code)).toBe(true);
 
     const tampered = `${code.slice(0, -1)}${code.slice(-1) === 'Z' ? 'Y' : 'Z'}`;
     expect(isBookingCodeWellFormed(tampered)).toBe(false);
-    expect(isBookingCodeWellFormed('AQ-1000')).toBe(false);
+    expect(isBookingCodeWellFormed('NAUT-1000')).toBe(false);
     expect(isBookingCodeWellFormed(undefined)).toBe(false);
   });
 
   test('checkCharacter is stable and rejects unknown characters', () => {
     expect(checkCharacter('AQ1000')).toBe(checkCharacter('AQ1000'));
-    expect(() => checkCharacter('AQ-1000')).toThrow();
+    expect(() => checkCharacter('NAUT-1000')).toThrow();
   });
 });
 
@@ -310,3 +310,4 @@ describe('device secret', () => {
     expect(ensureDeviceSecret(storage)).toBe(before);
   });
 });
+

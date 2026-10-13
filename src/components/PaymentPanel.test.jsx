@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+﻿import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import PaymentPanel from './PaymentPanel';
 import { clearAll } from '../lib/storage';
@@ -22,8 +22,8 @@ import { clearAll } from '../lib/storage';
  */
 
 const ORDER = {
-  id: 'AQ-1A2B3C',
-  code: 'AQ-1A2B3C',
+  id: 'NAUT-1A2B3C',
+  code: 'NAUT-1A2B3C',
   email: 'buyer@example.com',
   location: 'East Legon, Accra',
   volumeLitres: 5000,
@@ -41,7 +41,7 @@ const SETTLEMENT = {
   status: 'settled',
   reason: 'payment_confirmed',
   reference: 'aq1-abc',
-  orderId: 'AQ-1A2B3C',
+  orderId: 'NAUT-1A2B3C',
   amountMinor: 30000,
   currency: 'GHS',
   provider: 'paystack',

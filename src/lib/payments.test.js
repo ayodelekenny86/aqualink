@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+﻿import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import {
   buildReceipt,
@@ -24,7 +24,7 @@ import { formatCedi } from './money';
  */
 
 const ORDER = {
-  id: 'AQ-1A2B3C',
+  id: 'NAUT-1A2B3C',
   email: 'buyer@example.com',
   location: 'East Legon, Accra',
   volumeLitres: 5000,
@@ -68,8 +68,8 @@ describe('reading the server order shape', () => {
   // rather than written from the client's assumptions. It is snake_cased
   // because the endpoint is Postgres-shaped.
   const SERVER_ORDER = {
-    id: 'AQ-C1F4FA2D378A2D459D76',
-    code: 'AQ-C1F4FA2D378A2D459D76',
+    id: 'NAUT-C1F4FA2D378A2D459D76',
+    code: 'NAUT-C1F4FA2D378A2D459D76',
     email: 'buyer@example.com',
     phone: '+233201234567',
     location: 'Labone, Accra',
@@ -328,7 +328,7 @@ describe('receipts', () => {
     status: 'settled',
     reason: 'payment_confirmed',
     reference: 'aq1-abc',
-    orderId: 'AQ-1A2B3C',
+    orderId: 'NAUT-1A2B3C',
     amountMinor: 30000,
     currency: 'GHS',
     provider: 'paystack',
@@ -361,7 +361,7 @@ describe('receipts', () => {
   });
 
   test('never prints a zero for a figure the server never sent', () => {
-    const receipt = buildReceipt({ order: { id: 'AQ-1', email: 'b@example.com' }, payment: { reference: 'r1' } });
+    const receipt = buildReceipt({ order: { id: 'NAUT-1', email: 'b@example.com' }, payment: { reference: 'r1' } });
     expect(receipt.totalCharged).toBeNull();
     expect(receipt.sellerShare).toBeNull();
     // And the printed document says so rather than showing a blank or a zero.
@@ -493,3 +493,4 @@ describe('secret handling', () => {
     expect(source).toMatch(/from '\.\/api'/);
   });
 });
+

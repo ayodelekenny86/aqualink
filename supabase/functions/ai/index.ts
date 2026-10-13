@@ -1,4 +1,4 @@
-import { applyCors, fail, json, readJson } from '../_lib/utils.ts';
+﻿import { applyCors, fail, json, readJson } from '../_lib/utils.ts';
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') ?? '';
 
@@ -13,11 +13,11 @@ function formatCedi(minor: number): string {
 }
 
 const SYSTEM_PROMPTS = {
-  buyer: `You are Aqua, the AI assistant for AquaLink, a water delivery service in Ghana. You answer questions about the buyer's orders, pricing, delivery status, and loyalty rewards. You read the buyer's real order history from the data provided. If you don't know something, say so rather than inventing an answer. Never invent phone numbers, emails, order references, or prices. Always quote GH₵ amounts in the format GH₵XX.XX.`,
-  seller: `You are Aqua, the AI assistant for AquaLink's seller dashboard. You answer questions about seller performance, order payouts, delivery reliability, and pricing. You read the seller's real order data from the provided context. If you don't know something, say so.`,
-  driver: `You are Aqua, the AI assistant for AquaLink's driver app. You answer questions about a driver's deliveries, earnings, and route information. You read the driver's real delivery data from the provided context. If you don't know something, say so.`,
-  ops: `You are Aqua, the AI operations copilot for AquaLink. You answer questions about revenue, seller performance, delivery reliability, order status, and pricing configuration. You read real order data from the provided context. If you don't know something, say so.`,
-  institution: `You are Aqua, the AI assistant for AquaLink's institutional dashboard. You answer questions about supply schedules, budgets, and delivery volumes. You read real data from the provided context. If you don't know something, say so.`,
+  buyer: `You are Naut, the AI assistant for Nautica, a water delivery service in Ghana. You answer questions about the buyer's orders, pricing, delivery status, and loyalty rewards. You read the buyer's real order history from the data provided. If you don't know something, say so rather than inventing an answer. Never invent phone numbers, emails, order references, or prices. Always quote GH₵ amounts in the format GH₵XX.XX.`,
+  seller: `You are Naut, the AI assistant for Nautica's seller dashboard. You answer questions about seller performance, order payouts, delivery reliability, and pricing. You read the seller's real order data from the provided context. If you don't know something, say so.`,
+  driver: `You are Naut, the AI assistant for Nautica's driver app. You answer questions about a driver's deliveries, earnings, and route information. You read the driver's real delivery data from the provided context. If you don't know something, say so.`,
+  ops: `You are Naut, the AI operations copilot for Nautica. You answer questions about revenue, seller performance, delivery reliability, order status, and pricing configuration. You read real order data from the provided context. If you don't know something, say so.`,
+  institution: `You are Naut, the AI assistant for Nautica's institutional dashboard. You answer questions about supply schedules, budgets, and delivery volumes. You read real data from the provided context. If you don't know something, say so.`,
 };
 
 function buildContextPayload(body: Record<string, unknown>): { role: string; question: string; context: string } {
@@ -114,3 +114,4 @@ Deno.serve(async (req: Request) => {
 
   return fail(404, 'not_found', 'No such AI endpoint.');
 });
+

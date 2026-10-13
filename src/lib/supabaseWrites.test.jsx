@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+﻿import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { list, replaceAll } from './collections';
 import { clearAll } from './storage';
@@ -25,8 +25,8 @@ import useBooking from '../hooks/useBooking';
  */
 
 const ORDER = {
-  id: 'AQ-1A2B3C',
-  code: 'AQ-1A2B3C',
+  id: 'NAUT-1A2B3C',
+  code: 'NAUT-1A2B3C',
   location: 'East Legon, Accra',
   status: 'En Route',
   volume: '2,000 gal',
@@ -72,7 +72,7 @@ function stubSupabase(result) {
 }
 
 const REJECTED = { data: null, error: { message: 'new row violates row-level security policy', code: '42501' } };
-const ACCEPTED = { data: [{ id: 'AQ-1A2B3C' }], error: null };
+const ACCEPTED = { data: [{ id: 'NAUT-1A2B3C' }], error: null };
 
 function mountBooking() {
   return renderHook(() => useBooking({
@@ -113,16 +113,16 @@ describe('a refused write is never reported as done', () => {
     const { result } = mountBooking();
     let outcome;
     await act(async () => {
-      outcome = await result.current.confirmDelivery('AQ-1A2B3C', 'HX42');
+      outcome = await result.current.confirmDelivery('NAUT-1A2B3C', 'HX42');
     });
 
     expect(outcome).toMatchObject({ ok: false, reason: 'write-rejected' });
     // The false confirmation is the whole failure. It must not be in the list.
-    expect(notices.join(' ')).not.toMatch(/Delivery confirmed for AQ-1A2B3C/);
+    expect(notices.join(' ')).not.toMatch(/Delivery confirmed for NAUT-1A2B3C/);
     expect(notices.join(' ')).toMatch(/server rejected/i);
     // And the local copy still reflects the delivery, so the seller board is not
     // left showing a buyer who has already received the water as still waiting.
-    expect(list('orders').find((o) => o.id === 'AQ-1A2B3C').status).toBe('Delivered');
+    expect(list('orders').find((o) => o.id === 'NAUT-1A2B3C').status).toBe('Delivered');
   });
 
   test('an accepted delivery is reported plainly', async () => {
@@ -132,11 +132,11 @@ describe('a refused write is never reported as done', () => {
     const { result } = mountBooking();
     let outcome;
     await act(async () => {
-      outcome = await result.current.confirmDelivery('AQ-1A2B3C', 'HX42');
+      outcome = await result.current.confirmDelivery('NAUT-1A2B3C', 'HX42');
     });
 
     expect(outcome).toMatchObject({ ok: true });
-    expect(notices.join(' ')).toMatch(/Delivery confirmed for AQ-1A2B3C/);
+    expect(notices.join(' ')).toMatch(/Delivery confirmed for NAUT-1A2B3C/);
   });
 
   test('a status change the server refuses is not announced as done', async () => {
@@ -146,7 +146,7 @@ describe('a refused write is never reported as done', () => {
     const { result } = mountBooking();
     let outcome;
     await act(async () => {
-      outcome = await result.current.updateOrderStatus('AQ-1A2B3C', 'Delivered', () => {});
+      outcome = await result.current.updateOrderStatus('NAUT-1A2B3C', 'Delivered', () => {});
     });
 
     await waitFor(() => expect(outcome).toMatchObject({ ok: false, reason: 'write-rejected' }));
@@ -163,7 +163,7 @@ describe('a refused write is never reported as done', () => {
     const { result } = mountBooking();
     let outcome;
     await act(async () => {
-      outcome = await result.current.acceptDriverJob('AQ-1A2B3C', () => {});
+      outcome = await result.current.acceptDriverJob('NAUT-1A2B3C', () => {});
     });
 
     // A driver told their claim succeeded drives to an address where nothing is
@@ -178,7 +178,7 @@ describe('a refused write is never reported as done', () => {
     const { result } = mountBooking();
     let outcome;
     await act(async () => {
-      outcome = await result.current.issueDeliveryCode('AQ-1A2B3C');
+      outcome = await result.current.issueDeliveryCode('NAUT-1A2B3C');
     });
 
     expect(outcome).toMatchObject({ ok: false });
@@ -194,7 +194,7 @@ describe('a refused write is never reported as done', () => {
     const { result } = mountBooking();
     let outcome;
     await act(async () => {
-      outcome = await result.current.releaseDriverJob('AQ-1A2B3C', () => {});
+      outcome = await result.current.releaseDriverJob('NAUT-1A2B3C', () => {});
     });
 
     await waitFor(() => expect(outcome).toMatchObject({ ok: false, reason: 'write-rejected' }));
@@ -212,11 +212,12 @@ describe('a request that never reached the server is reported the same way', () 
     const { result } = mountBooking();
     let outcome;
     await act(async () => {
-      outcome = await result.current.confirmDelivery('AQ-1A2B3C', 'HX42');
+      outcome = await result.current.confirmDelivery('NAUT-1A2B3C', 'HX42');
     });
 
     expect(outcome).toMatchObject({ ok: false, reason: 'write-failed' });
     expect(notices.join(' ')).toMatch(/unreachable/i);
-    expect(notices.join(' ')).not.toMatch(/Delivery confirmed for AQ-1A2B3C/);
+    expect(notices.join(' ')).not.toMatch(/Delivery confirmed for NAUT-1A2B3C/);
   });
 });
+

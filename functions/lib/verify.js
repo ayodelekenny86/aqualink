@@ -96,7 +96,7 @@ export function checkSettlement({ transaction, order, currency = 'GHS' }) {
  * reference.
  */
 export function newReference(orderCode) {
-  const code = String(orderCode ?? 'aq').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 12) || 'aq';
+  const code = String(orderCode ?? 'naut').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 12) || 'naut';
   return `${code}-${randomBytes(8).toString('hex')}`;
 }
 

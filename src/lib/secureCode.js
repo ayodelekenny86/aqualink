@@ -1,5 +1,5 @@
-/**
- * Self-contained code and credential generation for AquaLink.
+﻿/**
+ * Self-contained code and credential generation for Nautica.
  *
  * Everything here is produced by the browser's own Web Crypto API
  * (`crypto.getRandomValues` and `crypto.subtle`). There is no third-party
@@ -120,10 +120,10 @@ export function checkCharacter(body) {
 }
 
 /**
- * Booking reference such as `AQ-1048-K`. Sequential so references look and sort
+ * Booking reference such as `NAUT-1048-K`. Sequential so references look and sort
  * like real ones, with a check character that catches transcription errors.
  */
-export function generateBookingCode(existingCodes = [], { prefix = 'AQ', start = 1000 } = {}) {
+export function generateBookingCode(existingCodes = [],   { prefix = 'NAUT', start = 1000 } = {}) {
   const highest = existingCodes.reduce((max, code) => {
     const match = /^([A-Z]+)-(\d+)/.exec(code ?? '');
     return match ? Math.max(max, Number(match[2])) : max;
@@ -361,3 +361,4 @@ export function ensureDeviceSecret(storage = globalThis.localStorage) {
   storage?.setItem(DEVICE_SECRET_KEY, secret);
   return secret;
 }
+

@@ -1,4 +1,4 @@
-const PREFIX = 'nautica.v1.';
+﻿const PREFIX = 'nautica.v1.';
 
 /**
  * Tiny JSON wrapper over localStorage so the app keeps its own state across
@@ -39,7 +39,7 @@ export function clearValue(key) {
   }
 }
 
-/** Reset every AquaLink key. Used by the "reset demo data" control. */
+/** Reset every Nautica key. Used by the "reset demo data" control. */
 export function clearAll() {
   try {
     const store = storage();
@@ -59,3 +59,4 @@ export function clearAll() {
 export function persistedState(key, fallback) {
   return () => readValue(key, fallback);
 }
+

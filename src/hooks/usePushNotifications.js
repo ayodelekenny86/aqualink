@@ -1,8 +1,8 @@
-import { useEffect, useState, useCallback } from 'react';
+﻿import { useEffect, useState, useCallback } from 'react';
 import { apiRequest } from '../lib/api';
 
 /**
- * Push notifications via the AquaLink server.
+ * Push notifications via the Nautica server.
  *
  * The push channel is whatever the operator configures on the server; this
  * hook only asks the server to store or revoke a token. When no server is

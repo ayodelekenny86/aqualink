@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+﻿import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
   checkSettlement,
   newReference,
@@ -133,7 +133,7 @@ Deno.serve(async (req: Request) => {
             payment_options: 'card,mobilemoney,banktransfer,ussd',
             redirect_url: callbackUrl,
             customer: { email: order.email, phone: order.phone ?? '' },
-            customizations: { title: 'AquaLink water delivery', description: `Order ${orderId}` },
+            customizations: { title: 'Nautica water delivery', description: `Order ${orderId}` },
             metadata: { order_id: orderId, volume_litres: order.volume_litres },
           }),
         });

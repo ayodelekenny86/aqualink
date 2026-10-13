@@ -1,8 +1,8 @@
-@echo off
-REM AquaLink deployment script (Windows)
+﻿@echo off
+REM Nautica deployment script (Windows)
 REM Run from repo root after: supabase login
 
-echo === AquaLink deployment ===
+echo === Nautica deployment ===
 
 REM 1. Apply database migrations (Realtime publications for orders + notifications)
 echo ^>^> Applying Supabase migrations...

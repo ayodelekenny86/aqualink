@@ -1,4 +1,4 @@
-import { readValue, writeValue } from './storage';
+﻿import { readValue, writeValue } from './storage';
 import { formatCedi, toMinor } from './money';
 import { apiRequest, apiTarget } from './api';
 
@@ -12,7 +12,7 @@ import { apiRequest, apiTarget } from './api';
  * moving. That is not a demo, it is a way to make a business believe it was
  * paid.
  *
- * So there is exactly one code path now, and it talks to the AquaLink server:
+ * So there is exactly one code path now, and it talks to the Nautica server:
  *
  *   - the server holds the Paystack secret and is never shipped to a browser;
  *   - the server prices the order, so a tampered client cannot lower the amount;
@@ -341,7 +341,7 @@ export function receiptHtml(receipt) {
     ...(receipt.serviceCharge ? [['Service charge', receipt.serviceCharge]] : []),
     ['Water seller share', cell(receipt.sellerShare)],
     ['Driver share', cell(receipt.driverShare)],
-    ['AquaLink share', cell(receipt.platformShare)],
+    ['Nautica share', cell(receipt.platformShare)],
   ];
 
   // Both providers are live at once, behind their own keys, so naming Paystack
@@ -355,7 +355,7 @@ export function receiptHtml(receipt) {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AquaLink receipt ${escapeHtml(receipt.reference)}</title>
+<title>Nautica receipt ${escapeHtml(receipt.reference)}</title>
 <style>
   body{font:15px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0;padding:32px;background:#f6f8f8;color:#16333a}
   .card{max-width:560px;margin:0 auto;background:#fff;border:1px solid #e2eae9;border-radius:14px;padding:28px}
@@ -370,11 +370,11 @@ export function receiptHtml(receipt) {
   @media print{body{background:#fff;padding:0}.card{border:none}}
 </style></head>
 <body><div class="card">
-<h1>AquaLink receipt</h1>
+<h1>Nautica receipt</h1>
 <p class="sub">${provider ? `Payment confirmed by ${provider}` : 'Payment confirmed'}</p>
 <table>${rows.map(([label, value]) => `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(value)}</td></tr>`).join('')}
 <tr class="total"><td>Total charged</td><td>${escapeHtml(cell(receipt.totalCharged))}</td></tr></table>
-<p class="foot">AquaLink · water delivery coordination</p>
+<p class="foot">Nautica · water delivery coordination</p>
 </div></body></html>`;
 }
 
@@ -471,3 +471,4 @@ export async function sellerStatus(phone, { signal } = {}) {
   const query = new URLSearchParams({ phone: String(phone ?? '') });
   return apiRequest(`/sellers/status?${query}`, { signal });
 }
+

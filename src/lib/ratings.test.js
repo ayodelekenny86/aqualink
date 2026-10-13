@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach } from 'vitest';
+﻿import { describe, expect, test, beforeEach } from 'vitest';
 import {
   validateRating,
   computeAverages,
@@ -15,7 +15,7 @@ beforeEach(() => {
 });
 
 const valid = (overrides = {}) => ({
-  orderId: 'AQ-1',
+  orderId: 'NAUT-1',
   buyerId: 'buyer_1',
   sellerId: 'seller_1',
   driverId: 'driver_1',

@@ -54,7 +54,7 @@ Deno.serve(async (req: Request) => {
     const split = configError ? DEFAULT_SPLIT : { ...DEFAULT_SPLIT, ...(config?.split ?? {}) };
 
     const priced = priceOrder({ pricing, split, volumeLitres });
-    const orderId = generateId('AQ');
+    const orderId = generateId('NAUT');
 
     const order = {
       id: orderId,

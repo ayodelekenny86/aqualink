@@ -1,10 +1,10 @@
-#!/usr/bin/env bash
-# AquaLink deployment script
+﻿#!/usr/bin/env bash
+# Nautica deployment script
 # Run from repo root after: supabase login
 
 set -euo pipefail
 
-echo "=== AquaLink deployment ==="
+echo "=== Nautica deployment ==="
 
 # 1. Apply database migrations (Realtime publications for orders + notifications)
 echo "→ Applying Supabase migrations..."

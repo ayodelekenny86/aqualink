@@ -1,6 +1,6 @@
-{
+﻿{
   "name": "nautica-functions",
-  "description": "AquaLink server. Owns order pricing and all payment-provider secrets.",
+  "description": "Nautica server. Owns order pricing and all payment-provider secrets.",
   "private": true,
   "type": "module",
   "main": "index.js",
@@ -17,3 +17,4 @@
     "firebase-functions": "^6.1.1"
   }
 }
+

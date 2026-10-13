@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+﻿import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { apiRequest, apiUrl, apiTarget } from './api';
 
@@ -7,7 +7,7 @@ import { apiRequest, apiUrl, apiTarget } from './api';
  * knows which one it is talking to. So these tests are about two things: the
  * mapping from the stable `/api` contract onto Supabase function names, and the
  * guarantee that a credential-bearing header cannot be aimed anywhere except the
- * AquaLink server.
+ * Nautica server.
  */
 
 const PROJECT_URL = 'https://project-ref.supabase.co';
@@ -128,7 +128,7 @@ describe('secret handling', () => {
   test('the transport never names a payment provider or carries a secret', async () => {
     const source = await readFile('src/lib/api.js', 'utf8');
 
-    // This module is shipped to every visitor. It may only name the AquaLink
+    // This module is shipped to every visitor. It may only name the Nautica
     // server, never a payment provider's API host, and must carry nothing that
     // looks like a credential.
     expect(source).not.toMatch(/api\.paystack\.co/);
@@ -148,3 +148,4 @@ describe('secret handling', () => {
     expect(hardcoded).toEqual([]);
   });
 });
+

@@ -1,6 +1,6 @@
-# AquaLink — deployment guide
+﻿# Nautica — deployment guide
 
-AquaLink is a React/Vite front end backed by Supabase Edge Functions. The
+Nautica is a React/Vite front end backed by Supabase Edge Functions. The
 server owns order pricing and every provider secret.
 
 ## What is configured
@@ -45,7 +45,7 @@ availability:
 
 | Check | What it catches |
 | --- | --- |
-| `the live build matches this checkout` | A deployment serving an old commit. Every build stamps its commit into `index.html` as `aqualink-build`, so a bundle from a month ago is reported as such |
+| `the live build matches this checkout` | A deployment serving an old commit. Every build stamps its commit into `index.html` as `nautical-build`, so a bundle from a month ago is reported as such |
 | `the served bundle contains no fabricated claims` | A build from before the honesty work, still showing invented GMV, an escrow balance and a fixed persona on a live URL |
 | `the served bundle is built against the server` | A build with no API origin in it, which cannot price an order or take a payment |
 | `a CSP is set` | An origin serving the app with no Content-Security-Policy at all |
@@ -57,8 +57,8 @@ not have caught a missing action anyway: `orders/create` answering 405 proves
 `orders` is deployed, not that `orders/verify` exists.
 
 It exits non-zero and lists each failure, prefixed with the host it came from. Set
-`AQUALINK_SITE_URLS` to a comma-separated list to check origins beyond the two
-defaults (`aqualinkgh1.vercel.app` and `viviluxy-assistant.web.app`).
+`NAUTLINK_SITE_URLS` to a comma-separated list to check origins beyond the two
+defaults (`nauticalgh1.vercel.app` and `nautical.web.app`).
 
 Deploying to Vercel needs no extra config: `vercel.json` carries the same security
 headers as `firebase.json`, plus the SPA rewrite. `scripts/verifyLive.test.js`
@@ -75,7 +75,7 @@ below:
 | `ai/chat has a usable key` | `GEMINI_API_KEY` is unset, so the function answers 503 | `supabase secrets set GEMINI_API_KEY=…` |
 
 The last one is not cosmetic. Without the key the AI panel does not fail loudly:
-`useAquaAi` falls back to the local matcher so the assistant keeps answering, and
+`useNautAi` falls back to the local matcher so the assistant keeps answering, and
 on an undeployed server *every* answer is a local one. The panel therefore names
 the reason it fell back — "not deployed", "no AI key set", or "this device could
 not reach the server" — instead of showing a badge that reads like a deliberate
@@ -188,11 +188,11 @@ from it, and an empty workspace says it has no data. Invented figures ("124
 orders", "GH₵18,540 GMV", a 4.8★ seller rating, a "100% — certificates up to
 date" water quality score, a GH₵3,500/month subscription) have been removed
 rather than kept as sample data, because a business cannot tell invented
-numbers from measured ones. The Aqua panel says it cannot forecast demand
+numbers from measured ones. The Naut panel says it cannot forecast demand
 rather than inventing a forecast.
 
 There is no escrow and no pending-payout queue. Paystack collects money
-directly into the AquaLink account, so confirming delivery marks an order
+directly into the Nautica account, so confirming delivery marks an order
 delivered and records that the seller payout is handled separately by
 operations.
 

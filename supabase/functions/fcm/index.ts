@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Push notification token management for Supabase Edge Functions.
  *
  * The client calls `POST /fcmToken` to register a token and
@@ -82,7 +82,7 @@ Deno.serve(async (req: Request) => {
       // When the caller identifies itself, the row must belong to it. Without
       // that, anyone who learned a token string could revoke it — and, more
       // usefully for an attacker, could not use it to learn anything, so this
-      // is a narrowing rather than a full authorisation boundary. AquaLink's
+      // is a narrowing rather than a full authorisation boundary. Nautica's
       // buyer accounts are local to the browser, so there is no server-side
       // session to check against yet; `userId` is a caller assertion until then.
       let query = db.from('fcm_tokens').update({

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import {
   buildReceipt,
   downloadReceipt,
@@ -189,7 +189,7 @@ export default function PaymentPanel({ order, onPaid, showNotice }) {
             <div><dt>Total charged</dt><dd>{receiptCell(receipt.totalCharged)}</dd></div>
             <div><dt>Water seller</dt><dd>{receiptCell(receipt.sellerShare)}</dd></div>
             <div><dt>Driver</dt><dd>{receiptCell(receipt.driverShare)}</dd></div>
-            <div><dt>AquaLink</dt><dd>{receiptCell(receipt.platformShare)}</dd></div>
+            <div><dt>Nautica</dt><dd>{receiptCell(receipt.platformShare)}</dd></div>
           </dl>
           <button className="outline-button" type="button" onClick={() => downloadReceipt(receipt)}>
             Download receipt ↓
@@ -213,3 +213,4 @@ export default function PaymentPanel({ order, onPaid, showNotice }) {
     </section>
   );
 }
+

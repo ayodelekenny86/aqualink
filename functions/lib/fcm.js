@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Firebase Cloud Messaging utilities for server-side push notifications.
  *
  * Uses the Firebase Admin SDK to send messages to client tokens stored in Firestore.
@@ -88,7 +88,7 @@ export async function notifyOrderStatusChange(order, oldStatus) {
     'Cancelled': 'Your order has been cancelled.',
   };
 
-  const title = 'AquaLink Order Update';
+  const title = 'Nautica Order Update';
   const body = statusMessages[order.status] || `Order status: ${order.status}`;
 
   return sendPushToUser(order.email, {

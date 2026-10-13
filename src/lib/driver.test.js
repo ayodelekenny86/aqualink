@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+﻿import { describe, expect, test } from 'vitest';
 import {
   DRIVER_STEPS,
   advanceAction,
@@ -22,8 +22,8 @@ const AMA = { id: 'drv_ama', name: 'Ama Boateng', phone: '0544002233', base: 'Ca
 
 function order(overrides = {}) {
   return {
-    id: 'AQ-1001',
-    code: 'AQ-1001',
+    id: 'NAUT-1001',
+    code: 'NAUT-1001',
     location: 'East Legon, Accra',
     volume: '2,000 gal',
     status: 'Awaiting payment',
@@ -71,10 +71,10 @@ describe('matching a signed-in account to the driver roster', () => {
 
 describe('which orders belong to a driver', () => {
   test('shows only orders assigned to them', () => {
-    const orders = [order(), order({ id: 'AQ-1002', driverId: 'drv_ama', driverPhone: '0544002233' })];
+    const orders = [order(), order({ id: 'NAUT-1002', driverId: 'drv_ama', driverPhone: '0544002233' })];
     const mine = driverOrders(KOJO, orders);
     expect(mine).toHaveLength(1);
-    expect(mine[0].id).toBe('AQ-1001');
+    expect(mine[0].id).toBe('NAUT-1001');
   });
 
   test('falls back to phone matching for orders with no driver id', () => {
@@ -95,10 +95,10 @@ describe('which orders belong to a driver', () => {
 
   test('sorts newest first', () => {
     const orders = [
-      order({ id: 'AQ-OLD', createdAt: '2026-10-01T09:00:00Z' }),
-      order({ id: 'AQ-NEW', createdAt: '2026-10-03T09:00:00Z' }),
+      order({ id: 'NAUT-OLD', createdAt: '2026-10-01T09:00:00Z' }),
+      order({ id: 'NAUT-NEW', createdAt: '2026-10-03T09:00:00Z' }),
     ];
-    expect(driverOrders(KOJO, orders).map((row) => row.id)).toEqual(['AQ-NEW', 'AQ-OLD']);
+    expect(driverOrders(KOJO, orders).map((row) => row.id)).toEqual(['NAUT-NEW', 'NAUT-OLD']);
   });
 });
 

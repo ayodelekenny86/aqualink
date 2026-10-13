@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { googleClientId, isGoogleConfigured, loadGoogleIdentity, signInWithGoogle } from '../lib/googleAuth';
 
 /**
@@ -28,7 +28,7 @@ export default function GoogleSignInButton({ role = 'buyer', onVerified, onError
         <strong>Google sign-in is not configured.</strong>
         <p>
           Add <code>VITE_GOOGLE_CLIENT_ID</code> to the environment and redeploy. The button appears once a
-          Google OAuth client id is present. AquaLink never enables this button without one, so it cannot
+          Google OAuth client id is present. Nautica never enables this button without one, so it cannot
           accept an unverified identity.
         </p>
       </div>
@@ -67,3 +67,4 @@ export default function GoogleSignInButton({ role = 'buyer', onVerified, onError
     </div>
   );
 }
+

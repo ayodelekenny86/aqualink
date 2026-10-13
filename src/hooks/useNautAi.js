@@ -1,11 +1,11 @@
-import { useCallback, useState } from 'react';
+﻿import { useCallback, useState } from 'react';
 import { translations } from '../data/translations';
 import { formatCedi } from '../lib/money';
 import { tierFor, computePoints, TIERS } from './useLoyalty';
 import { askAiQuestion, aiFallbackMessage, classifyAiFailure } from '../lib/ai';
 
 /**
- * The Aqua panel.
+ * The Naut panel.
  *
  * This is a keyword matcher, not a model, and it used to pretend otherwise. It
  * answered "the price is GH₵300, discounted to GH₵250 with a 15% commission" and
@@ -92,7 +92,7 @@ export function getAiAnswer(question, { language = 'en', orders = [], split, sel
         const parts = [
           `water seller ${formatCedi(latest.sellerReceives ?? 0)}`,
           `driver ${formatCedi(latest.driverReceives ?? 0)}`,
-          `AquaLink ${formatCedi(latest.platformCommission ?? 0)}`,
+          `Nautica ${formatCedi(latest.platformCommission ?? 0)}`,
         ].join(', ');
         return `For ${latest.code}: ${parts}.${totalShare ? ` The configured split is ${totalShare}.` : ''}`;
       },
@@ -174,7 +174,7 @@ export function getAiAnswer(question, { language = 'en', orders = [], split, sel
   return language !== 'en' && support ? `${support} \u00b7 ${answer}` : answer;
 }
 
-export function useAquaAi({ language, orders = [], split, sellerScores = [], reliabilityScores = [], buyerId = null, role = 'buyer' } = {}) {
+export function useNautAi({ language, orders = [], split, sellerScores = [], reliabilityScores = [], buyerId = null, role = 'buyer' } = {}) {
   const [aiOpen, setAiOpen] = useState(false);
   const [aiInput, setAiInput] = useState('');
   const [aiMessages, setAiMessages] = useState([greeting]);
@@ -230,4 +230,4 @@ export function useAquaAi({ language, orders = [], split, sellerScores = [], rel
   return { aiOpen, toggleAi, closeAi, aiInput, setAiInput, aiMessages, askAi, aiLoading, aiSource, aiFallbackReason };
 }
 
-export default useAquaAi;
+export default useNautAi;

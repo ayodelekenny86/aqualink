@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+﻿import { expect, test } from 'vitest';
 import { readdir, readFile } from 'node:fs/promises';
 
 /**
@@ -21,8 +21,8 @@ const checker = await readFile('scripts/verify-live.mjs', 'utf8');
 test('every origin this project serves from is probed', () => {
   // Each deployment found in the wild belongs in the default list. A URL that is
   // not probed is a URL nobody looks at.
-  expect(checker).toMatch(/viviluxy-assistant\.web\.app/);
-  expect(checker).not.toMatch(/aqualinkgh1\.vercel\.app/);
+  expect(checker).toMatch(/nautical\.web\.app/);
+  expect(checker).not.toMatch(/nauticalgh1\.vercel\.app/);
 });
 
 test('the check is about what is served, not just that it answers', () => {

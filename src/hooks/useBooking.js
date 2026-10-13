@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import { generateBookingCode, generateConfirmationCode } from '../lib/secureCode';
 import { list, replaceAll } from '../lib/collections';
 import { assignDriver, assignSeller } from '../lib/dispatch';
@@ -217,7 +217,7 @@ export function useBooking({ email, buyerPhone = '', onNotice, notify, pricing =
       // the payment flow will refuse without a server.
       if (caught.status === 0 || /fetch|network|failed to fetch/i.test(caught.message || '')) {
         serverOrder = localPriceOrder(volumeLitres, pricing, split);
-        serverOrder.id = `AQ-${generateBookingCode().toUpperCase()}`;
+        serverOrder.id = `NAUT-${generateBookingCode().toUpperCase()}`;
         serverOrder.code = serverOrder.id;
         serverOrder.location = location;
         onNotice('Booking service is not reachable, so this order was priced locally. It is awaiting payment and cannot be settled without the server.');

@@ -1,7 +1,7 @@
-import { supabaseUrl, anonKey } from './supabase';
+﻿import { supabaseUrl, anonKey } from './supabase';
 
 /**
- * One place that knows how to reach the AquaLink server.
+ * One place that knows how to reach the Nautica server.
  *
  * There are two deployments of the same API and the app has to talk to exactly
  * one of them:
@@ -102,7 +102,7 @@ export function apiUrl(path) {
 const DEFAULT_TIMEOUT_MS = 30000;
 
 /**
- * Send a request to the AquaLink server and parse the JSON reply.
+ * Send a request to the Nautica server and parse the JSON reply.
  *
  * A non-2xx reply throws with the server's own customer-facing message and its
  * `code`, so the UI can explain what went wrong instead of showing a generic
@@ -171,3 +171,4 @@ export async function apiRequest(path, { method = 'GET', body, signal, auth = nu
 }
 
 export { API_ROOT };
+

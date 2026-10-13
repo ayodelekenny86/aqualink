@@ -1,8 +1,8 @@
-import { vi } from 'vitest';
+﻿import { vi } from 'vitest';
 import { DEFAULT_PRICING, DEFAULT_SPLIT, priceOrder } from '../functions/lib/pricing.js';
 
 /**
- * Stubs the AquaLink server for tests.
+ * Stubs the Nautica server for tests.
  *
  * The booking flow now creates its order server-side, because the server owns
  * the price, so tests need something to talk to. This stub prices with the real
@@ -62,7 +62,7 @@ function serverOrder(body, pricing = DEFAULT_PRICING, split = DEFAULT_SPLIT) {
   const volumeLitres = Number(body.volumeLitres ?? 0);
   const priced = priceOrder({ pricing, split, volumeLitres });
 
-  const id = `AQ-${Math.random().toString(16).slice(2, 8).toUpperCase()}`;
+  const id = `NAUT-${Math.random().toString(16).slice(2, 8).toUpperCase()}`;
   const order = {
     id,
     code: id,
@@ -269,3 +269,4 @@ export function teardownFakeApi() {
   SELLERS.clear();
   OPS.clear();
 }
+

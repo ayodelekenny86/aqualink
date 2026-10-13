@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, test } from 'vitest';
+﻿import { afterEach, beforeEach, expect, test } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { installFakeApi, teardownFakeApi } from './testServer';
 import { clearAll } from './lib/storage';
@@ -67,7 +67,7 @@ const GROUPS = [
       { label: 'seller delivery count', pattern: />52</ },
       { label: 'seller rating', pattern: /4\.8 <small>/ },
       { label: 'invented job location', pattern: /Osu, Oxford Street/ },
-      { label: 'invented dispute', pattern: /AQ-1043/ },
+      { label: 'invented dispute', pattern: /NAUT-1043/ },
       { label: 'refund availability claim', pattern: /refund available/ },
     ],
   },
@@ -130,7 +130,7 @@ const GROUPS = [
     ],
   },
   {
-    // The `ai` function is not deployed on this server, so every answer the Aqua
+    // The `ai` function is not deployed on this server, so every answer the Naut
     // panel gives today comes from the local matcher. The panel used to call that
     // an offline condition, which is false: the device is online and the server has
     // no AI on it. A reader told their device is offline stops looking for the real
@@ -203,3 +203,4 @@ for (const group of GROUPS) {
     });
   }
 }
+

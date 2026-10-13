@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Contact actions shared by every role.
  *
  * Both links are derived from a Ghanaian number: `wa.me` needs the digits with
@@ -10,7 +10,7 @@
 
 import { formatPhoneForDisplay, normalizePhone } from '../lib/accounts';
 
-const DEFAULT_SUPPORT = { name: 'AquaLink Support', phone: '0545009046' };
+const DEFAULT_SUPPORT = { name: 'Nautica Support', phone: '0545009046' };
 
 /** Digits-only international form that wa.me and tel: both need. */
 export function internationalPhone(phone) {
@@ -33,7 +33,7 @@ export function telHref(phone) {
 /** Order-aware message so the recipient knows which job this is about. */
 export function orderMessage({ code, location, volume, status, eta }) {
   const lines = [
-    'Hello, this is your AquaLink delivery driver.',
+    'Hello, this is your Nautica delivery driver.',
     `Order: ${code ?? 'your order'}`,
   ];
   if (location) lines.push(`Location: ${location}`);
@@ -81,3 +81,4 @@ export default function ContactButtons({ phone = DEFAULT_SUPPORT.phone, whatsapp
     </span>
   );
 }
+

@@ -1,4 +1,4 @@
--- Supabase seed file for local development
+﻿-- Supabase seed file for local development
 -- Run with: supabase db seed
 
 -- This file is run after migrations to populate the database with test data.
@@ -73,8 +73,8 @@ insert into public.orders (
 )
 values
   (
-    'AQ-TEST000001',
-    'AQ-TEST000001',
+    'NAUT-TEST000001',
+    'NAUT-TEST000001',
     'buyer1@example.com',
     '+233244111222',
     'Accra, East Legon',
@@ -88,8 +88,8 @@ values
     'Paid', 'paystack_test_ref_001'
   ),
   (
-    'AQ-TEST000002',
-    'AQ-TEST000002',
+    'NAUT-TEST000002',
+    'NAUT-TEST000002',
     'buyer2@example.com',
     '+233544333444',
     'Kumasi, Ahodwo',
@@ -113,7 +113,7 @@ insert into public.receipts (
 )
 values
   (
-    'paystack_test_ref_001', 'AQ-TEST000001',
+    'paystack_test_ref_001', 'NAUT-TEST000001',
     '2024-01-15 10:30:00+00', 'settled', '2024-01-15 10:30:00+00',
     'Test Buyer', 'GHS', '1500.00', '0.00', '1500.00',
     '675.00', '225.00', '600.00', 'Accra, East Legon', '500'

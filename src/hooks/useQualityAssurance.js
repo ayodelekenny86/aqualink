@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+﻿import { useState, useEffect, useMemo, useCallback } from 'react';
 
 const USE_MOCK = typeof window !== 'undefined' && (!window.__SUPABASE_URL__ || !window.__SUPABASE_ANON_KEY__);
 
@@ -193,7 +193,7 @@ export function useQualityAssurance({ qualityRecords = [], sources = [], orders 
           end: new Date().toISOString().split('T')[0],
         },
         validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        issuedBy: 'AquaLink Quality Assurance',
+        issuedBy: 'Nautica Quality Assurance',
       }));
   }, [sourceAnalysis]);
 

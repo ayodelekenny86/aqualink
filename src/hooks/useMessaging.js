@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import { list, insert, update, findBy } from '../lib/collections';
 
 /**
- * In-app messaging system for AquaLink.
+ * In-app messaging system for Nautica.
  * 
  * Supports conversations between:
  * - Buyer ↔ Driver (for active deliveries)

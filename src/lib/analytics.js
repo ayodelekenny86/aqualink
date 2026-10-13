@@ -1,4 +1,4 @@
-// Web Vitals and Performance Monitoring for AquaLink
+﻿// Web Vitals and Performance Monitoring for Nautica
 // Lightweight, no external dependencies
 
 let vitalsBuffer = [];

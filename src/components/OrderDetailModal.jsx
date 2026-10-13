@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+﻿import { useEffect, useRef } from 'react';
 import ContactButtons, { orderMessage } from './ContactButtons';
 import { RATING_CATEGORIES } from '../lib/ratings';
 
@@ -96,10 +96,10 @@ export default function OrderDetailModal({ order, onClose, viewerRole = 'buyer',
 
   // A message from the buyer to the driver reads differently from the same
   // template the other way round. `orderMessage` opens with "this is your
-  // AquaLink delivery driver", which is wrong in the buyer's mouth.
+  // Nautica delivery driver", which is wrong in the buyer's mouth.
   const contactMessage = viewerIsBuyer
     ? [
-        'Hello, this is AquaLink. I have ordered water delivery.',
+        'Hello, this is Nautica. I have ordered water delivery.',
         `Order: ${order.code ?? order.id}`,
         order.location ? `Deliver to: ${order.location}` : '',
         order.volume ? `Volume: ${order.volume}` : '',
@@ -209,3 +209,4 @@ export default function OrderDetailModal({ order, onClose, viewerRole = 'buyer',
     </div>
   );
 }
+

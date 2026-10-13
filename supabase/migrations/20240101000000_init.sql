@@ -1,4 +1,4 @@
--- Supabase migration: AquaLink database schema
+﻿-- Supabase migration: Nautica database schema
 -- Replaces the Firestore collections from functions/index.js
 
 -- Enable required extensions
@@ -146,3 +146,4 @@ create policy "users can manage their own tokens"
   on public.fcm_tokens
   for all using (auth.uid()::text = user_id)
   with check (auth.uid()::text = user_id);
+

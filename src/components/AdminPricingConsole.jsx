@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { readValue, writeValue } from '../lib/storage';
 import { fetchQuote, updatePricing } from '../lib/payments';
 import {
@@ -40,7 +40,7 @@ const NUMERIC_FIELDS = {
   buyerServiceCharge: { min: 0, max: 50, step: 1, label: 'Buyer service charge (%)' },
   seller: { min: 0, max: 100, step: 1, label: 'Water seller share (%)' },
   driver: { min: 0, max: 100, step: 1, label: 'Driver share (%)' },
-  platformCommission: { min: 0, max: 100, step: 1, label: 'AquaLink share (%)' },
+  platformCommission: { min: 0, max: 100, step: 1, label: 'Nautica share (%)' },
 };
 
 function readStored() {
@@ -297,7 +297,7 @@ export default function AdminPricingConsole({ onNotice, onPricingChange, opsToke
               <div className="highlight"><dt>Buyer is charged</dt><dd>{formatCedi(breakdown.buyerPays)}</dd></div>
               <div><dt>Water seller receives</dt><dd>{formatCedi(breakdown.sellerReceives)}</dd></div>
               <div><dt>Driver receives</dt><dd>{formatCedi(breakdown.driverReceives)}</dd></div>
-              <div><dt>AquaLink keeps</dt><dd>{formatCedi(breakdown.companyTake)}</dd></div>
+              <div><dt>Nautica keeps</dt><dd>{formatCedi(breakdown.companyTake)}</dd></div>
             </dl>
           ) : (
             <p className="empty-feed">Enter valid numbers to see the quote.</p>
@@ -372,3 +372,4 @@ export default function AdminPricingConsole({ onNotice, onPricingChange, opsToke
 }
 
 export { readStored as readAdminPricing };
+

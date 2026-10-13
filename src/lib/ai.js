@@ -1,11 +1,11 @@
-/**
- * Client-side AI helper for the AquaLink assistant.
+﻿/**
+ * Client-side AI helper for the Nautica assistant.
  *
  * Calls the server-side `/ai/chat` endpoint, which proxies to the Gemini API.
  * The API key stays on the server; the client only sends the question and
  * role-scoped order context.
  *
- * Throws when the server is unreachable; the caller (useAquaAi hook) is
+ * Throws when the server is unreachable; the caller (useNautAi hook) is
  * responsible for falling back to the keyword matcher in that case.
  *
  * The failure is kept rather than discarded, because "the assistant answered
@@ -67,7 +67,7 @@ export function aiFallbackMessage(reason) {
 }
 
 /**
- * Ask the Aqua AI assistant a question.
+ * Ask the Naut AI assistant a question.
  *
  * Throws if the server is unreachable — the hook wraps this in try/catch
  * and falls back to the local keyword matcher so the assistant still works

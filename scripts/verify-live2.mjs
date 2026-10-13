@@ -1,6 +1,6 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 /**
- * Check what the deployed AquaLink actually answers.
+ * Check what the deployed Nautica actually answers.
  *
  * `npm run build` passing says nothing about the deployment. A function that was
  * never deployed returns 404 from the browser and shows up as a CORS failure on a
@@ -53,11 +53,11 @@ const anonKey = env.VITE_SUPABASE_ANON_KEY || '';
 /**
  * Every origin this project is served from. A deployment that is not listed here
  * is a deployment nobody checks, which is how a live URL went unexamined for a
- * month; `AQUALINK_SITE_URLS` (comma-separated) adds more.
+ * month; `NAUTLINK_SITE_URLS` (comma-separated) adds more.
  */
 const sites = (
-  process.env.AQUALINK_SITE_URLS
-    || 'https://viviluxy-assistant.web.app'
+  process.env.NAUTLINK_SITE_URLS
+    || 'https://nautical.web.app'
 ).split(',').map((value) => value.trim()).filter(Boolean);
 
 /**
@@ -295,3 +295,4 @@ console.log(`${YELLOW}${failed.length} of ${results.length} checks failed:${OFF}
 for (const item of failed) console.log(`  - ${item.name}${item.detail ? `: ${item.detail}` : ''}`);
 console.log(`\n${DIM}See DEPLOY.md for the command that fixes each one.${OFF}`);
 process.exit(1);
+

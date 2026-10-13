@@ -1,4 +1,4 @@
-import { readValue, writeValue } from './storage';
+﻿import { readValue, writeValue } from './storage';
 
 /**
  * Local collection layer for the self-contained build.
@@ -53,12 +53,12 @@ export function createId(prefix = 'id') {
   return `${prefix}_${unique}`;
 }
 
-/** Human-facing booking code, e.g. AQ-1051. Unique within the orders table. */
+/** Human-facing booking code, e.g. NAUT-1051. Unique within the orders table. */
 export function createBookingCode(existing = []) {
   const taken = new Set(existing.map((order) => order.code));
   let candidate = 1000;
-  while (taken.has(`AQ-${candidate}`)) candidate += 1;
-  return `AQ-${candidate}`;
+  while (taken.has(`NAUT-${candidate}`)) candidate += 1;
+  return `NAUT-${candidate}`;
 }
 
 export function list(name, fallback = []) {
@@ -144,3 +144,4 @@ export function syncUsers(accounts) {
   }));
   return replaceAll('users', rows);
 }
+

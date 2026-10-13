@@ -1,4 +1,4 @@
-import { describe, expect, test, vi, beforeEach } from 'vitest';
+﻿import { describe, expect, test, vi, beforeEach } from 'vitest';
 import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import DriverDashboard from './DriverDashboard';
@@ -17,8 +17,8 @@ const KOJO = { id: 'drv_kojo', name: 'Kojo Mensah', phone: '0545009046', base: '
 
 function order(overrides = {}) {
   return {
-    id: 'AQ-1001',
-    code: 'AQ-1001',
+    id: 'NAUT-1001',
+    code: 'NAUT-1001',
     location: 'East Legon, Accra',
     volume: '2,000 gal',
     status: 'Awaiting payment',
@@ -98,12 +98,12 @@ describe('a driver only sees their own work', () => {
   test("does not show another driver's job", () => {
     renderDashboard({
       orders: [
-        order({ id: 'AQ-MINE', driverId: 'drv_kojo' }),
-        order({ id: 'AQ-THEIRS', driverId: 'drv_ama', driverPhone: '0544002233' }),
+        order({ id: 'NAUT-MINE', driverId: 'drv_kojo' }),
+        order({ id: 'NAUT-THEIRS', driverId: 'drv_ama', driverPhone: '0544002233' }),
       ],
     });
-    expect(screen.getByTestId('driver-job-AQ-MINE')).toBeInTheDocument();
-    expect(screen.queryByTestId('driver-job-AQ-THEIRS')).not.toBeInTheDocument();
+    expect(screen.getByTestId('driver-job-NAUT-MINE')).toBeInTheDocument();
+    expect(screen.queryByTestId('driver-job-NAUT-THEIRS')).not.toBeInTheDocument();
   });
 });
 
@@ -111,9 +111,9 @@ describe('the stats bar', () => {
   test('shows available, active, completed and earned counts', () => {
     renderDashboard({
       orders: [
-        order({ id: 'AQ-1', status: 'Awaiting payment' }),
-        order({ id: 'AQ-2', status: 'Assigned' }),
-        order({ id: 'AQ-3', status: 'Delivered', driverReceives: 4500 }),
+        order({ id: 'NAUT-1', status: 'Awaiting payment' }),
+        order({ id: 'NAUT-2', status: 'Assigned' }),
+        order({ id: 'NAUT-3', status: 'Delivered', driverReceives: 4500 }),
       ],
     });
     // Stats bar is always visible - use section-kicker text which is unique
@@ -161,15 +161,15 @@ describe('bottom navigation tabs', () => {
     const user = userEvent.setup();
     renderDashboard({
       orders: [
-        order({ id: 'AQ-1', status: 'Awaiting payment' }),
-        order({ id: 'AQ-2', status: 'Assigned' }),
-        order({ id: 'AQ-3', status: 'Delivered' }),
+        order({ id: 'NAUT-1', status: 'Awaiting payment' }),
+        order({ id: 'NAUT-2', status: 'Assigned' }),
+        order({ id: 'NAUT-3', status: 'Delivered' }),
       ],
     });
     
     // Default is Available tab
     expect(screen.getByText('AVAILABLE NEAR YOU')).toBeInTheDocument();
-    expect(screen.getByTestId('driver-job-AQ-1')).toBeInTheDocument();
+    expect(screen.getByTestId('driver-job-NAUT-1')).toBeInTheDocument();
     
     // Switch to Active tab
     await switchToTab(user, 'active');
@@ -177,7 +177,7 @@ describe('bottom navigation tabs', () => {
     await waitFor(() => {
       expect(screen.getByText('ACTIVE DELIVERIES')).toBeInTheDocument();
     });
-    expect(screen.getByTestId('driver-job-AQ-2')).toBeInTheDocument();
+    expect(screen.getByTestId('driver-job-NAUT-2')).toBeInTheDocument();
     
     // Switch to History tab
     await switchToTab(user, 'history');
@@ -188,7 +188,7 @@ describe('bottom navigation tabs', () => {
       expect(panel).toBeInTheDocument();
     });
     // Completed jobs are hidden by default
-    expect(screen.queryByTestId('driver-job-AQ-3')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('driver-job-NAUT-3')).not.toBeInTheDocument();
   });
 });
 
@@ -205,7 +205,7 @@ describe('claiming and progressing a job', () => {
     const { onAccept } = renderDashboard({ orders: [order({ status: 'Awaiting payment' })] });
     
     await user.click(screen.getByRole('button', { name: /accept job/i }));
-    expect(onAccept).toHaveBeenCalledWith('AQ-1001');
+    expect(onAccept).toHaveBeenCalledWith('NAUT-1001');
   });
 
   test('shows advance button for Assigned jobs in Active tab', async () => {
@@ -232,7 +232,7 @@ describe('claiming and progressing a job', () => {
     });
     
     await user.click(screen.getByRole('button', { name: /mark picked up/i }));
-    expect(onAdvance).toHaveBeenCalledWith('AQ-1001', 'Picked Up');
+    expect(onAdvance).toHaveBeenCalledWith('NAUT-1001', 'Picked Up');
   });
 
   test('shows enter delivery code button for En Route jobs in Active tab', async () => {
@@ -257,7 +257,7 @@ describe('claiming and progressing a job', () => {
     });
     
     await user.click(screen.getByRole('button', { name: /enter delivery code/i }));
-    expect(onComplete).toHaveBeenCalledWith('AQ-1001');
+    expect(onComplete).toHaveBeenCalledWith('NAUT-1001');
   });
 });
 
@@ -333,7 +333,7 @@ describe('the delivery stepper', () => {
 describe('completed history tab', () => {
   test('shows toggle to show/hide completed deliveries', async () => {
     const user = userEvent.setup();
-    renderDashboard({ orders: [order({ id: 'AQ-1', status: 'Delivered' }), order({ id: 'AQ-2', status: 'Delivered' })] });
+    renderDashboard({ orders: [order({ id: 'NAUT-1', status: 'Delivered' }), order({ id: 'NAUT-2', status: 'Delivered' })] });
     
     await switchToTab(user, 'history');
     
@@ -346,15 +346,15 @@ describe('completed history tab', () => {
     await user.click(screen.getByRole('button', { name: /show history/i }));
     
     await waitFor(() => {
-      expect(screen.getByTestId('driver-job-AQ-1')).toBeInTheDocument();
-      expect(screen.getByTestId('driver-job-AQ-2')).toBeInTheDocument();
+      expect(screen.getByTestId('driver-job-NAUT-1')).toBeInTheDocument();
+      expect(screen.getByTestId('driver-job-NAUT-2')).toBeInTheDocument();
     });
     
     // Click to hide
     await user.click(screen.getByRole('button', { name: /hide history/i }));
     
     await waitFor(() => {
-      expect(screen.queryByTestId('driver-job-AQ-1')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('driver-job-NAUT-1')).not.toBeInTheDocument();
     });
   });
 });
@@ -364,8 +364,8 @@ describe('earnings tab', () => {
     const user = userEvent.setup();
     renderDashboard({ 
       orders: [
-        order({ id: 'AQ-1', status: 'Delivered', driverReceives: 4500, createdAt: '2026-10-01T09:00:00Z' }),
-        order({ id: 'AQ-2', status: 'Delivered', driverReceives: 3500, createdAt: '2026-09-15T09:00:00Z' }),
+        order({ id: 'NAUT-1', status: 'Delivered', driverReceives: 4500, createdAt: '2026-10-01T09:00:00Z' }),
+        order({ id: 'NAUT-2', status: 'Delivered', driverReceives: 3500, createdAt: '2026-09-15T09:00:00Z' }),
       ] 
     });
     

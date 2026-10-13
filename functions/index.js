@@ -1,5 +1,5 @@
-/**
- * AquaLink server.
+﻿/**
+ * Nautica server.
  *
  * Three responsibilities, and the boundary between them is the point of this
  * file:
@@ -523,7 +523,7 @@ export const apiCreateOrder = onRequest(async (req, res) => {
     // Any amount sent by the client is ignored on purpose. The price below is
     // the only one that is stored and later charged.
     const priced = priceOrder({ pricing, split, volumeLitres });
-    const orderId = `AQ-${randomBytes(5).toString('hex').toUpperCase()}`;
+    const orderId = `NAUT-${randomBytes(5).toString('hex').toUpperCase()}`;
 
     const order = {
       id: orderId,
@@ -905,7 +905,7 @@ export const apiTestNotification = onRequest({ secrets: [OPS_SESSION_SECRET] }, 
     const body = await readJson(req);
     const userId = String(body.userId ?? '').trim();
     const title = String(body.title ?? 'Test Notification');
-    const bodyText = String(body.body ?? 'This is a test push notification from AquaLink.');
+    const bodyText = String(body.body ?? 'This is a test push notification from Nautica.');
 
     if (!userId) {
       return fail(res, 400, 'missing_user', 'userId is required.');
@@ -926,11 +926,11 @@ export const apiTestNotification = onRequest({ secrets: [OPS_SESSION_SECRET] }, 
 /* ----------------------------------------------------------- AI chat */
 
 const SYSTEM_PROMPTS = {
-  buyer: `You are Aqua, the AI assistant for AquaLink, a water delivery service in Ghana. You answer questions about the buyer's orders, pricing, delivery status, and loyalty rewards. You read the buyer's real order history from the data provided. If you don't know something, say so rather than inventing an answer. Never invent phone numbers, emails, order references, or prices. Always quote GH₵ amounts in the format GH₵XX.XX.`,
-  seller: `You are Aqua, the AI assistant for AquaLink's seller dashboard. You answer questions about seller performance, order payouts, delivery reliability, and pricing. You read the seller's real order data from the provided context. If you don't know something, say so.`,
-  driver: `You are Aqua, the AI assistant for AquaLink's driver app. You answer questions about a driver's deliveries, earnings, and route information. You read the driver's real delivery data from the provided context. If you don't know something, say so.`,
-  ops: `You are Aqua, the AI operations copilot for AquaLink. You answer questions about revenue, seller performance, delivery reliability, order status, and pricing configuration. You read real order data from the provided context. If you don't know something, say so.`,
-  institution: `You are Aqua, the AI assistant for AquaLink's institutional dashboard. You answer questions about supply schedules, budgets, and delivery volumes. You read real data from the provided context. If you don't know something, say so.`,
+  buyer: `You are Naut, the AI assistant for Nautica, a water delivery service in Ghana. You answer questions about the buyer's orders, pricing, delivery status, and loyalty rewards. You read the buyer's real order history from the data provided. If you don't know something, say so rather than inventing an answer. Never invent phone numbers, emails, order references, or prices. Always quote GH₵ amounts in the format GH₵XX.XX.`,
+  seller: `You are Naut, the AI assistant for Nautica's seller dashboard. You answer questions about seller performance, order payouts, delivery reliability, and pricing. You read the seller's real order data from the provided context. If you don't know something, say so.`,
+  driver: `You are Naut, the AI assistant for Nautica's driver app. You answer questions about a driver's deliveries, earnings, and route information. You read the driver's real delivery data from the provided context. If you don't know something, say so.`,
+  ops: `You are Naut, the AI operations copilot for Nautica. You answer questions about revenue, seller performance, delivery reliability, order status, and pricing configuration. You read real order data from the provided context. If you don't know something, say so.`,
+  institution: `You are Naut, the AI assistant for Nautica's institutional dashboard. You answer questions about supply schedules, budgets, and delivery volumes. You read real data from the provided context. If you don't know something, say so.`,
 };
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
@@ -1029,3 +1029,4 @@ export const apiAiChat = onRequest({ secrets: [GEMINI_API_KEY] }, async (req, re
 });
 
 export { verifyPassword, hashPassword };
+
