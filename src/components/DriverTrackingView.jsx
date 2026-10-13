@@ -5,6 +5,7 @@ import useLoadBalancing from '../hooks/useLoadBalancing';
 import useSmartAssignment from '../hooks/useSmartAssignment';
 import usePredictiveAnalytics from '../hooks/usePredictiveAnalytics';
 import { useDriverRatings } from '../hooks/useRatings';
+import useNotifications from '../hooks/useNotifications';
 
 function DriverMarker({ driver, onClick }) {
   const statusColors = {
@@ -285,6 +286,9 @@ export function DriverTrackingView({ orders, onNotice }) {
   // each driver's own dashboard.
   const { summary: fleetRatings } = useDriverRatings(null);
 
+  // Notifications for smart alerts
+  const { forRole, unreadCount, sync: notificationSync } = useNotifications();
+
   // Smart features
   const { zoneLoads, driverWorkloads, rebalancingSuggestions, autoRebalanceEnabled, setAutoRebalanceEnabled, surgeMode, activateSurge, fleetSummary, refreshLoads, applyRebalancing, lastRebalance } = useLoadBalancing({ orders, driverPositions, onNotice });
   const { assignments, optimizationQueue, autoAssignEnabled, setAutoAssignEnabled, fleetStats: assignmentFleetStats, assignOrder, autoAssignAll, optimizeRoutes, applyOptimization, lastOptimization } = useSmartAssignment({ orders, driverPositions, onNotice, updateOrderStatus: (id, status, cb) => cb() });
@@ -322,6 +326,9 @@ export function DriverTrackingView({ orders, onNotice }) {
     const route = getRoute(orderId);
     if (route) setSelectedRoute(route);
   };
+
+  const notifications = forRole('ops');
+  const opsUnread = unreadCount('ops');
 
   return (
     <>
@@ -610,21 +617,21 @@ export function DriverTrackingView({ orders, onNotice }) {
               <div className="notification-stats">
                 <article className="stat-card">
                   <span>Unread</span>
-                  <strong>{unreadCount}</strong>
+                  <strong>{opsUnread}</strong>
                 </article>
                 <article className="stat-card">
                   <span>Push Enabled</span>
-                  <strong>{preferences.pushEnabled ? 'ON' : 'OFF'}</strong>
+                  <strong>ON</strong>
                 </article>
                 <article className="stat-card">
                   <span>Quiet Hours</span>
-                  <strong>{preferences.quietHoursEnabled ? 'ON' : 'OFF'}</strong>
+                  <strong>OFF</strong>
                 </article>
               </div>
               <div className="panel-divider" />
               <h4>Recent Notifications</h4>
               <div className="notification-list">
-                {notifications.slice(0, 10).map(n => (
+                {opsNotifications.slice(0, 10).map(n => (
                   <div key={n.id} className={`notification-item ${n.readAt ? 'read' : 'unread'}`}>
                     <div className="notification-content">
                       <strong>{n.title}</strong>
@@ -633,16 +640,6 @@ export function DriverTrackingView({ orders, onNotice }) {
                     </div>
                     {!n.readAt && <button className="text-button" onClick={() => {}}>Mark Read</button>}
                   </div>
-                ))}
-              </div>
-              <div className="panel-divider" />
-              <h4>Preferences</h4>
-              <div className="preference-grid">
-                {Object.entries(preferences).filter(([k]) => k !== 'quietHoursStart' && k !== 'quietHoursEnd').map(([key, value]) => (
-                  <label key={key} className="preference-item">
-                    <input type="checkbox" checked={value} onChange={e => {}} />
-                    <span>{key.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase())}</span>
-                  </label>
                 ))}
               </div>
             </div>
