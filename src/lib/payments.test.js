@@ -460,7 +460,7 @@ describe('receipts', () => {
   });
 
   test('survives corrupt storage instead of crashing the panel', () => {
-    localStorage.setItem('aqualink.v1.payments.receipts', '{"not":"an array"}');    expect(listReceipts()).toEqual([]);
+    localStorage.setItem('nautica.v1.payments.receipts', '{"not":"an array"}');    expect(listReceipts()).toEqual([]);
   });
 });
 

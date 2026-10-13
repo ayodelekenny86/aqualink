@@ -41,8 +41,8 @@ test('refuses to publish and does not claim success without an operator token', 
   // The refusal is explicit about why: prices are set on the server.
   expect(onNotice).toHaveBeenCalledWith(expect.stringMatching(/sign in as an operator/i));
 
-  // And nothing was written, so a later read cannot mistake this for a live price.
-  expect(localStorage.getItem('aqualink.v1.admin.pricing.pricing')).toBeNull();
+// And nothing was written, so a later read cannot mistake this for a live price.
+  expect(localStorage.getItem('nautica.v1.admin.pricing.pricing')).toBeNull();
 
   // The operator is told up front that this is a preview, not a control.
   expect(screen.getByText(/not signed in as an operator/i)).toBeInTheDocument();
@@ -60,7 +60,7 @@ test('publishes to the server and only then reports success', async () => {
   expect(onNotice).not.toHaveBeenCalledWith(expect.stringMatching(/sign in as an operator/i));
 
   // The accepted price is what got cached, so the display matches the server.
-  const cached = JSON.parse(localStorage.getItem('aqualink.v1.admin.pricing.pricing'));
+  const cached = JSON.parse(localStorage.getItem('nautica.v1.admin.pricing.pricing'));
   expect(cached.listPrice).toBe(900);
 });
 
@@ -76,7 +76,7 @@ test('surfaces a server rejection instead of writing the change locally', async 
 
   await waitFor(() => expect(onNotice).toHaveBeenCalledWith(expect.stringMatching(/sign in as an operator to do that/i)));
   expect(onNotice).not.toHaveBeenCalledWith(expect.stringMatching(/pricing published/i));
-  expect(localStorage.getItem('aqualink.v1.admin.pricing.pricing')).toBeNull();
+  expect(localStorage.getItem('nautica.v1.admin.pricing.pricing')).toBeNull();
 });
 
 test('refuses a split that does not total 100% before contacting the server', async () => {

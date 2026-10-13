@@ -155,13 +155,13 @@ async function probeSite(site) {
 
 /** Which commit is live, and does it match this checkout? */
 async function probeBuild(site, html, origin) {
-  const deployed = html.match(/<meta name="aqualink-build" content="([^"]*)"/)?.[1] ?? '';
-  const builtAt = html.match(/<meta name="aqualink-built" content="([^"]*)"/)?.[1] ?? '';
+  const deployed = html.match(/<meta name="nautica-build" content="([^"]*)"/)?.[1] ?? '';
+  const builtAt = html.match(/<meta name="nautica-built" content="([^"]*)"/)?.[1] ?? '';
   const head = git('rev-parse', 'HEAD');
 
   if (!deployed) {
     // Pre-stamp builds cannot be dated. The bundle check below still applies.
-    record('the live build reports its commit', false, 'No aqualink-build meta tag, so this build cannot be dated. Rebuild and redeploy.', origin);
+    record('the live build reports its commit', false, 'No nautica-build meta tag, so this build cannot be dated. Rebuild and redeploy.', origin);
   } else if (!head) {
     record('the live build matches this checkout', true, `${deployed}${builtAt ? ` built ${builtAt}` : ''} ${DIM}(no local git, so not compared)${OFF}`, origin);
   } else {

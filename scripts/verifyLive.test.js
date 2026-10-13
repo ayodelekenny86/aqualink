@@ -138,7 +138,7 @@ test('every table the client subscribes to is published for Realtime', async () 
 test('every build is stamped with the commit it came from', async () => {
   // Without the stamp a stale deployment is indistinguishable from a current one.
   const config = await readFile('vite.config.js', 'utf8');
-  expect(config).toMatch(/aqualink-build/);
-  expect(config).toMatch(/aqualink-built/);
+  expect(config).toMatch(/nautica-build/);
+  expect(config).toMatch(/nautica-built/);
   expect(config).toMatch(/rev-parse/);
 });
