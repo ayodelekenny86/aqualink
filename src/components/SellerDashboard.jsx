@@ -537,6 +537,7 @@ export function SellerDashboard({
             <button className={smartTab === 'waterquality' ? 'active' : ''} onClick={() => setSmartTab('waterquality')}>Water Quality</button>
             <button className={smartTab === 'inventory' ? 'active' : ''} onClick={() => setSmartTab('inventory')}>Predictive Inventory</button>
             <button className={smartTab === 'routing' ? 'active' : ''} onClick={() => setSmartTab('routing')}>Route Optimization</button>
+            <button className={smartTab === 'routing-v2' ? 'active' : ''} onClick={() => setSmartTab('routing-v2')}>Route Optimization V2</button>
             <button className={smartTab === 'customers' ? 'active' : ''} onClick={() => setSmartTab('customers')}>Customer Intelligence</button>
             <button className={smartTab === 'notifications' ? 'active' : ''} onClick={() => setSmartTab('notifications')}>Smart Alerts</button>
             <button className={smartTab === 'loadbalance' ? 'active' : ''} onClick={() => setSmartTab('loadbalance')}>Load Balancing</button>
@@ -561,6 +562,11 @@ export function SellerDashboard({
             <button className={smartTab === 'quality-prediction' ? 'active' : ''} onClick={() => setSmartTab('quality-prediction')}>Quality Prediction</button>
             <button className={smartTab === 'sentiment' ? 'active' : ''} onClick={() => setSmartTab('sentiment')}>Sentiment</button>
             <button className={smartTab === 'revenue-leaks' ? 'active' : ''} onClick={() => setSmartTab('revenue-leaks')}>Revenue Leaks</button>
+            <button className={smartTab === 'predictive-pricing' ? 'active' : ''} onClick={() => setSmartTab('predictive-pricing')}>Predictive Pricing</button>
+            <button className={smartTab === 'inventory-forecasting' ? 'active' : ''} onClick={() => setSmartTab('inventory-forecasting')}>Inventory Forecasting</button>
+            <button className={smartTab === 'driver-behavior' ? 'active' : ''} onClick={() => setSmartTab('driver-behavior')}>Driver Behavior</button>
+            <button className={smartTab === 'customer-lifetime-value' ? 'active' : ''} onClick={() => setSmartTab('customer-lifetime-value')}>Customer LTV</button>
+            <button className={smartTab === 'demand-sensing' ? 'active' : ''} onClick={() => setSmartTab('demand-sensing')}>Demand Sensing</button>
           </div>
 
           {smartTab === 'forecast' && (
@@ -1123,6 +1129,75 @@ export function SellerDashboard({
               pricing={{}}
               drivers={fleetDrivers} 
               facilities={[]}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'predictive-pricing' && (
+            <PredictivePricingPanel 
+              orders={orders} 
+              pricing={{}} 
+              competitors={[]}
+              weatherData={[]}
+              events={[]}
+              historicalPricing={[]}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'inventory-forecasting' && (
+            <InventoryForecastingPanel 
+              products={[]} 
+              orders={orders} 
+              suppliers={[]}
+              warehouses={[]}
+              usageHistory={[]}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'driver-behavior' && (
+            <DriverBehaviorPanel 
+              drivers={fleetDrivers} 
+              trips={[]} 
+              vehicles={[]}
+              fuelRecords={[]}
+              maintenanceRecords={[]}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'customer-lifetime-value' && (
+            <CustomerLifetimeValuePanel 
+              customers={[]} 
+              orders={orders} 
+              payments={[]}
+              subscriptions={[]}
+              interactions={[]}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'demand-sensing' && (
+            <DemandSensingPanel 
+              orders={orders} 
+              customers={[]} 
+              weatherForecast={[]}
+              events={[]}
+              historicalData={[]}
+              marketIndicators={[]}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'routing-v2' && (
+            <RouteOptimizationV2Panel 
+              orders={orders} 
+              drivers={fleetDrivers} 
+              vehicles={[]}
+              facilities={[]}
+              trafficData={[]}
+              timeWindows={[]}
               onNotice={showNotice}
             />
           )}

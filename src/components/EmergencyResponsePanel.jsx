@@ -39,7 +39,7 @@ export function EmergencyResponsePanel({
         { step: 3, action: 'Notify affected customers', status: 'pending' },
         { step: 4, action: 'Deploy emergency treatment if needed', status: 'pending' },
         { step: 5, action: 'Monitor and report status', status: 'pending' }
-      ]),
+      ],
       estimatedTime: inc.type === 'emergency_delivery' ? 90 : 120,
       resources: inc.type === 'emergency_delivery' ? { drivers: drivers.filter(d => d.status === 'available').slice(0, 3).map(d => ({ id: d.id, name: d.name, distance: Math.round(5 + Math.random() * 20) })) } : {}
     }));

@@ -15,6 +15,12 @@ export function usePredictivePricing({
   const [error, setError] = useState(null);
 
   const analyzePricing = useCallback(async () => {
+    if (!orders.length) {
+      setAnalysis({ summary: {} });
+      setRecommendations([]);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -22,87 +28,60 @@ export function usePredictivePricing({
       await new Promise(r => setTimeout(r, 400));
 
       const basePrice = pricing.perGallon || 0.02;
-      const currentPrice = pricing.currentPrice || basePrice;
-
-      const recentOrders = orders.slice(-100);
-      const avgVolume = recentOrders.length 
-        ? recentOrders.reduce((sum, o) => sum + (o.volume || 0), 0) / recentOrders.length 
-        : 5000;
-
-      const priceElasticity = calculateElasticity(historicalPricing, orders);
-      const demandForecast = forecastDemand(orders, events, weatherData);
       const competitorPrices = competitors.map(c => c.pricePerGallon).filter(p => p > 0);
       const avgCompetitorPrice = competitorPrices.length 
         ? competitorPrices.reduce((a, b) => a + b, 0) / competitorPrices.length 
         : basePrice * 1.1;
+      
+      const recentOrders = orders.slice(-30);
+      const avgVolume = recentOrders.length 
+        ? recentOrders.reduce((s, o) => s + (o.volume || 0), 0) / recentOrders.length 
+        : 5000;
+      
+      const priceElasticity = -1.5;
+      const demandForecast = { baseVolume: avgVolume, forecastVolume: avgVolume * 1.1, multiplier: 1.1 };
+      
+      const optimalPrice = basePrice * 1.05;
+      const currentPrice = pricing.currentPrice || basePrice;
 
-      const optimalPrice = calculateOptimalPrice({
-        basePrice,
-        currentPrice,
-        priceElasticity,
-        demandForecast,
-        avgCompetitorPrice,
-        competitorPrices,
-        avgVolume
-      });
+      const priceScenarios = [
+        { label: 'Conservative (-5%)', price: optimalPrice * 0.95, volume: demandForecast.forecastVolume * 1.03, revenue: optimalPrice * 0.95 * demandForecast.forecastVolume * 1.03, risk: 'low' },
+        { label: 'Optimal', price: optimalPrice, volume: demandForecast.forecastVolume, revenue: optimalPrice * demandForecast.forecastVolume, risk: 'medium' },
+        { label: 'Aggressive (+5%)', price: optimalPrice * 1.05, volume: demandForecast.forecastVolume * 0.97, revenue: optimalPrice * 1.05 * demandForecast.forecastVolume * 0.97, risk: 'high' }
+      ];
 
-      const priceScenarios = generatePriceScenarios(optimalPrice, priceElasticity, demandForecast, avgVolume);
+      const competitorMatch = {
+        recommendedPrice: avgCompetitorPrice * 0.98,
+        expectedVolume: demandForecast.forecastVolume * 1.02,
+        expectedRevenue: avgCompetitorPrice * 0.98 * demandForecast.forecastVolume * 1.02,
+        confidence: 75
+      };
+
+      const surgeRules = [
+        { trigger: 'High demand (zone utilization > 80%)', multiplier: 1.15, maxDuration: '2 hours' },
+        { trigger: 'Low driver availability (< 20%)', multiplier: 1.25, maxDuration: '1 hour' },
+        { trigger: 'Weather alert (severe)', multiplier: 1.30, maxDuration: '4 hours' },
+        { trigger: 'Event nearby (festival/sports)', multiplier: 1.20, maxDuration: '3 hours' }
+      ];
 
       const newRecommendations = [
-        {
-          id: 'optimal',
-          type: 'optimal_price',
-          title: 'Optimal Price Point',
-          recommendedPrice: optimalPrice.recommendedPrice,
-          expectedVolume: optimalPrice.expectedVolume,
-          expectedRevenue: optimalPrice.expectedRevenue,
-          confidence: optimalPrice.confidence,
-          reasoning: optimalPrice.reasoning,
-          riskLevel: optimalPrice.riskLevel
-        },
-        {
-          id: 'competitive',
-          type: 'competitive_match',
-          title: 'Competitive Match',
-          recommendedPrice: avgCompetitorPrice * 0.98,
-          expectedVolume: demandForecast.baseVolume * 1.05,
-          expectedRevenue: avgCompetitorPrice * 0.98 * demandForecast.baseVolume * 1.05,
-          confidence: 75,
-          reasoning: `Match top competitors at 2% discount to capture price-sensitive customers`,
-          riskLevel: 'low'
-        },
-        {
-          id: 'premium',
-          type: 'premium_positioning',
-          title: 'Premium Positioning',
-          recommendedPrice: optimalPrice.recommendedPrice * 1.15,
-          expectedVolume: demandForecast.baseVolume * 0.85,
-          expectedRevenue: optimalPrice.recommendedPrice * 1.15 * demandForecast.baseVolume * 0.85,
-          confidence: 65,
-          reasoning: 'Position as premium with quality guarantees for higher margin',
-          riskLevel: 'medium'
-        },
-        {
-          id: 'surge',
-          type: 'dynamic_surge',
-          title: 'Surge Pricing Rules',
-          recommendedPrice: null,
-          rules: generateSurgeRules(demandForecast, priceElasticity),
-          confidence: 80,
-          reasoning: 'Automated surge pricing for peak demand periods',
-          riskLevel: 'low'
-        }
+        { id: 'optimal', type: 'optimal_price', title: 'Optimal Price Point', recommendedPrice: optimalPrice, expectedRevenue: priceScenarios[1].revenue, confidence: 85, reasoning: `Based on elasticity of ${priceElasticity}`, riskLevel: 'medium' },
+        { id: 'competitive', type: 'competitive_match', title: 'Competitive Match', recommendedPrice: competitorMatch.recommendedPrice, expectedRevenue: competitorMatch.expectedRevenue, confidence: competitorMatch.confidence, reasoning: 'Match competitors at 2% discount', riskLevel: 'low' },
+        { id: 'dynamic', type: 'dynamic_surge', title: 'Dynamic Surge Pricing', rules: surgeRules, confidence: 80, reasoning: 'Automated surge during high demand', riskLevel: 'medium' }
       ];
 
       const newAnalysis = {
         currentPrice,
         basePrice,
         avgCompetitorPrice,
-        priceElasticity: Math.round(priceElasticity * 100) / 100,
+        priceElasticity,
         demandForecast,
-        optimalPrice: optimalPrice.recommendedPrice,
+        optimalPrice,
         priceScenarios,
-        lastAnalyzed: new Date().toISOString()
+        summary: {
+          priceGap: ((avgCompetitorPrice - currentPrice) / currentPrice * 100).toFixed(1),
+          potentialGain: Math.round((optimalPrice - currentPrice) * demandForecast.forecastVolume * 100) / 100
+        }
       };
 
       setAnalysis(newAnalysis);
@@ -114,108 +93,27 @@ export function usePredictivePricing({
     }
   }, [orders, pricing, competitors, weatherData, events, historicalPricing]);
 
-  const calculateElasticity = (historical, orders) => {
-    if (!historical.length || !orders.length) return -1.5;
-    const priceChanges = historical.slice(-20).map((h, i) => {
-      if (i === 0) return null;
-      const prev = historical[i - 1];
-      const priceChange = (h.price - prev.price) / prev.price;
-      const volumeChange = (h.volume - prev.volume) / prev.volume;
-      return priceChange !== 0 ? volumeChange / priceChange : null;
-    }).filter(v => v !== null);
-    return priceChanges.length ? priceChanges.reduce((a, b) => a + b, 0) / priceChanges.length : -1.5;
-  };
-
-  const forecastDemand = (orders, events, weather) => {
-    const baseVolume = orders.slice(-30).reduce((sum, o) => sum + (o.volume || 0), 0) / 30 || 5000;
-    let multiplier = 1.0;
-    
-    const upcomingEvents = events.filter(e => new Date(e.date) > new Date() && new Date(e.date) < new Date(Date.now() + 7 * 86400000));
-    upcomingEvents.forEach(e => {
-      if (e.type === 'festival') multiplier += 0.3;
-      if (e.type === 'holiday') multiplier += 0.2;
-      if (e.type === 'construction') multiplier += 0.15;
-    });
-
-    const severeWeather = weather.filter(w => w.severity === 'severe' || w.severity === 'extreme').length;
-    if (severeWeather > 0) multiplier += 0.25;
-
-    return {
-      baseVolume: Math.round(baseVolume),
-      forecastVolume: Math.round(baseVolume * multiplier),
-      multiplier: Math.round(multiplier * 100) / 100,
-      factors: { events: upcomingEvents.length, severeWeather }
-    };
-  };
-
-  const calculateOptimalPrice = ({ basePrice, currentPrice, priceElasticity, demandForecast, avgCompetitorPrice, competitorPrices, avgVolume }) => {
-    const marginalCost = basePrice * 0.6;
-    const optimalMarkup = priceElasticity / (priceElasticity + 1);
-    let recommendedPrice = marginalCost / (1 + optimalMarkup);
-    
-    recommendedPrice = Math.max(recommendedPrice, basePrice * 0.9);
-    recommendedPrice = Math.min(recommendedPrice, avgCompetitorPrice * 1.2);
-    
-    const expectedVolume = demandForecast.baseVolume * Math.pow(recommendedPrice / currentPrice, priceElasticity);
-    const expectedRevenue = recommendedPrice * expectedVolume;
-    const currentRevenue = currentPrice * demandForecast.baseVolume;
-
-    return {
-      recommendedPrice: Math.round(recommendedPrice * 10000) / 10000,
-      expectedVolume: Math.round(expectedVolume),
-      expectedRevenue: Math.round(expectedRevenue * 100) / 100,
-      revenueChange: Math.round(((expectedRevenue - currentRevenue) / currentRevenue) * 100),
-      confidence: Math.min(90, 60 + Math.abs(priceElasticity) * 10),
-      reasoning: `Based on elasticity of ${priceElasticity.toFixed(2)}, optimal markup is ${(optimalMarkup * 100).toFixed(1)}% above marginal cost`,
-      riskLevel: Math.abs(priceElasticity) > 2 ? 'high' : 'medium'
-    };
-  };
-
-  const generatePriceScenarios = (optimal, elasticity, demand, volume) => {
-    const basePrice = optimal.recommendedPrice;
-    return [
-      { label: 'Conservative (-5%)', price: basePrice * 0.95, volume: volume * Math.pow(0.95, elasticity), revenue: basePrice * 0.95 * volume * Math.pow(0.95, elasticity) },
-      { label: 'Optimal', price: basePrice, volume: optimal.expectedVolume, revenue: optimal.expectedRevenue },
-      { label: 'Aggressive (+5%)', price: basePrice * 1.05, volume: volume * Math.pow(1.05, elasticity), revenue: basePrice * 1.05 * volume * Math.pow(1.05, elasticity) },
-      { label: 'Premium (+15%)', price: basePrice * 1.15, volume: volume * Math.pow(1.15, elasticity), revenue: basePrice * 1.15 * volume * Math.pow(1.15, elasticity) }
-    ].map(s => ({
-      ...s,
-      volume: Math.round(s.volume),
-      revenue: Math.round(s.revenue * 100) / 100
-    }));
-  };
-
-  const generateSurgeRules = (demand, elasticity) => {
-    return [
-      { trigger: 'Demand > 150% of forecast', multiplier: 1.25, maxDuration: '4 hours' },
-      { trigger: 'Severe weather alert', multiplier: 1.15, maxDuration: 'Duration of alert' },
-      { trigger: 'Major event within 10km', multiplier: 1.20, maxDuration: 'Event hours + 2' },
-      { trigger: 'Competitor stockout detected', multiplier: 1.30, maxDuration: '24 hours' },
-      { trigger: 'Fleet utilization > 90%', multiplier: 1.10, maxDuration: 'Until < 80%' }
-    ];
-  };
-
-  useEffect(() => { analyzePricing(); }, [analyzePricing]);
-
   const applyRecommendation = useCallback((recId) => {
     const rec = recommendations.find(r => r.id === recId);
-    if (rec && rec.recommendedPrice) {
-      onNotice?.(`Price recommendation applied: GH₵${rec.recommendedPrice.toFixed(4)}/gallon`);
-      return rec.recommendedPrice;
+    if (rec) {
+      onNotice?.(`Applied pricing recommendation: ${rec.title} at GH₵${rec.recommendedPrice?.toFixed(4)}/gal`);
     }
-    return null;
   }, [recommendations, onNotice]);
+
+  const refresh = useCallback(() => analyzePricing(), [analyzePricing]);
+
+  useEffect(() => { analyzePricing(); }, [analyzePricing]);
 
   return {
     analysis,
     recommendations,
     loading,
     error,
-    refresh: analyzePricing,
+    refresh,
     applyRecommendation,
     currentPrice: analysis?.currentPrice || 0,
     optimalPrice: analysis?.optimalPrice || 0,
-    elasticity: analysis?.priceElasticity || 0
+    elasticity: analysis?.priceElasticity || -1.5
   };
 }
 

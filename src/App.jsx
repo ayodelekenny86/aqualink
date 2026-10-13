@@ -52,11 +52,17 @@ import SustainabilityTrackingPanel from './components/SustainabilityTrackingPane
 import WaterSourceOptimizationPanel from './components/WaterSourceOptimizationPanel';
 import ComplianceMonitoringPanel from './components/ComplianceMonitoringPanel';
 import EmergencyResponsePanel from './components/EmergencyResponsePanel';
-import CarbonFootprintPanel from './components/CarbonFootprintPanel';
+import CarbonFootprintTrackingPanel from './components/CarbonFootprintTrackingPanel';
 import SmartDeliverySchedulingPanel from './components/SmartDeliverySchedulingPanel';
 import WaterQualityPredictionPanel from './components/WaterQualityPredictionPanel';
-import CustomerSentimentPanel from './components/CustomerSentimentPanel';
+import CustomerSentimentAnalysisPanel from './components/CustomerSentimentAnalysisPanel';
 import RevenueLeakDetectionPanel from './components/RevenueLeakDetectionPanel';
+import PredictivePricingPanel from './components/PredictivePricingPanel';
+import RouteOptimizationV2Panel from './components/RouteOptimizationV2Panel';
+import InventoryForecastingPanel from './components/InventoryForecastingPanel';
+import DriverBehaviorPanel from './components/DriverBehaviorPanel';
+import CustomerLifetimeValuePanel from './components/CustomerLifetimeValuePanel';
+import DemandSensingPanel from './components/DemandSensingPanel';
 
 // Smart feature hooks
 import useSmartScheduling from './hooks/useSmartScheduling';
@@ -83,6 +89,12 @@ import { useSmartDeliveryScheduling } from './hooks/useSmartDeliveryScheduling';
 import { useWaterQualityPrediction } from './hooks/useWaterQualityPrediction';
 import { useCustomerSentimentAnalysis } from './hooks/useCustomerSentimentAnalysis';
 import { useRevenueLeakDetection } from './hooks/useRevenueLeakDetection';
+import { usePredictivePricing } from './hooks/usePredictivePricing';
+import { useRouteOptimizationV2 } from './hooks/useRouteOptimizationV2';
+import { useInventoryForecasting } from './hooks/useInventoryForecasting';
+import { useDriverBehavior } from './hooks/useDriverBehavior';
+import { useCustomerLifetimeValue } from './hooks/useCustomerLifetimeValue';
+import { useDemandSensing } from './hooks/useDemandSensing';
 
 // Admin-only and overlay surfaces load on demand. A buyer who never opens the
 // admin console never downloads it, which keeps the initial bundle small.
@@ -501,6 +513,137 @@ function App() {
     onNotice: showNotice 
   });
 
+  // New advanced hooks
+  const { 
+    analysis: predictivePricingAnalysis,
+    recommendations: pricingRecommendations,
+    loading: pricingLoading,
+    refresh: refreshPricing,
+    currentPrice,
+    optimalPrice,
+    elasticity
+  } = usePredictivePricing({
+    orders,
+    pricing: pricingRules,
+    competitors: [],
+    weatherData: [],
+    events: [],
+    historicalPricing: [],
+    onNotice: showNotice
+  });
+
+  const { 
+    optimization: routeV2Optimization,
+    routes: routeV2Routes,
+    loading: routeV2Loading,
+    error: routeV2Error,
+    refresh: refreshRouteV2,
+    reoptimizeRoute,
+    assignOrderToRoute,
+    totalSavings: routeV2Savings,
+    savingsPercent: routeV2SavingsPercent,
+    unassignedCount: routeV2Unassigned,
+    getDriverRoute: getRouteV2DriverRoute
+  } = useRouteOptimizationV2({
+    orders,
+    drivers: fleetDrivers,
+    vehicles: [],
+    facilities: [],
+    trafficData: [],
+    timeWindows: [],
+    onNotice: showNotice
+  });
+
+  const { 
+    forecasts: inventoryForecasts,
+    alerts: inventoryAlerts,
+    loading: inventoryLoading,
+    error: inventoryError,
+    refresh: refreshInventory,
+    placeOrder: placeInventoryOrder,
+    updateReorderPoint,
+    getProductForecast,
+    getCriticalAlerts: getInventoryCriticalAlerts,
+    getTotalInventoryValue,
+    criticalCount: inventoryCriticalCount,
+    highCount: inventoryHighCount,
+    atRiskProducts
+  } = useInventoryForecasting({
+    products: [],
+    orders,
+    suppliers: [],
+    warehouses: [],
+    usageHistory: [],
+    onNotice: showNotice
+  });
+
+  const { 
+    analysis: driverBehaviorAnalysis,
+    coachingAlerts: driverBehaviorCoachingAlerts,
+    loading: driverBehaviorLoading,
+    error: driverBehaviorError,
+    refresh: refreshDriverBehavior,
+    getDriverAnalysis,
+    getCoachingCandidates,
+    acknowledgeAlert: acknowledgeDriverAlert,
+    summary: driverBehaviorSummary,
+    criticalAlerts: driverBehaviorCriticalAlerts,
+    highAlerts: driverBehaviorHighAlerts
+  } = useDriverBehavior({
+    drivers: fleetDrivers,
+    trips: [],
+    vehicles: [],
+    fuelRecords: [],
+    maintenanceRecords: [],
+    onNotice: showNotice
+  });
+
+  const { 
+    segments: clvSegments,
+    clvAnalysis,
+    loading: clvLoading,
+    error: clvError,
+    refresh: refreshCLV,
+    getCustomerCLV,
+    getHighValueCustomers,
+    getChurnRiskCustomers,
+    getRetentionRecommendations,
+    summary: clvSummary,
+    topCustomers,
+    churnRiskCount: clvChurnRiskCount
+  } = useCustomerLifetimeValue({
+    customers: [],
+    orders,
+    payments: [],
+    subscriptions: [],
+    interactions: [],
+    onNotice: showNotice
+  });
+
+  const { 
+    demandForecast: demandSensingForecast,
+    anomalies: demandSensingAnomalies,
+    loading: demandSensingLoading,
+    error: demandSensingError,
+    refresh: refreshDemandSensing,
+    getDemandAtDate,
+    getWeeklyDemand,
+    adjustForecast,
+    totalForecast,
+    avgDailyDemand,
+    peakDemand,
+    anomalyCount: demandSensingAnomalyCount,
+    highSeverityAnomalies
+  } = useDemandSensing({
+    orders,
+    customers: [],
+    weatherForecast: [],
+    events: [],
+    historicalData: [],
+    marketIndicators: [],
+    onNotice: showNotice
+  });
+
   // Reliability is a second opinion on seller performance, aimed at the
   // operator question "how dependable is this seller, and how long do they
   // usually take?". The SLA is the median of observed delivery windows and is
@@ -915,6 +1058,73 @@ function App() {
             netLeak={netLeak}
             leakCriticalCount={leakCriticalCount}
             leakHighCount={leakHighCount}
+            predictivePricingAnalysis={predictivePricingAnalysis}
+            pricingRecommendations={pricingRecommendations}
+            pricingLoading={pricingLoading}
+            refreshPricing={refreshPricing}
+            currentPrice={currentPrice}
+            optimalPrice={optimalPrice}
+            elasticity={elasticity}
+            routeV2Optimization={routeV2Optimization}
+            routeV2Routes={routeV2Routes}
+            routeV2Loading={routeV2Loading}
+            routeV2Error={routeV2Error}
+            refreshRouteV2={refreshRouteV2}
+            reoptimizeRoute={reoptimizeRoute}
+            assignOrderToRoute={assignOrderToRoute}
+            routeV2Savings={routeV2Savings}
+            routeV2SavingsPercent={routeV2SavingsPercent}
+            routeV2Unassigned={routeV2Unassigned}
+            getRouteV2DriverRoute={getRouteV2DriverRoute}
+            inventoryForecasts={inventoryForecasts}
+            inventoryAlerts={inventoryAlerts}
+            inventoryLoading={inventoryLoading}
+            inventoryError={inventoryError}
+            refreshInventory={refreshInventory}
+            placeInventoryOrder={placeInventoryOrder}
+            updateReorderPoint={updateReorderPoint}
+            getProductForecast={getProductForecast}
+            getInventoryCriticalAlerts={getInventoryCriticalAlerts}
+            getTotalInventoryValue={getTotalInventoryValue}
+            inventoryCriticalCount={inventoryCriticalCount}
+            inventoryHighCount={inventoryHighCount}
+            atRiskProducts={atRiskProducts}
+            driverBehaviorAnalysis={driverBehaviorAnalysis}
+            driverBehaviorCoachingAlerts={driverBehaviorCoachingAlerts}
+            driverBehaviorLoading={driverBehaviorLoading}
+            driverBehaviorError={driverBehaviorError}
+            refreshDriverBehavior={refreshDriverBehavior}
+            getDriverAnalysis={getDriverAnalysis}
+            getCoachingCandidates={getCoachingCandidates}
+            acknowledgeDriverAlert={acknowledgeDriverAlert}
+            driverBehaviorSummary={driverBehaviorSummary}
+            driverBehaviorCriticalAlerts={driverBehaviorCriticalAlerts}
+            driverBehaviorHighAlerts={driverBehaviorHighAlerts}
+            clvSegments={clvSegments}
+            clvAnalysis={clvAnalysis}
+            clvLoading={clvLoading}
+            clvError={clvError}
+            refreshCLV={refreshCLV}
+            getCustomerCLV={getCustomerCLV}
+            getHighValueCustomers={getHighValueCustomers}
+            getChurnRiskCustomers={getChurnRiskCustomers}
+            getRetentionRecommendations={getRetentionRecommendations}
+            clvSummary={clvSummary}
+            topCustomers={topCustomers}
+            clvChurnRiskCount={clvChurnRiskCount}
+            demandSensingForecast={demandSensingForecast}
+            demandSensingAnomalies={demandSensingAnomalies}
+            demandSensingLoading={demandSensingLoading}
+            demandSensingError={demandSensingError}
+            refreshDemandSensing={refreshDemandSensing}
+            getDemandAtDate={getDemandAtDate}
+            getWeeklyDemand={getWeeklyDemand}
+            adjustForecast={adjustForecast}
+            totalForecast={totalForecast}
+            avgDailyDemand={avgDailyDemand}
+            peakDemand={peakDemand}
+            demandSensingAnomalyCount={demandSensingAnomalyCount}
+            highSeverityAnomalies={highSeverityAnomalies}
           />
         ) : (
           <SellerAccessGate
@@ -1090,6 +1300,73 @@ function App() {
             netLeak={netLeak}
             leakCriticalCount={leakCriticalCount}
             leakHighCount={leakHighCount}
+            predictivePricingAnalysis={predictivePricingAnalysis}
+            pricingRecommendations={pricingRecommendations}
+            pricingLoading={pricingLoading}
+            refreshPricing={refreshPricing}
+            currentPrice={currentPrice}
+            optimalPrice={optimalPrice}
+            elasticity={elasticity}
+            routeV2Optimization={routeV2Optimization}
+            routeV2Routes={routeV2Routes}
+            routeV2Loading={routeV2Loading}
+            routeV2Error={routeV2Error}
+            refreshRouteV2={refreshRouteV2}
+            reoptimizeRoute={reoptimizeRoute}
+            assignOrderToRoute={assignOrderToRoute}
+            routeV2Savings={routeV2Savings}
+            routeV2SavingsPercent={routeV2SavingsPercent}
+            routeV2Unassigned={routeV2Unassigned}
+            getRouteV2DriverRoute={getRouteV2DriverRoute}
+            inventoryForecasts={inventoryForecasts}
+            inventoryAlerts={inventoryAlerts}
+            inventoryLoading={inventoryLoading}
+            inventoryError={inventoryError}
+            refreshInventory={refreshInventory}
+            placeInventoryOrder={placeInventoryOrder}
+            updateReorderPoint={updateReorderPoint}
+            getProductForecast={getProductForecast}
+            getInventoryCriticalAlerts={getInventoryCriticalAlerts}
+            getTotalInventoryValue={getTotalInventoryValue}
+            inventoryCriticalCount={inventoryCriticalCount}
+            inventoryHighCount={inventoryHighCount}
+            atRiskProducts={atRiskProducts}
+            driverBehaviorAnalysis={driverBehaviorAnalysis}
+            driverBehaviorCoachingAlerts={driverBehaviorCoachingAlerts}
+            driverBehaviorLoading={driverBehaviorLoading}
+            driverBehaviorError={driverBehaviorError}
+            refreshDriverBehavior={refreshDriverBehavior}
+            getDriverAnalysis={getDriverAnalysis}
+            getCoachingCandidates={getCoachingCandidates}
+            acknowledgeDriverAlert={acknowledgeDriverAlert}
+            driverBehaviorSummary={driverBehaviorSummary}
+            driverBehaviorCriticalAlerts={driverBehaviorCriticalAlerts}
+            driverBehaviorHighAlerts={driverBehaviorHighAlerts}
+            clvSegments={clvSegments}
+            clvAnalysis={clvAnalysis}
+            clvLoading={clvLoading}
+            clvError={clvError}
+            refreshCLV={refreshCLV}
+            getCustomerCLV={getCustomerCLV}
+            getHighValueCustomers={getHighValueCustomers}
+            getChurnRiskCustomers={getChurnRiskCustomers}
+            getRetentionRecommendations={getRetentionRecommendations}
+            clvSummary={clvSummary}
+            topCustomers={topCustomers}
+            clvChurnRiskCount={clvChurnRiskCount}
+            demandSensingForecast={demandSensingForecast}
+            demandSensingAnomalies={demandSensingAnomalies}
+            demandSensingLoading={demandSensingLoading}
+            demandSensingError={demandSensingError}
+            refreshDemandSensing={refreshDemandSensing}
+            getDemandAtDate={getDemandAtDate}
+            getWeeklyDemand={getWeeklyDemand}
+            adjustForecast={adjustForecast}
+            totalForecast={totalForecast}
+            avgDailyDemand={avgDailyDemand}
+            peakDemand={peakDemand}
+            demandSensingAnomalyCount={demandSensingAnomalyCount}
+            highSeverityAnomalies={highSeverityAnomalies}
           />
         )}
         {ready && role === 'ops' && (adminAuthenticated ? <Suspense fallback={null}><OpsView orders={orders} downloadReport={downloadReport} opsToken={opsToken} showNotice={showNotice} sellerPerfSummary={sellerPerfSummary} sellerRanked={sellerRanked} reliabilitySummary={reliabilitySummaryData} reliabilityRanked={reliabilityRanked} driverRatingsSummary={driverRatingsSummary} /></Suspense> : <AdminAccessGate onSignIn={signInWithPassword} error={signInError} onGoogle={signInWithGoogleIdentity} onMeta={signInWithMetaIdentity} showNotice={showNotice} />)}

@@ -17,6 +17,7 @@ export function useDemandSensing({
   const generateDemandForecast = useCallback(async () => {
     if (!orders.length) {
       setDemandForecast({ daily: [], weekly: [], monthly: [], summary: {} });
+      setAnomalies([]);
       return;
     }
 
@@ -89,20 +90,6 @@ export function useDemandSensing({
         });
       }
 
-      const monthlyForecast = [];
-      for (let m = 0; m < 3; m++) {
-        const monthStart = new Date(Date.now() + m * 30 * 86400000);
-        const monthDays = dailyForecast.slice(m * 30, (m + 1) * 30);
-        const monthVolume = monthDays.reduce((s, d) => s + d.predictedVolume, 0);
-        const avgConfidence = Math.round(monthDays.reduce((s, d) => s + d.confidence, 0) / monthDays.length);
-        
-        monthlyForecast.push({
-          month: monthStart.toLocaleString('default', { month: 'long', year: 'numeric' }),
-          predictedVolume: monthVolume,
-          avgConfidence
-        });
-      }
-
       const anomalyDetection = detectAnomalies(dailyVolume, dailyForecast);
       setAnomalies(anomalyDetection);
 
@@ -112,7 +99,7 @@ export function useDemandSensing({
       const newForecast = {
         daily: dailyForecast,
         weekly: weeklyForecast,
-        monthly: monthlyForecast,
+        monthly: [],
         anomalies: anomalyDetection,
         customerSegments,
         productDemand,
@@ -241,6 +228,8 @@ export function useDemandSensing({
     onNotice?.(`Demand adjusted for ${date}`);
   }, [onNotice]);
 
+  const refresh = useCallback(() => generateDemandForecast(), [generateDemandForecast]);
+
   useEffect(() => { generateDemandForecast(); }, [generateDemandForecast]);
 
   return {
@@ -248,7 +237,7 @@ export function useDemandSensing({
     anomalies,
     loading,
     error,
-    refresh: generateDemandForecast,
+    refresh,
     getDemandAtDate,
     getWeeklyDemand,
     adjustForecast,

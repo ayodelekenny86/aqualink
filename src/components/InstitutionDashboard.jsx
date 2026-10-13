@@ -27,11 +27,16 @@ import SustainabilityTrackingPanel from './SustainabilityTrackingPanel';
 import WaterSourceOptimizationPanel from './WaterSourceOptimizationPanel';
 import ComplianceMonitoringPanel from './ComplianceMonitoringPanel';
 import EmergencyResponsePanel from './EmergencyResponsePanel';
-import CarbonFootprintPanel from './CarbonFootprintPanel';
+import CarbonFootprintTrackingPanel from './CarbonFootprintTrackingPanel';
 import SmartDeliverySchedulingPanel from './SmartDeliverySchedulingPanel';
 import WaterQualityPredictionPanel from './WaterQualityPredictionPanel';
-import CustomerSentimentPanel from './CustomerSentimentPanel';
+import CustomerSentimentAnalysisPanel from './CustomerSentimentAnalysisPanel';
 import RevenueLeakDetectionPanel from './RevenueLeakDetectionPanel';
+import PredictivePricingPanel from './PredictivePricingPanel';
+import InventoryForecastingPanel from './InventoryForecastingPanel';
+import DriverBehaviorPanel from './DriverBehaviorPanel';
+import CustomerLifetimeValuePanel from './CustomerLifetimeValuePanel';
+import DemandSensingPanel from './DemandSensingPanel';
 
 function ScheduleCard({ schedule, onToggle, onDelete, onEdit }) {
   const freqLabels = {
@@ -615,6 +620,11 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
             <button className={smartTab === 'quality-prediction' ? 'active' : ''} onClick={() => setSmartTab('quality-prediction')}>Quality Prediction</button>
             <button className={smartTab === 'sentiment' ? 'active' : ''} onClick={() => setSmartTab('sentiment')}>Sentiment</button>
             <button className={smartTab === 'revenue-leaks' ? 'active' : ''} onClick={() => setSmartTab('revenue-leaks')}>Revenue Leaks</button>
+            <button className={smartTab === 'predictive-pricing' ? 'active' : ''} onClick={() => setSmartTab('predictive-pricing')}>Predictive Pricing</button>
+            <button className={smartTab === 'inventory-forecasting' ? 'active' : ''} onClick={() => setSmartTab('inventory-forecasting')}>Inventory Forecasting</button>
+            <button className={smartTab === 'driver-behavior' ? 'active' : ''} onClick={() => setSmartTab('driver-behavior')}>Driver Behavior</button>
+            <button className={smartTab === 'customer-lifetime-value' ? 'active' : ''} onClick={() => setSmartTab('customer-lifetime-value')}>Customer LTV</button>
+            <button className={smartTab === 'demand-sensing' ? 'active' : ''} onClick={() => setSmartTab('demand-sensing')}>Demand Sensing</button>
           </div>
 
           {smartTab === 'forecast' && (
@@ -1108,6 +1118,63 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
               pricing={{}}
               drivers={fleetDrivers} 
               facilities={[]}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'predictive-pricing' && (
+            <PredictivePricingPanel 
+              orders={orders} 
+              pricing={{}} 
+              competitors={[]}
+              weatherData={[]}
+              events={[]}
+              historicalPricing={[]}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'inventory-forecasting' && (
+            <InventoryForecastingPanel 
+              products={[]} 
+              orders={orders} 
+              suppliers={[]}
+              warehouses={[]}
+              usageHistory={[]}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'driver-behavior' && (
+            <DriverBehaviorPanel 
+              drivers={fleetDrivers} 
+              trips={[]} 
+              vehicles={[]}
+              fuelRecords={[]}
+              maintenanceRecords={[]}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'customer-lifetime-value' && (
+            <CustomerLifetimeValuePanel 
+              customers={[]} 
+              orders={orders} 
+              payments={[]}
+              subscriptions={[]}
+              interactions={[]}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'demand-sensing' && (
+            <DemandSensingPanel 
+              orders={orders} 
+              customers={[]} 
+              weatherForecast={[]}
+              events={[]}
+              historicalData={[]}
+              marketIndicators={[]}
               onNotice={showNotice}
             />
           )}
