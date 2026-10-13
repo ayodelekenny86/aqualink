@@ -15,6 +15,7 @@ import useNotifications from '../hooks/useNotifications';
 import WaterQualityPanel from './WaterQualityPanel';
 import PredictiveInventoryPanel from './PredictiveInventoryPanel';
 import RouteOptimizationPanel from './RouteOptimizationPanel';
+import RouteOptimizationV2Panel from './RouteOptimizationV2Panel';
 import CustomerIntelligencePanel from './CustomerIntelligencePanel';
 import DemandForecastingPanel from './DemandForecastingPanel';
 import DriverPerformancePanel from './DriverPerformancePanel';
@@ -32,11 +33,16 @@ import SustainabilityTrackingPanel from './SustainabilityTrackingPanel';
 import WaterSourceOptimizationPanel from './WaterSourceOptimizationPanel';
 import ComplianceMonitoringPanel from './ComplianceMonitoringPanel';
 import EmergencyResponsePanel from './EmergencyResponsePanel';
-import CarbonFootprintPanel from './CarbonFootprintPanel';
+import CarbonFootprintTrackingPanel from './CarbonFootprintTrackingPanel';
 import SmartDeliverySchedulingPanel from './SmartDeliverySchedulingPanel';
 import WaterQualityPredictionPanel from './WaterQualityPredictionPanel';
-import CustomerSentimentPanel from './CustomerSentimentPanel';
+import CustomerSentimentAnalysisPanel from './CustomerSentimentAnalysisPanel';
 import RevenueLeakDetectionPanel from './RevenueLeakDetectionPanel';
+import PredictivePricingPanel from './PredictivePricingPanel';
+import InventoryForecastingPanel from './InventoryForecastingPanel';
+import DriverBehaviorPanel from './DriverBehaviorPanel';
+import CustomerLifetimeValuePanel from './CustomerLifetimeValuePanel';
+import DemandSensingPanel from './DemandSensingPanel';
 
 function JobCard({ order, driver, onAccept, onStart, onComplete, onView }) {
   const statusColors = {

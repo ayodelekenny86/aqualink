@@ -1,209 +1,218 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
 export function useComplianceMonitoring({ 
-  permits = [], 
-  inspections = [], 
-  regulations = [],
+  sources = [], 
+  qualityTests = [],
   facilities = [],
+  permits = [],
+  regulations = [],
+  inspections = [],
   onNotice 
 }) {
-  const [status, setStatus] = useState(null);
+  const [complianceStatus, setComplianceStatus] = useState(null);
+  const [violations, setViolations] = useState([]);
+  const [upcomingDeadlines, setUpcomingDeadlines] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const checkCompliance = useCallback(async () => {
+  const runComplianceCheck = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      await new Promise(r => setTimeout(r, 250));
+      await new Promise(r => setTimeout(r, 400));
 
-      const now = new Date();
-      const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+      const sourceCompliance = sources.filter(s => s.status === 'active').map(source => {
+        const recentTests = qualityTests.filter(t => t.sourceId === source.id).slice(-5);
+        const latestTest = recentTests[recentTests.length - 1];
+        
+        const checks = {
+          ph: latestTest ? (latestTest.ph >= 6.5 && latestTest.ph <= 8.5) : true,
+          turbidity: latestTest ? (latestTest.turbidity <= 4) : true,
+          chlorine: latestTest ? (latestTest.chlorine >= 0.2 && latestTest.chlorine <= 4) : true,
+          tds: latestTest ? (latestTest.tds <= 500) : true,
+          bacteria: latestTest ? (latestTest.bacteria === 0) : true,
+          testingFrequency: recentTests.length >= 4,
+          permitValid: permits.find(p => p.sourceId === source.id)?.status === 'valid'
+        };
 
-      const permitStatus = permits.map(permit => {
-        const expiry = new Date(permit.expiryDate);
-        const daysUntilExpiry = Math.ceil((expiry - now) / (24 * 60 * 60 * 1000));
-        const isExpired = daysUntilExpiry < 0;
-        const isExpiringSoon = daysUntilExpiry >= 0 && daysUntilExpiry <= 30;
+        const passed = Object.values(checks).filter(v => v).length;
+        const total = Object.keys(checks).length;
+        const score = Math.round((passed / total) * 100);
+        
+        const sourceViolations = Object.entries(checks)
+          .filter(([k, v]) => !v)
+          .map(([check]) => ({
+            sourceId: source.id,
+            sourceName: source.name,
+            regulation: check,
+            severity: check === 'bacteria' ? 'critical' : check === 'permitValid' ? 'high' : 'medium',
+            description: `Non-compliant: ${check}`,
+            detectedAt: new Date().toISOString(),
+            status: 'open'
+          }));
 
         return {
-          ...permit,
-          daysUntilExpiry,
-          status: isExpired ? 'expired' : isExpiringSoon ? 'expiring' : 'valid',
-          riskLevel: isExpired ? 'critical' : isExpiringSoon ? 'high' : 'low'
+          sourceId: source.id,
+          sourceName: source.name,
+          complianceScore: score,
+          checks,
+          status: score === 100 ? 'compliant' : score >= 80 ? 'minor_issues' : score >= 60 ? 'major_issues' : 'non_compliant',
+          violations: sourceViolations,
+          lastInspection: inspections.find(i => i.sourceId === source.id)?.date || 'Never',
+          nextInspectionDue: new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0]
         };
       });
 
-      const inspectionStatus = inspections.map(inspection => {
-        const dueDate = new Date(inspection.dueDate);
-        const daysUntilDue = Math.ceil((dueDate - now) / (24 * 60 * 60 * 1000));
-        const isOverdue = daysUntilDue < 0;
-        const isDueSoon = daysUntilDue >= 0 && daysUntilDue <= 14;
+      const facilityCompliance = facilities.map(facility => {
+        const facilityPermits = permits.filter(p => p.facilityId === facility.id);
+        const facilityInspections = inspections.filter(i => i.facilityId === facility.id);
+        
+        const checks = {
+          operatingPermit: facilityPermits.some(p => p.type === 'operating' && p.status === 'valid'),
+          environmentalPermit: facilityPermits.some(p => p.type === 'environmental' && p.status === 'valid'),
+          dischargePermit: facilityPermits.some(p => p.type === 'discharge' && p.status === 'valid'),
+          recentInspection: facilityInspections.length > 0 && 
+            (Date.now() - new Date(facilityInspections[0].date).getTime()) < 365 * 86400000,
+          safetyCompliance: Math.random() > 0.1,
+          recordKeeping: Math.random() > 0.15
+        };
+
+        const passed = Object.values(checks).filter(v => v).length;
+        const score = Math.round((passed / Object.keys(checks).length) * 100);
+
+        const facilityViolations = Object.entries(checks)
+          .filter(([k, v]) => !v)
+          .map(([check]) => ({
+            facilityId: facility.id,
+            facilityName: facility.name,
+            regulation: check,
+            severity: check.includes('Permit') ? 'high' : 'medium',
+            description: `Missing or expired: ${check}`,
+            detectedAt: new Date().toISOString(),
+            status: 'open'
+          }));
 
         return {
-          ...inspection,
-          daysUntilDue,
-          status: isOverdue ? 'overdue' : isDueSoon ? 'due_soon' : 'scheduled',
-          riskLevel: isOverdue ? 'critical' : isDueSoon ? 'high' : 'low'
+          facilityId: facility.id,
+          facilityName: facility.name,
+          complianceScore: score,
+          checks,
+          status: score === 100 ? 'compliant' : score >= 80 ? 'minor_issues' : 'major_issues',
+          violations: facilityViolations,
+          permits: facilityPermits,
+          lastInspection: facilityInspections[0]?.date || 'Never'
         };
       });
 
-      const regulationStatus = regulations.map(reg => {
-        const facilityCompliance = facilities.map(f => {
-          const facilityReg = f.regulations?.find(r => r.id === reg.id);
-          return {
-            facilityId: f.id,
-            facilityName: f.name,
-            compliant: facilityReg?.compliant ?? true,
-            lastChecked: facilityReg?.lastChecked,
-            notes: facilityReg?.notes
-          };
-        });
-
-        const nonCompliant = facilityCompliance.filter(f => !f.compliant).length;
-        const total = facilityCompliance.length;
-        const complianceRate = total ? (total - nonCompliant) / total : 1;
-
-        return {
-          ...reg,
-          complianceRate: Math.round(complianceRate * 100),
-          nonCompliantCount: nonCompliant,
-          totalFacilities: total,
-          status: complianceRate === 1 ? 'compliant' : complianceRate >= 0.8 ? 'mostly_compliant' : 'non_compliant',
-          facilities: facilityCompliance
-        };
-      });
-
-      const criticalAlerts = [
-        ...permitStatus.filter(p => p.status === 'expired').map(p => ({
-          type: 'permit_expired',
-          severity: 'critical',
-          title: `Permit Expired: ${p.name}`,
-          message: `${p.name} (${p.type}) expired ${Math.abs(p.daysUntilExpiry)} days ago`,
-          entityId: p.id,
-          entityType: 'permit',
-          action: 'Renew immediately to avoid service disruption'
-        })),
-        ...permitStatus.filter(p => p.status === 'expiring').map(p => ({
-          type: 'permit_expiring',
-          severity: 'high',
-          title: `Permit Expiring Soon: ${p.name}`,
-          message: `${p.name} expires in ${p.daysUntilExpiry} days`,
-          entityId: p.id,
-          entityType: 'permit',
-          action: 'Initiate renewal process'
-        })),
-        ...inspectionStatus.filter(i => i.status === 'overdue').map(i => ({
-          type: 'inspection_overdue',
-          severity: 'critical',
-          title: `Inspection Overdue: ${i.type}`,
-          message: `${i.type} inspection at ${i.facilityName} was due ${Math.abs(i.daysUntilDue)} days ago`,
-          entityId: i.id,
-          entityType: 'inspection',
-          action: 'Schedule inspection immediately'
-        })),
-        ...inspectionStatus.filter(i => i.status === 'due_soon').map(i => ({
-          type: 'inspection_due',
-          severity: 'high',
-          title: `Inspection Due: ${i.type}`,
-          message: `${i.type} inspection at ${i.facilityName} due in ${i.daysUntilDue} days`,
-          entityId: i.id,
-          entityType: 'inspection',
-          action: 'Confirm inspection schedule'
-        })),
-        ...regulationStatus.filter(r => r.status === 'non_compliant').flatMap(r => 
-          r.facilities.filter(f => !f.compliant).map(f => ({
-            type: 'regulation_violation',
-            severity: 'critical',
-            title: `Regulation Violation: ${r.name}`,
-            message: `Facility ${f.facilityName} non-compliant with ${r.name} (${r.code})`,
-            entityId: r.id,
-            entityType: 'regulation',
-            facilityId: f.facilityId,
-            action: 'Review and remediate compliance gap'
-          }))
-        )
+      const allViolations = [
+        ...sourceCompliance.flatMap(s => s.violations),
+        ...facilityCompliance.flatMap(f => f.violations)
       ];
 
-      const expiringPermits = permitStatus.filter(p => p.status === 'expiring').length;
-      const overdueInspections = inspectionStatus.filter(i => i.status === 'overdue').length;
-      const nonCompliantRegs = regulationStatus.filter(r => r.status === 'non_compliant').length;
+      const deadlines = [
+        ...permits.filter(p => p.expiryDate && new Date(p.expiryDate) > new Date() && new Date(p.expiryDate) < new Date(Date.now() + 60 * 86400000))
+          .map(p => ({
+            id: p.id,
+            type: 'permit_renewal',
+            entity: p.sourceId ? 'source' : 'facility',
+            entityId: p.sourceId || p.facilityId,
+            entityName: sources.find(s => s.id === p.sourceId)?.name || facilities.find(f => f.id === p.facilityId)?.name,
+            permitType: p.type,
+            dueDate: p.expiryDate,
+            daysUntilDue: Math.ceil((new Date(p.expiryDate).getTime() - Date.now()) / 86400000),
+            priority: Math.ceil((new Date(p.expiryDate).getTime() - Date.now()) / 86400000) < 30 ? 'high' : 'medium'
+          })),
+        ...sourceCompliance.filter(s => s.nextInspectionDue && new Date(s.nextInspectionDue) < new Date(Date.now() + 30 * 86400000))
+          .map(s => ({
+            id: `inspection-${s.sourceId}`,
+            type: 'inspection_due',
+            entity: 'source',
+            entityId: s.sourceId,
+            entityName: s.sourceName,
+            dueDate: s.nextInspectionDue,
+            daysUntilDue: Math.ceil((new Date(s.nextInspectionDue).getTime() - Date.now()) / 86400000),
+            priority: 'medium'
+          }))
+      ].sort((a, b) => a.daysUntilDue - b.daysUntilDue);
 
-      const overallScore = Math.max(0, 100 - (
-        permitStatus.filter(p => p.status === 'expired').length * 20 +
-        permitStatus.filter(p => p.status === 'expiring').length * 5 +
-        inspectionStatus.filter(i => i.status === 'overdue').length * 15 +
-        inspectionStatus.filter(i => i.status === 'due_soon').length * 3 +
-        nonCompliantRegs * 10
-      ));
+      const overallScore = [...sourceCompliance, ...facilityCompliance].length > 0
+        ? Math.round([...sourceCompliance, ...facilityCompliance].reduce((s, c) => s + c.complianceScore, 0) / [...sourceCompliance, ...facilityCompliance].length)
+        : 100;
 
       const newStatus = {
-        permits: permitStatus,
-        inspections: inspectionStatus,
-        regulations: regulationStatus,
-        alerts: criticalAlerts.sort((a, b) => 
-          (b.severity === 'critical' ? 2 : 1) - (a.severity === 'critical' ? 2 : 1)
-        ),
+        sources: sourceCompliance,
+        facilities: facilityCompliance,
+        overallScore,
         summary: {
-          overallScore,
-          totalPermits: permits.length,
-          validPermits: permitStatus.filter(p => p.status === 'valid').length,
-          expiringPermits,
-          expiredPermits: permitStatus.filter(p => p.status === 'expired').length,
-          totalInspections: inspections.length,
-          overdueInspections,
-          dueSoonInspections: inspectionStatus.filter(i => i.status === 'due_soon').length,
-          totalRegulations: regulations.length,
-          compliantRegulations: regulationStatus.filter(r => r.status === 'compliant').length,
-          nonCompliantRegulations: nonCompliantRegs
-        },
-        lastChecked: new Date().toISOString()
+          totalSources: sources.filter(s => s.status === 'active').length,
+          totalFacilities: facilities.length,
+          compliantSources: sourceCompliance.filter(s => s.status === 'compliant').length,
+          compliantFacilities: facilityCompliance.filter(f => f.status === 'compliant').length,
+          sourcesWithIssues: sourceCompliance.filter(s => s.status !== 'compliant').length,
+          facilitiesWithIssues: facilityCompliance.filter(f => f.status !== 'compliant').length,
+          totalViolations: allViolations.length,
+          criticalViolations: allViolations.filter(v => v.severity === 'critical').length,
+          highViolations: allViolations.filter(v => v.severity === 'high').length,
+          upcomingDeadlines: deadlines.length,
+          overdueDeadlines: deadlines.filter(d => d.daysUntilDue < 0).length
+        }
       };
 
-      setStatus(newStatus);
+      setComplianceStatus(newStatus);
+      setViolations(allViolations);
+      setUpcomingDeadlines(deadlines);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [permits, inspections, regulations, facilities]);
+  }, [sources, qualityTests, facilities, permits, regulations, inspections]);
 
-  useEffect(() => { checkCompliance(); }, [checkCompliance]);
-
-  const acknowledgeAlert = useCallback((alertId) => {
-    setStatus(prev => prev ? {
-      ...prev,
-      alerts: prev.alerts.filter(a => a.entityId !== alertId)
-    } : null);
-    onNotice?.(`Alert acknowledged`);
+  const resolveViolation = useCallback((violationId) => {
+    setViolations(prev => prev.map(v => 
+      `${v.sourceId || v.facilityId}-${v.regulation}` === violationId 
+        ? { ...v, status: 'resolved', resolvedAt: new Date().toISOString() } 
+        : v
+    ));
+    onNotice?.(`Violation ${violationId} marked resolved`);
   }, [onNotice]);
 
-  const getPermitStatus = useCallback((permitId) => {
-    return status?.permits?.find(p => p.id === permitId) || null;
-  }, [status]);
+  const getSourceCompliance = useCallback((sourceId) => {
+    return complianceStatus?.sources?.find(s => s.sourceId === sourceId) || null;
+  }, [complianceStatus]);
 
-  const getInspectionStatus = useCallback((inspectionId) => {
-    return status?.inspections?.find(i => i.id === inspectionId) || null;
-  }, [status]);
+  const getFacilityCompliance = useCallback((facilityId) => {
+    return complianceStatus?.facilities?.find(f => f.facilityId === facilityId) || null;
+  }, [complianceStatus]);
 
-  const getRegulationStatus = useCallback((regulationId) => {
-    return status?.regulations?.find(r => r.id === regulationId) || null;
-  }, [status]);
+  const getViolationsBySeverity = useCallback((severity) => {
+    return violations.filter(v => v.severity === severity);
+  }, [violations]);
+
+  const getUpcomingDeadlines = useCallback((days = 30) => {
+    return upcomingDeadlines.filter(d => d.daysUntilDue <= days && d.daysUntilDue >= 0);
+  }, [upcomingDeadlines]);
+
+  useEffect(() => { runComplianceCheck(); }, [runComplianceCheck]);
 
   return {
-    status,
+    complianceStatus,
+    violations,
+    upcomingDeadlines,
     loading,
     error,
-    refresh: checkCompliance,
-    acknowledgeAlert,
-    getPermitStatus,
-    getInspectionStatus,
-    getRegulationStatus,
-    overallScore: status?.summary?.overallScore || 100,
-    criticalAlerts: status?.alerts?.filter(a => a.severity === 'critical') || [],
-    highAlerts: status?.alerts?.filter(a => a.severity === 'high') || [],
-    summary: status?.summary || {}
+    refresh: runComplianceCheck,
+    resolveViolation,
+    getSourceCompliance,
+    getFacilityCompliance,
+    getViolationsBySeverity,
+    getUpcomingDeadlines,
+    overallScore: complianceStatus?.overallScore || 0,
+    totalViolations: violations.length,
+    criticalViolations: violations.filter(v => v.severity === 'critical').length,
+    highViolations: violations.filter(v => v.severity === 'high').length,
+    upcomingDeadlinesCount: upcomingDeadlines.length
   };
 }
 

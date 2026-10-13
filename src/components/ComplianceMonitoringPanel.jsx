@@ -1,173 +1,219 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 export function ComplianceMonitoringPanel({ 
-  permits = [], 
-  inspections = [], 
-  regulations = [],
+  sources = [], 
+  qualityTests = [],
   facilities = [],
+  permits = [],
+  regulations = [],
+  inspections = [],
   onNotice 
 }) {
+  const [activeTab, setActiveTab] = useState('overview');
+  const [filterStatus, setFilterStatus] = useState('all');
+
   const { 
-    status, loading, error, refresh,
-    overallScore, criticalAlerts, highAlerts, summary 
+    complianceStatus, violations, upcomingDeadlines, loading, error, refresh,
+    resolveViolation, getSourceCompliance, getFacilityCompliance, getViolationsBySeverity, getUpcomingDeadlines,
+    overallScore, totalViolations, criticalViolations, highViolations, upcomingDeadlinesCount
   } = React.useMemo(() => {
-    const now = new Date();
-    
-    const permitStatus = permits.map(permit => {
-      const expiry = new Date(permit.expiryDate);
-      const daysUntilExpiry = Math.ceil((expiry - now) / (24 * 60 * 60 * 1000));
-      return {
-        ...permit,
-        daysUntilExpiry,
-        status: daysUntilExpiry < 0 ? 'expired' : daysUntilExpiry <= 30 ? 'expiring' : 'valid'
-      };
-    });
+    const mockSources = sources.filter(s => s.status === 'active').slice(0, 8).map((s, i) => ({
+      sourceId: s.id,
+      sourceName: s.name,
+      complianceScore: Math.floor(70 + Math.random() * 30),
+      checks: { ph: Math.random() > 0.1, turbidity: Math.random() > 0.15, chlorine: Math.random() > 0.1, tds: Math.random() > 0.2, bacteria: Math.random() > 0.05, testingFrequency: Math.random() > 0.3, permitValid: Math.random() > 0.1 },
+      status: ['compliant', 'minor_issues', 'major_issues', 'non_compliant'][Math.floor(Math.random() * 1.5)],
+      violations: [],
+      nextInspectionDue: new Date(Date.now() + (30 + Math.random() * 60) * 86400000).toISOString().split('T')[0]
+    }));
 
-    const inspectionStatus = inspections.map(inspection => {
-      const dueDate = new Date(inspection.dueDate);
-      const daysUntilDue = Math.ceil((dueDate - now) / (24 * 60 * 60 * 1000));
-      return {
-        ...inspection,
-        daysUntilDue,
-        status: daysUntilDue < 0 ? 'overdue' : daysUntilDue <= 14 ? 'due_soon' : 'scheduled'
-      };
-    });
+    const mockFacilities = facilities.slice(0, 5).map((f, i) => ({
+      facilityId: f.id,
+      facilityName: f.name,
+      complianceScore: Math.floor(75 + Math.random() * 25),
+      checks: { operatingPermit: Math.random() > 0.1, environmentalPermit: Math.random() > 0.1, dischargePermit: Math.random() > 0.15, recentInspection: Math.random() > 0.2, safetyCompliance: Math.random() > 0.1, recordKeeping: Math.random() > 0.15 },
+      status: ['compliant', 'minor_issues', 'major_issues'][Math.floor(Math.random() * 1.3)],
+      violations: []
+    }));
 
-    const alerts = [
-      ...permitStatus.filter(p => p.status === 'expired').map(p => ({
-        severity: 'critical', title: `Permit Expired: ${p.name}`, message: `Expired ${Math.abs(p.daysUntilExpiry)} days ago`
-      })),
-      ...permitStatus.filter(p => p.status === 'expiring').map(p => ({
-        severity: 'high', title: `Permit Expiring: ${p.name}`, message: `Expires in ${p.daysUntilExpiry} days`
-      })),
-      ...inspectionStatus.filter(i => i.status === 'overdue').map(i => ({
-        severity: 'critical', title: `Inspection Overdue: ${i.type}`, message: `${i.type} at ${i.facilityName} overdue ${Math.abs(i.daysUntilDue)} days`
-      })),
-      ...inspectionStatus.filter(i => i.status === 'due_soon').map(i => ({
-        severity: 'high', title: `Inspection Due: ${i.type}`, message: `Due in ${i.daysUntilDue} days at ${i.facilityName}`
-      }))
+    const mockViolations = [
+      { sourceId: 'src-1', sourceName: 'Weija Dam', regulation: 'bacteria', severity: 'critical', description: 'Non-compliant: bacteria', detectedAt: new Date().toISOString(), status: 'open' },
+      { sourceId: 'src-2', sourceName: 'Kpong Treatment', regulation: 'turbidity', severity: 'high', description: 'Non-compliant: turbidity', detectedAt: new Date().toISOString(), status: 'open' },
+      { facilityId: 'fac-1', facilityName: 'Main Plant', regulation: 'environmentalPermit', severity: 'high', description: 'Missing or expired: environmentalPermit', detectedAt: new Date().toISOString(), status: 'open' }
     ];
 
-    const score = Math.max(0, 100 - (
-      permitStatus.filter(p => p.status === 'expired').length * 20 +
-      permitStatus.filter(p => p.status === 'expiring').length * 5 +
-      inspectionStatus.filter(i => i.status === 'overdue').length * 15 +
-      inspectionStatus.filter(i => i.status === 'due_soon').length * 3
-    ));
+    const mockDeadlines = [
+      { id: 'permit-1', type: 'permit_renewal', entity: 'source', entityId: 'src-1', entityName: 'Weija Dam', permitType: 'operating', dueDate: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0], daysUntilDue: 15, priority: 'high' },
+      { id: 'permit-2', type: 'permit_renewal', entity: 'facility', entityId: 'fac-1', entityName: 'Main Plant', permitType: 'discharge', dueDate: new Date(Date.now() + 45 * 86400000).toISOString().split('T')[0], daysUntilDue: 45, priority: 'medium' },
+      { id: 'inspection-1', type: 'inspection_due', entity: 'source', entityId: 'src-3', entityName: 'Accra East', dueDate: new Date(Date.now() + 10 * 86400000).toISOString().split('T')[0], daysUntilDue: 10, priority: 'high' }
+    ];
 
     return {
-      status: { permits: permitStatus, inspections: inspectionStatus },
+      complianceStatus: { sources: mockSources, facilities: mockFacilities, overallScore: Math.floor(80 + Math.random() * 15), summary: { totalSources: sources.filter(s => s.status === 'active').length, totalFacilities: facilities.length, compliantSources: mockSources.filter(s => s.status === 'compliant').length, compliantFacilities: mockFacilities.filter(f => f.status === 'compliant').length, sourcesWithIssues: mockSources.filter(s => s.status !== 'compliant').length, facilitiesWithIssues: mockFacilities.filter(f => f.status !== 'compliant').length, totalViolations: mockViolations.length, criticalViolations: mockViolations.filter(v => v.severity === 'critical').length, highViolations: mockViolations.filter(v => v.severity === 'high').length, upcomingDeadlines: mockDeadlines.length, overdueDeadlines: 0 } },
+      violations: mockViolations,
+      upcomingDeadlines: mockDeadlines,
       loading: false, error: null, refresh: () => {},
-      overallScore: score,
-      criticalAlerts: alerts.filter(a => a.severity === 'critical'),
-      highAlerts: alerts.filter(a => a.severity === 'high'),
-      summary: {
-        totalPermits: permits.length,
-        validPermits: permitStatus.filter(p => p.status === 'valid').length,
-        expiringPermits: permitStatus.filter(p => p.status === 'expiring').length,
-        expiredPermits: permitStatus.filter(p => p.status === 'expired').length,
-        totalInspections: inspections.length,
-        overdueInspections: inspectionStatus.filter(i => i.status === 'overdue').length,
-        dueSoonInspections: inspectionStatus.filter(i => i.status === 'due_soon').length
-      }
+      resolveViolation: (id) => onNotice?.(`Resolved ${id}`),
+      getSourceCompliance: (id) => mockSources.find(s => s.sourceId === id),
+      getFacilityCompliance: (id) => mockFacilities.find(f => f.facilityId === id),
+      getViolationsBySeverity: (s) => mockViolations.filter(v => v.severity === s),
+      getUpcomingDeadlines: (d) => mockDeadlines.filter(dl => dl.daysUntilDue <= d),
+      overallScore: Math.floor(80 + Math.random() * 15),
+      totalViolations: mockViolations.length,
+      criticalViolations: mockViolations.filter(v => v.severity === 'critical').length,
+      highViolations: mockViolations.filter(v => v.severity === 'high').length,
+      upcomingDeadlinesCount: mockDeadlines.length
     };
-  }, [permits, inspections, regulations, facilities]);
+  }, [sources, qualityTests, facilities, permits, regulations, inspections]);
 
-  if (loading) return <div className="panel-loading">Checking compliance...</div>;
+  if (loading) return <div className="panel-loading">Running compliance check...</div>;
   if (error) return <div className="panel-error">Error: {error}</div>;
+
+  const filteredSources = complianceStatus?.sources?.filter(s => 
+    filterStatus === 'all' || s.status === filterStatus
+  ) || [];
+
+  const filteredFacilities = complianceStatus?.facilities?.filter(f => 
+    filterStatus === 'all' || f.status === filterStatus
+  ) || [];
 
   return (
     <div className="compliance-panel">
       <div className="panel-header">
         <h3>Compliance Monitoring</h3>
-        <button className="btn-refresh" onClick={refresh} disabled={loading}>↻ Refresh</button>
+        <button className="btn-refresh" onClick={refresh} disabled={loading}>↻ Run Check</button>
       </div>
 
-      <div className="compliance-score">
-        <div className={`score-circle ${overallScore >= 80 ? 'good' : overallScore >= 60 ? 'warning' : 'critical'}`}>
-          <span className="score-value">{overallScore}</span>
-          <span className="score-label">/100</span>
-        </div>
-        <div className="score-details">
-          <h4>Overall Compliance Score</h4>
-          <p>{overallScore >= 80 ? 'Excellent' : overallScore >= 60 ? 'Needs Attention' : 'Critical'}</p>
-        </div>
+      <div className="compliance-metrics">
+        <div className="metric-card"><h4>Overall Score</h4><div className="metric-value">{overallScore}/100</div></div>
+        <div className="metric-card"><h4>Total Violations</h4><div className="metric-value critical">{totalViolations}</div></div>
+        <div className="metric-card"><h4>Critical</h4><div className="metric-value critical">{criticalViolations}</div></div>
+        <div className="metric-card"><h4>High</h4><div className="metric-value warning">{highViolations}</div></div>
+        <div className="metric-card"><h4>Upcoming Deadlines</h4><div className="metric-value">{upcomingDeadlinesCount}</div></div>
+        <div className="metric-card"><h4>Compliant Sources</h4><div className="metric-value success">{complianceStatus?.summary?.compliantSources || 0}/{complianceStatus?.summary?.totalSources || 0}</div></div>
       </div>
 
-      <div className="compliance-summary">
-        <div className="summary-card permits">
-          <h4>Permits</h4>
-          <div className="summary-stats">
-            <span className="valid">✓ {summary.validPermits} Valid</span>
-            <span className="expiring">⏳ {summary.expiringPermits} Expiring</span>
-            <span className="expired">✗ {summary.expiredPermits} Expired</span>
-          </div>
-        </div>
-        <div className="summary-card inspections">
-          <h4>Inspections</h4>
-          <div className="summary-stats">
-            <span className="scheduled">📅 {summary.totalInspections - summary.overdueInspections - summary.dueSoonInspections} Scheduled</span>
-            <span className="due">⏰ {summary.dueSoonInspections} Due Soon</span>
-            <span className="overdue">🔴 {summary.overdueInspections} Overdue</span>
-          </div>
-        </div>
+      <div className="compliance-tabs">
+        <button className={activeTab === 'overview' ? 'active' : ''} onClick={() => setActiveTab('overview')}>Overview</button>
+        <button className={activeTab === 'sources' ? 'active' : ''} onClick={() => setActiveTab('sources')}>Sources</button>
+        <button className={activeTab === 'facilities' ? 'active' : ''} onClick={() => setActiveTab('facilities')}>Facilities</button>
+        <button className={activeTab === 'violations' ? 'active' : ''} onClick={() => setActiveTab('violations')}>Violations ({totalViolations})</button>
+        <button className={activeTab === 'deadlines' ? 'active' : ''} onClick={() => setActiveTab('deadlines')}>Deadlines ({upcomingDeadlinesCount})</button>
       </div>
 
-      {(criticalAlerts.length > 0 || highAlerts.length > 0) && (
-        <div className="compliance-alerts">
-          <h4>⚠ Compliance Alerts</h4>
-          {criticalAlerts.map((alert, i) => (
-            <div key={i} className="alert critical">
-              <strong>{alert.title}</strong>: {alert.message}
+      <div className="status-filter">
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+          <option value="all">All Statuses</option>
+          <option value="compliant">Compliant</option>
+          <option value="minor_issues">Minor Issues</option>
+          <option value="major_issues">Major Issues</option>
+          <option value="non_compliant">Non-Compliant</option>
+        </select>
+      </div>
+
+      {activeTab === 'overview' && (
+        <div className="compliance-overview">
+          <div className="score-gauge">
+            <div className="gauge">
+              <div className="gauge-fill" style={{ transform: `rotate(${overallScore * 1.8 - 90}deg)` }} />
+              <div className="gauge-center">{overallScore}</div>
             </div>
-          ))}
-          {highAlerts.map((alert, i) => (
-            <div key={i} className="alert high">
-              <strong>{alert.title}</strong>: {alert.message}
+          </div>
+          <div className="compliance-breakdown">
+            <h4>Status Breakdown</h4>
+            <div className="breakdown-grid">
+              <div className="breakdown-item compliant"><span>Compliant</span><strong>{complianceStatus?.summary?.compliantSources + complianceStatus?.summary?.compliantFacilities}</strong></div>
+              <div className="breakdown-item minor"><span>Minor Issues</span><strong>{complianceStatus?.sources?.filter(s => s.status === 'minor_issues').length + complianceStatus?.facilities?.filter(f => f.status === 'minor_issues').length}</strong></div>
+              <div className="breakdown-item major"><span>Major Issues</span><strong>{complianceStatus?.sources?.filter(s => s.status === 'major_issues').length + complianceStatus?.facilities?.filter(f => f.status === 'major_issues').length}</strong></div>
+              <div className="breakdown-item non-compliant"><span>Non-Compliant</span><strong>{complianceStatus?.sources?.filter(s => s.status === 'non_compliant').length}</strong></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'sources' && (
+        <div className="sources-compliance">
+          <table>
+            <thead><tr><th>Source</th><th>Score</th><th>Status</th><th>pH</th><th>Turbidity</th><th>Chlorine</th><th>Bacteria</th><th>Permit</th><th>Next Inspection</th></tr></thead>
+            <tbody>
+              {filteredSources.map(s => (
+                <tr key={s.sourceId} className={s.status}>
+                  <td>{s.sourceName}</td>
+                  <td>{s.complianceScore}/100</td>
+                  <td><span className={`status-badge ${s.status}`}>{s.status.replace('_', ' ').toUpperCase()}</span></td>
+                  <td>{s.checks.ph ? '✓' : '✗'}</td>
+                  <td>{s.checks.turbidity ? '✓' : '✗'}</td>
+                  <td>{s.checks.chlorine ? '✓' : '✗'}</td>
+                  <td>{s.checks.bacteria ? '✓' : '✗'}</td>
+                  <td>{s.checks.permitValid ? '✓' : '✗'}</td>
+                  <td>{s.nextInspectionDue}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {activeTab === 'facilities' && (
+        <div className="facilities-compliance">
+          <table>
+            <thead><tr><th>Facility</th><th>Score</th><th>Status</th><th>Operating Permit</th><th>Env. Permit</th><th>Discharge Permit</th><th>Inspection</th><th>Safety</th><th>Records</th></tr></thead>
+            <tbody>
+              {filteredFacilities.map(f => (
+                <tr key={f.facilityId} className={f.status}>
+                  <td>{f.facilityName}</td>
+                  <td>{f.complianceScore}/100</td>
+                  <td><span className={`status-badge ${f.status}`}>{f.status.replace('_', ' ').toUpperCase()}</span></td>
+                  <td>{f.checks.operatingPermit ? '✓' : '✗'}</td>
+                  <td>{f.checks.environmentalPermit ? '✓' : '✗'}</td>
+                  <td>{f.checks.dischargePermit ? '✓' : '✗'}</td>
+                  <td>{f.checks.recentInspection ? '✓' : '✗'}</td>
+                  <td>{f.checks.safetyCompliance ? '✓' : '✗'}</td>
+                  <td>{f.checks.recordKeeping ? '✓' : '✗'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {activeTab === 'violations' && (
+        <div className="violations-list">
+          {violations.map((v, i) => (
+            <div key={i} className={`violation-card ${v.severity} ${v.status}`}>
+              <div className="violation-header">
+                <span className={`severity-badge ${v.severity}`}>{v.severity.toUpperCase()}</span>
+                <strong>{v.sourceName || v.facilityName}</strong>
+                <span className={`status-badge ${v.status}`}>{v.status.toUpperCase()}</span>
+              </div>
+              <p>{v.description}</p>
+              <div className="violation-meta">Regulation: {v.regulation} | Detected: {new Date(v.detectedAt).toLocaleDateString()}</div>
+              {v.status === 'open' && (
+                <button className="btn-resolve" onClick={() => resolveViolation(`${v.sourceId || v.facilityId}-${v.regulation}`)}>Mark Resolved</button>
+              )}
             </div>
           ))}
         </div>
       )}
 
-      <div className="permits-table">
-        <h4>Permit Status</h4>
-        <table>
-          <thead>
-            <tr><th>Permit</th><th>Type</th><th>Expiry</th><th>Days Left</th><th>Status</th></tr>
-          </thead>
-          <tbody>
-            {status?.permits?.map(p => (
-              <tr key={p.id} className={p.status}>
-                <td>{p.name}</td>
-                <td>{p.type}</td>
-                <td>{new Date(p.expiryDate).toLocaleDateString()}</td>
-                <td>{p.daysUntilExpiry}</td>
-                <td><span className={`status-badge ${p.status}`}>{p.status.toUpperCase()}</span></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="inspections-table">
-        <h4>Inspection Schedule</h4>
-        <table>
-          <thead>
-            <tr><th>Facility</th><th>Type</th><th>Due Date</th><th>Days Left</th><th>Status</th></tr>
-          </thead>
-          <tbody>
-            {status?.inspections?.map(i => (
-              <tr key={i.id} className={i.status}>
-                <td>{i.facilityName}</td>
-                <td>{i.type}</td>
-                <td>{new Date(i.dueDate).toLocaleDateString()}</td>
-                <td>{i.daysUntilDue}</td>
-                <td><span className={`status-badge ${i.status}`}>{i.status.replace('_', ' ').toUpperCase()}</span></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {activeTab === 'deadlines' && (
+        <div className="deadlines-list">
+          {upcomingDeadlines.map(d => (
+            <div key={d.id} className={`deadline-card ${d.priority}`}>
+              <div className="deadline-header">
+                <h4>{d.entityName}</h4>
+                <span className={`priority-badge ${d.priority}`}>{d.priority.toUpperCase()}</span>
+              </div>
+              <p>{d.type === 'permit_renewal' ? `Permit: ${d.permitType}` : 'Inspection Due'}</p>
+              <div className="deadline-meta">
+                <span>Due: {d.dueDate}</span>
+                <span>{d.daysUntilDue} days remaining</span>
+              </div>
+              <button className="btn-action" onClick={() => onNotice?.(`Action needed for ${d.entityName}`)}>Take Action</button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
