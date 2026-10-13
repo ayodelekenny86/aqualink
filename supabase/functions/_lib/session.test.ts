@@ -178,17 +178,17 @@ describe('ops session tokens', () => {
   const NOW = Date.UTC(2026, 9, 2, 12, 0, 0);
 
   test('issues a token that verifies', () => {
-    const token = signOpsToken({ email: 'ops@aqualink.gh', secret: SECRET, now: NOW });
+    const token = signOpsToken({ email: 'ops@nautica.gh', secret: SECRET, now: NOW });
     const result = verifyOpsToken(token, SECRET, { now: NOW });
     expect(result.valid).toBe(true);
-    expect(result.payload.sub).toBe('ops@aqualink.gh');
+    expect(result.payload.sub).toBe('ops@nautica.gh');
   });
 
   test('expires at the stated second, not one second after it', () => {
     // `exp` is the first second the token is no longer valid, so the comparison
     // must be `>=`. With `>` a token stayed usable for one second past its
     // lifetime — small on its own, but it is an off-by-one in an expiry check.
-    const token = signOpsToken({ email: 'ops@aqualink.gh', secret: SECRET, ttlSeconds: 3600, now: NOW });
+    const token = signOpsToken({ email: 'ops@nautica.gh', secret: SECRET, ttlSeconds: 3600, now: NOW });
     const atExpiry = NOW + 3600 * 1000;
     expect(verifyOpsToken(token, SECRET, { now: atExpiry - 1000 }).valid).toBe(true);
     expect(verifyOpsToken(token, SECRET, { now: atExpiry }).valid).toBe(false);

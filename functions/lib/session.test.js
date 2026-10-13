@@ -24,7 +24,7 @@ describe('issuing ops tokens', () => {
   });
 
   test('refuses to issue a token with no secret', () => {
-    expect(() => signOpsToken({ email: 'ops@aqualink.gh', secret: '' })).toThrow(/signing secret/i);
+    expect(() => signOpsToken({ email: 'ops@nautica.gh', secret: '' })).toThrow(/signing secret/i);
   });
 
   test('refuses to issue a token with no subject', () => {
@@ -32,14 +32,14 @@ describe('issuing ops tokens', () => {
   });
 
   test('lowercases the subject so identity is not case-dependent', () => {
-    const token = signOpsToken({ email: '  OPS@AquaLink.GH ', secret: SECRET, now: NOW });
-    expect(verifyOpsToken(token, SECRET, { now: NOW }).payload.sub).toBe('ops@aqualink.gh');
+    const token = signOpsToken({ email: '  OPS@Nautica.GH ', secret: SECRET, now: NOW });
+    expect(verifyOpsToken(token, SECRET, { now: NOW }).payload.sub).toBe('ops@nautica.gh');
   });
 });
 
 describe('verifying ops tokens', () => {
   test('rejects a token signed with a different secret', () => {
-    const forged = signOpsToken({ email: 'ops@aqualink.gh', secret: 'another-secret', now: NOW });
+    const forged = signOpsToken({ email: 'ops@nautica.gh', secret: 'another-secret', now: NOW });
     const result = verifyOpsToken(forged, SECRET, { now: NOW });
     expect(result.valid).toBe(false);
     expect(result.reason).toBe('invalid_signature');

@@ -21,7 +21,7 @@ const OPS = new Map();
  * Kept explicit rather than derived so a test can prove the client refuses to
  * publish when the server rejects the sign-in.
  */
-const OPS_EMAIL = 'ops@aqualink.gh';
+const OPS_EMAIL = 'ops@nautica.gh';
 const OPS_PASSWORD = 'ops-test-password-42';
 const OPS_TOKEN = 'test.ops.token';
 
