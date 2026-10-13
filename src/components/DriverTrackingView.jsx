@@ -614,20 +614,20 @@ export function DriverTrackingView({ orders, onNotice }) {
 
           {smartTab === 'notifications' && (
             <div className="smart-panel">
-              <div className="notification-stats">
-                <article className="stat-card">
-                  <span>Unread</span>
-                  <strong>{opsUnread}</strong>
-                </article>
-                <article className="stat-card">
-                  <span>Push Enabled</span>
-                  <strong>ON</strong>
-                </article>
-                <article className="stat-card">
-                  <span>Quiet Hours</span>
-                  <strong>OFF</strong>
-                </article>
-              </div>
+<div className="notification-stats">
+              <article className="summary-card">
+                <span>Unread</span>
+                <strong>{opsUnread}</strong>
+              </article>
+              <article className="summary-card">
+                <span>Push Enabled</span>
+                <strong>ON</strong>
+              </article>
+              <article className="summary-card">
+                <span>Quiet Hours</span>
+                <strong>OFF</strong>
+              </article>
+            </div>
               <div className="panel-divider" />
               <h4>Recent Notifications</h4>
               <div className="notification-list">

@@ -245,27 +245,27 @@ export default function WaterQualityPanel({ orders = [], onNotice, sellers = [] 
           )}
 
           <div className="compliance-summary">
-            <article className="stat-card {report.complianceRate >= 80 ? 'good' : report.complianceRate >= 50 ? 'warning' : 'critical'}">
+            <article className="summary-card {report.complianceRate >= 80 ? 'good' : report.complianceRate >= 50 ? 'warning' : 'critical'}">
               <span>Compliance Rate</span>
               <strong>{report.complianceRate}%</strong>
             </article>
-            <article className="stat-card good">
+            <article className="summary-card good">
               <span>Compliant Sources</span>
               <strong>{report.compliant}</strong>
             </article>
-            <article className="stat-card critical">
+            <article className="summary-card critical">
               <span>Non-Compliant</span>
               <strong>{report.nonCompliant}</strong>
             </article>
-            <article className="stat-card warning">
+            <article className="summary-card warning">
               <span>Expiring Soon</span>
               <strong>{report.expiringSoon}</strong>
             </article>
-            <article className="stat-card">
+            <article className="summary-card">
               <span>Expired</span>
               <strong>{report.expired}</strong>
             </article>
-            <article className="stat-card">
+            <article className="summary-card">
               <span>No Data</span>
               <strong>{report.noData}</strong>
             </article>

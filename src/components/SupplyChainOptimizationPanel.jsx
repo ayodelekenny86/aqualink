@@ -135,7 +135,7 @@ export default function SupplyChainOptimizationPanel({
                     </div>
                     <div className="stat-row">
                       <span className="stat-label">Cost/Gallon</span>
-                      <span className="stat-value">GH₵${supplier.costPerGallon.toFixed(3)}</span>
+                      <span className="stat-value">{formatCedi(supplier.costPerGallon * 100)}/gal</span>
                     </div>
                     <div className="stat-row">
                       <span className="stat-label">Total Cost</span>

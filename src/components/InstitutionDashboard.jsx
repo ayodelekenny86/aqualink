@@ -842,20 +842,20 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
 
           {smartTab === 'notifications' && (
             <div className="smart-panel">
-              <div className="notification-stats">
-                <article className="stat-card">
-                  <span>Unread</span>
-                  <strong>{unreadCount}</strong>
-                </article>
-                <article className="stat-card">
-                  <span>Push Enabled</span>
-                  <strong>{preferences.pushEnabled ? 'ON' : 'OFF'}</strong>
-                </article>
-                <article className="stat-card">
-                  <span>Quiet Hours</span>
-                  <strong>{preferences.quietHoursEnabled ? 'ON' : 'OFF'}</strong>
-                </article>
-              </div>
+<div className="notification-stats">
+              <article className="summary-card">
+                <span>Unread</span>
+                <strong>{unreadCount}</strong>
+              </article>
+              <article className="summary-card">
+                <span>Push Enabled</span>
+                <strong>{preferences.pushEnabled ? 'ON' : 'OFF'}</strong>
+              </article>
+              <article className="summary-card">
+                <span>Quiet Hours</span>
+                <strong>{preferences.quietHoursEnabled ? 'ON' : 'OFF'}</strong>
+              </article>
+            </div>
               <div className="panel-divider" />
               <h4>Recent Notifications</h4>
               <div className="notification-list">

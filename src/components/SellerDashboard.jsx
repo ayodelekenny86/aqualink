@@ -596,24 +596,24 @@ export function SellerDashboard({
 
           {smartTab === 'assignment' && (
             <div className="smart-panel">
-              <div className="assignment-stats">
-                <article className="stat-card">
-                  <span>Pending Assignment</span>
-                  <strong>{fleetStats.unassignedOrders}</strong>
-                </article>
-                <article className="stat-card">
-                  <span>Available Drivers</span>
-                  <strong>{fleetStats.availableDrivers}</strong>
-                </article>
-                <article className="stat-card">
-                  <span>Auto-Assign</span>
-                  <strong>{autoAssignEnabled ? 'ON' : 'OFF'}</strong>
-                </article>
-                <article className="stat-card">
-                  <span>Pending Optimizations</span>
-                  <strong>{fleetStats.pendingOptimizations}</strong>
-                </article>
-              </div>
+<div className="assignment-stats">
+              <article className="summary-card">
+                <span>Pending Assignment</span>
+                <strong>{fleetStats.unassignedOrders}</strong>
+              </article>
+              <article className="summary-card">
+                <span>Available Drivers</span>
+                <strong>{fleetStats.availableDrivers}</strong>
+              </article>
+              <article className="summary-card">
+                <span>Auto-Assign</span>
+                <strong>{autoAssignEnabled ? 'ON' : 'OFF'}</strong>
+              </article>
+              <article className="summary-card">
+                <span>Pending Optimizations</span>
+                <strong>{fleetStats.pendingOptimizations}</strong>
+              </article>
+            </div>
               <div className="assignment-controls">
                 <label className="toggle-label">
                   <input type="checkbox" checked={autoAssignEnabled} onChange={e => setAutoAssignEnabled(e.target.checked)} />
@@ -753,20 +753,20 @@ export function SellerDashboard({
 
           {smartTab === 'notifications' && (
             <div className="smart-panel">
-              <div className="notification-stats">
-                <article className="stat-card">
-                  <span>Unread</span>
-                  <strong>{unreadCount}</strong>
-                </article>
-                <article className="stat-card">
-                  <span>Push Enabled</span>
-                  <strong>{preferences.pushEnabled ? 'ON' : 'OFF'}</strong>
-                </article>
-                <article className="stat-card">
-                  <span>Quiet Hours</span>
-                  <strong>{preferences.quietHoursEnabled ? 'ON' : 'OFF'}</strong>
-                </article>
-              </div>
+<div className="notification-stats">
+              <article className="summary-card">
+                <span>Unread</span>
+                <strong>{unreadCount}</strong>
+              </article>
+              <article className="summary-card">
+                <span>Push Enabled</span>
+                <strong>{preferences.pushEnabled ? 'ON' : 'OFF'}</strong>
+              </article>
+              <article className="summary-card">
+                <span>Quiet Hours</span>
+                <strong>{preferences.quietHoursEnabled ? 'ON' : 'OFF'}</strong>
+              </article>
+            </div>
               <div className="panel-divider" />
               <h4>Recent Notifications</h4>
               <div className="notification-list">
@@ -796,28 +796,28 @@ export function SellerDashboard({
 
           {smartTab === 'loadbalance' && (
             <div className="smart-panel">
-              <div className="loadbalance-summary">
-                <article className="stat-card">
-                  <span>Online Drivers</span>
-                  <strong>{fleetSummary.onlineDrivers}</strong>
-                </article>
-                <article className="stat-card">
-                  <span>On Job</span>
-                  <strong>{fleetSummary.onJobDrivers}</strong>
-                </article>
-                <article className="stat-card">
-                  <span>Pending Orders</span>
-                  <strong>{fleetSummary.totalPendingOrders}</strong>
-                </article>
-                <article className="stat-card">
-                  <span>Avg Utilization</span>
-                  <strong>{fleetSummary.avgZoneUtilization}%</strong>
-                </article>
-                <article className={fleetSummary.surgeActive ? 'stat-card warning' : 'stat-card'}>
-                  <span>Surge Mode</span>
-                  <strong>{fleetSummary.surgeActive ? 'ACTIVE' : 'OFF'}</strong>
-                </article>
-              </div>
+<div className="loadbalance-summary">
+              <article className="summary-card">
+                <span>Online Drivers</span>
+                <strong>{fleetSummary.onlineDrivers}</strong>
+              </article>
+              <article className="summary-card">
+                <span>On Job</span>
+                <strong>{fleetSummary.onJobDrivers}</strong>
+              </article>
+              <article className="summary-card">
+                <span>Pending Orders</span>
+                <strong>{fleetSummary.totalPendingOrders}</strong>
+              </article>
+              <article className="summary-card">
+                <span>Avg Utilization</span>
+                <strong>{fleetSummary.avgZoneUtilization}%</strong>
+              </article>
+              <article className={fleetSummary.surgeActive ? 'summary-card warning' : 'summary-card'}>
+                <span>Surge Mode</span>
+                <strong>{fleetSummary.surgeActive ? 'ACTIVE' : 'OFF'}</strong>
+              </article>
+            </div>
               <div className="loadbalance-controls">
                 <label className="toggle-label">
                   <input type="checkbox" checked={autoRebalanceEnabled} onChange={e => setAutoRebalanceEnabled(e.target.checked)} />
