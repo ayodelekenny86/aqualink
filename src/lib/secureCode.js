@@ -347,7 +347,7 @@ export async function verifyOtpChallenge(challenge, input, secret) {
 /* Per-device secret                                                    */
 /* ------------------------------------------------------------------ */
 
-const DEVICE_SECRET_KEY = 'aqualink.deviceSecret.v1';
+const DEVICE_SECRET_KEY = 'nautica.deviceSecret.v1';
 
 /**
  * A per-browser secret used to sign local challenges. Generated on first use

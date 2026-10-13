@@ -383,7 +383,7 @@ export function downloadReceipt(receipt) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `aqualink-receipt-${receipt.reference}.html`;
+  link.download = `nautica-receipt-${receipt.reference}.html`;
   document.body.appendChild(link);
   link.click();
   link.remove();

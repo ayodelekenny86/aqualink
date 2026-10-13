@@ -70,7 +70,7 @@ const downloadJson = (filename, payload) => {
 export function useReports({ region, orders = [], onNotice }) {
   const downloadReport = useCallback((kind) => {
     const report = buildReport(kind, region, orders);
-    const filename = `aqualink-${kind.toLowerCase().replaceAll(' ', '-')}-${region.toLowerCase()}.json`;
+    const filename = `nautica-${kind.toLowerCase().replaceAll(' ', '-')}-${region.toLowerCase()}.json`;
     downloadJson(filename, report);
     onNotice(`${kind} report downloaded for ${region}.`);
   }, [region, orders, onNotice]);
