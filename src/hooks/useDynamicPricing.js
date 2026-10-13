@@ -393,6 +393,53 @@ export function useDynamicPricing({ orders = [], sellerRanked = [], onNotice }) 
     return calculatePrice({ volumeGallons, region, loyaltyTier });
   }, [calculatePrice]);
 
+  const getPriceForVolume = getPricePreview;
+
+  const getPriceExplanation = useCallback((volume) => {
+    const volumeNum = parseInt(volume) || 0;
+    const price = calculatePrice({ volumeGallons: volumeNum, region: 'ACCRA' });
+    return price.breakdown?.map(b => b.description).join(', ') || 'Standard pricing';
+  }, [calculatePrice]);
+
+  const pricing = useMemo(() => {
+    const result = {};
+    const tiers = ['1,000', '2,000', '5,000', '10,000'];
+    tiers.forEach(tier => {
+      const vol = parseInt(tier.replace(/,/g, ''));
+      const price = calculatePrice({ volumeGallons: vol, region: 'ACCRA' });
+      result[tier] = {
+        basePrice: price.basePrice,
+        multiplier: price.surgeMultiplier || 1,
+        finalPrice: price.finalPrice,
+      };
+    });
+    return result;
+  }, [calculatePrice]);
+
+  const pricingSummary = useMemo(() => {
+    const surge = activeSurge;
+    const avgMultiplier = surge ? surge.multiplier : 1;
+    const discountRule = rules.find(r => r.type === 'volume_discount' && r.active);
+    return {
+      avgMultiplier,
+      surgeActive: !!surge?.active,
+      discountActive: !!discountRule,
+    };
+  }, [activeSurge, rules]);
+
+  const customerProfile = useMemo(() => ({
+    tier: 'standard',
+    loyaltyPoints: 0,
+    discountRate: 0,
+  }), []);
+
+  const experiments = useMemo(() => [], []);
+
+  const refresh = useCallback(() => {
+    const saved = list(STORAGE_KEY);
+    setRules(saved);
+  }, []);
+
   // Toggle rule
   const toggleRule = useCallback((ruleId) => {
     const updated = rules.map(r => 
@@ -435,6 +482,13 @@ export function useDynamicPricing({ orders = [], sellerRanked = [], onNotice }) 
     DEFAULT_RULES,
     calculatePrice,
     getPricePreview,
+    getPriceForVolume,
+    getPriceExplanation,
+    pricing,
+    pricingSummary,
+    customerProfile,
+    experiments,
+    refresh,
     calculateSurgeMultiplier,
     toggleRule,
     updateRule,

@@ -3,6 +3,39 @@ import { list, insert, update, replaceAll } from '../lib/collections';
 import { supabase, supabaseUrl, anonKey, writeResult } from '../lib/supabase';
 
 const USE_SERVER = typeof window !== 'undefined' && !!supabaseUrl && !!anonKey;
+const SYNC_RETRY_MS = 5000;
+const SYNC_STORAGE_KEY = 'notifications-outbox';
+
+function enqueueOutbox(notification) {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(SYNC_STORAGE_KEY);
+    const queue = raw ? JSON.parse(raw) : [];
+    queue.push({ ...notification, queuedAt: Date.now() });
+    localStorage.setItem(SYNC_STORAGE_KEY, JSON.stringify(queue));
+  } catch {
+    localStorage.removeItem(SYNC_STORAGE_KEY);
+  }
+}
+
+function readPendingCount() {
+  if (typeof window === 'undefined') return 0;
+  try { return (JSON.parse(localStorage.getItem(SYNC_STORAGE_KEY) || '[]')).length; } catch { return 0; }
+}
+
+function drainOutbox() {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(SYNC_STORAGE_KEY);
+    if (!raw) return [];
+    const queue = JSON.parse(raw);
+    localStorage.removeItem(SYNC_STORAGE_KEY);
+    return queue;
+  } catch {
+    localStorage.removeItem(SYNC_STORAGE_KEY);
+    return [];
+  }
+}
 
 /** How often the app re-reads the notification table looking for changes. */
 export const NOTIFICATION_POLL_MS = 15000;
@@ -114,9 +147,50 @@ export default function useNotifications() {
     }
   }, [refresh]);
 
+  useEffect(() => {
+    if (!USE_SERVER || !supabase) return;
+    let ticking = false;
+    const flush = async () => {
+      const queue = drainOutbox();
+      if (!queue.length) { ticking = false; return; }
+      for (const item of queue) {
+        try {
+          const written = writeResult(await supabase.from('notifications').insert({
+            role: item.role,
+            title: item.title,
+            body: item.body,
+            order_id: item.orderId,
+            kind: item.kind,
+            read: false,
+          }));
+          if (!written.ok) {
+            // re-enqueue and stop — will retry on next online event
+            enqueueOutbox(item);
+            return;
+          }
+        } catch {
+          enqueueOutbox(item);
+          return;
+        }
+      }
+      ticking = false;
+    };
+    const tick = () => { if (!ticking) { ticking = true; flush(); } };
+    const handleOnline = () => tick();
+    window.addEventListener('online', handleOnline);
+    const interval = setInterval(tick, SYNC_RETRY_MS);
+    // attempt on mount in case the app started while online
+    tick();
+    return () => { clearInterval(interval); window.removeEventListener('online', handleOnline); };
+  }, []);
+
   /**
    * Record a notification for a role. Writes to Supabase when available so other
    * devices see it instantly; always mirrors into localStorage for the offline cache.
+   *
+   * When the server write fails (offline, network error, missing table), the
+   * notification is queued in localStorage and retried on the next connectivity
+   * window instead of being silently lost.
    */
   const notify = useCallback(async ({ role = 'buyer', title, body, orderId = null, kind = 'update' }) => {
     if (!title) return null;
@@ -132,15 +206,6 @@ export default function useNotifications() {
     refresh();
 
     if (USE_SERVER && supabase) {
-      // There is no sync queue. A write that does not land here is lost, and the
-      // only trace is the local copy on this device — so the other device, which
-      // is the one that needed telling, never hears about it.
-      //
-      // The comment here used to say "Offline write will sync when the connection
-      // returns", which described a retry that has never existed. Worse, the
-      // `try/catch` around it caught nothing: `insert` resolves with `{ error }`
-      // when the row is refused, so a notification that reached nobody was
-      // reported as sent.
       try {
         const written = writeResult(await supabase.from('notifications').insert({
           role,
@@ -151,19 +216,21 @@ export default function useNotifications() {
           read: false,
         }));
         if (!written.ok) {
-          console.error('Failed to publish notification:', written.error);
-          return { ...row, delivered: false, error: written.error };
+          console.warn('Failed to publish notification, queued for retry:', written.error);
+        enqueueOutbox({ role, title, body, orderId, kind });
+        setPendingCount(readPendingCount());
+        return { ...row, delivered: false, error: written.error, queued: true };
         }
       } catch (err) {
-        console.error('Failed to publish notification:', err);
-        return { ...row, delivered: false, error: { message: String(err.message || err) } };
+        console.warn('Failed to publish notification, queued for retry:', err);
+        enqueueOutbox({ role, title, body, orderId, kind });
+        setPendingCount(readPendingCount());
+        return { ...row, delivered: false, error: { message: String(err.message || err) }, queued: true };
       }
       return { ...row, delivered: true };
     }
-    // No server configured, so there is nothing to deliver to. Reported as such
-    // rather than as a sent notification.
     return { ...row, delivered: false, error: { message: 'No notification server is configured for this deployment.' } };
-  }, [refresh]);
+  }, [refresh, setPendingCount]);
 
   const markRead = useCallback((id) => {
     update('notifications', id, { read: true });
@@ -180,5 +247,15 @@ export default function useNotifications() {
   const forRole = useCallback((role) => items.filter((row) => row.role === role), [items]);
   const unreadCount = useCallback((role) => items.filter((row) => row.role === role && !row.read).length, [items]);
 
-  return { items, forRole, unreadCount, notify, markRead, markAllRead, refresh, lastChecked, sync };
+  const [pendingCount, setPendingCount] = useState(() => readPendingCount());
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = () => {
+      setPendingCount(readPendingCount());
+    };
+    window.addEventListener('storage', handler);
+    return () => window.removeEventListener('storage', handler);
+  }, []);
+
+  return { items, forRole, unreadCount, notify, markRead, markAllRead, refresh, lastChecked, sync, pendingCount };
 }

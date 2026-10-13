@@ -18,7 +18,7 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 /** Crockford-style alphabet: digits plus letters with no I/L/O/U ambiguity. */
-export const CODE_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+export const CODE_ALPHABET = '0123456789ABCDEFGHJKLMNOPQRSTUVWXYZ';
 
 const UPPER = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 const LOWER = 'abcdefghijkmnopqrstuvwxyz';

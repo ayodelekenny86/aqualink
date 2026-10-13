@@ -11,7 +11,7 @@ import { getFleet } from '../lib/fleet';
  * All data comes from real orders and the local fleet registry.
  * No invented figures - every number is computed from actual order records.
  */
-export function useSellerDashboard({ sellerProfile, orders, onNotice, updateOrderStatus, issueDeliveryCode }) {
+export function useSellerDashboard({ sellerProfile, orders, onNotice, updateOrderStatus, issueDeliveryCode, sellerApproved = true }) {
   const [activeJobs, setActiveJobs] = useState([]);
   const [completedJobs, setCompletedJobs] = useState([]);
   const [driverLocations, setDriverLocations] = useState({});
@@ -42,6 +42,10 @@ export function useSellerDashboard({ sellerProfile, orders, onNotice, updateOrde
 
   // Accept a new job (moves from Awaiting payment -> Assigned)
   const acceptJob = useCallback(async (orderId) => {
+    if (!sellerApproved) {
+      onNotice('Your seller account is pending approval. You cannot accept jobs until an operator verifies your application.');
+      return { ok: false, reason: 'not-approved' };
+    }
     const order = findBy('orders', (o) => o.id === orderId);
     if (!order) return;
     await updateOrderStatus(orderId, 'Assigned', (n) => onNotice(n));
@@ -50,6 +54,10 @@ export function useSellerDashboard({ sellerProfile, orders, onNotice, updateOrde
 
   // Mark job as en route (seller confirms driver has left)
   const startJob = useCallback(async (orderId) => {
+    if (!sellerApproved) {
+      onNotice('Your seller account is pending approval. You cannot dispatch drivers until an operator verifies your application.');
+      return { ok: false, reason: 'not-approved' };
+    }
     // The result decides the message. `updateOrderStatus` reports a rejected write,
     // and announcing a dispatch that was never recorded is the same failure in a
     // different place: the seller believes the driver is moving and the buyer is
@@ -62,6 +70,10 @@ export function useSellerDashboard({ sellerProfile, orders, onNotice, updateOrde
 
   // Complete job with delivery code
   const completeJob = useCallback(async (orderId) => {
+    if (!sellerApproved) {
+      onNotice('Your seller account is pending approval. You cannot complete deliveries until an operator verifies your application.');
+      return { ok: false, reason: 'not-approved' };
+    }
     // `issueDeliveryCode` returns a result rather than a bare code, so a code the
     // server refused is not announced as one the buyer can use.
     const issued = await issueDeliveryCode(orderId);

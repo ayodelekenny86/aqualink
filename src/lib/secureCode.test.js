@@ -69,12 +69,12 @@ describe('random source', () => {
 
 describe('booking codes', () => {
   test('increments past the highest existing reference', () => {
-    expect(generateBookingCode([])).toBe('NAUT-1000-2');
-    expect(generateBookingCode(['NAUT-1048-1', 'NAUT-1051-2'])).toBe('NAUT-1052-9');
+    expect(generateBookingCode([])).toBe('NAUT-1000-W');
+    expect(generateBookingCode(['NAUT-1048-1', 'NAUT-1051-2'])).toBe('NAUT-1052-O');
   });
 
   test('ignores malformed codes when finding the high water mark', () => {
-    expect(generateBookingCode(['garbage', null, 'NAUT-3'])).toBe('NAUT-1000-2');
+    expect(generateBookingCode(['garbage', null, 'NAUT-3'])).toBe('NAUT-1000-W');
   });
 
   test('checkCharacter always returns a real alphabet character', () => {

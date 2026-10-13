@@ -78,8 +78,8 @@ export default defineConfig(({ mode }) => {
           description: 'Reliable water delivery in Ghana',
           theme_color: '#006064',
           background_color: '#ffffff',
-          display: 'standalone',
-          orientation: 'portrait-primary',
+           display: 'standalone',
+           orientation: 'any',
           scope: '/',
           start_url: '/',
           icons: [

@@ -837,6 +837,63 @@ button { cursor: pointer; }
 .earnings-card small { color: var(--muted); font-size: 9px; }
 .earnings-card.positive strong { color: #287660; }
 .panel-divider { height: 1px; background: var(--line); margin: 16px 0; }
+
+.approval-banner {
+  margin: 16px 0;
+  padding: 18px 22px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 5px;
+}
+.approval-banner .section-kicker {
+  color: #ea5804;
+}
+.approval-banner p {
+  color: #7c2d12;
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 8px 0;
+}
+.approval-banner small {
+  display: block;
+  color: #9a3412;
+  font-size: 9px;
+  margin-top: 4px;
+}
+.approval-banner button {
+  margin-top: 10px;
+}
+
+.pending-gate {
+  position: fixed;
+  inset: 0;
+  background: rgba(255, 150, 50, 0.08);
+  backdrop-filter: blur(1px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+.pending-gate .gate-content {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 28px 32px;
+  max-width: 420px;
+  text-align: center;
+}
+.pending-gate strong {
+  display: block;
+  font-size: 24px;
+  color: #ea5804;
+  margin-bottom: 8px;
+}
+.pending-gate p {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
 .earnings-history { display: flex; flex-direction: column; gap: 8px; }
 .earnings-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: #fff; border: 1px solid var(--line); border-radius: 5px; }
 .earnings-row strong { font-family: Georgia, serif; font-size: 14px; }

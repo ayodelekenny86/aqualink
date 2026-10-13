@@ -225,7 +225,7 @@ describe('payment references', () => {
     // receipt. The handlers previously used `crypto.randomUUID().slice(0, 8)`,
     // which is 32 bits.
     const reference = newReference('NAUT-1A2B3C');
-    expect(reference).toMatch(/^aq1a2b3c-[0-9a-f]{16}$/);
+    expect(reference).toMatch(/^naut1a2b3c-[0-9a-f]{16}$/);
     expect(new Set(Array.from({ length: 1000 }, () => newReference('NAUT-1A2B3C'))).size).toBe(1000);
   });
 

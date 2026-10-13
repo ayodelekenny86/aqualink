@@ -195,6 +195,11 @@ export function SellerDashboard({
   issueDeliveryCode,
   sellerProfile,
   setSellerProfile,
+  sellerApproved,
+  sellerApplicationId,
+  applyForSellerApproval,
+  refreshSellerApproval,
+  completeSellerApproval,
 }) {
   const {
     activeJobs,
@@ -216,6 +221,7 @@ export function SellerDashboard({
     onNotice: showNotice,
     updateOrderStatus,
     issueDeliveryCode,
+    sellerApproved,
   });
 
   // Smart features
@@ -263,6 +269,7 @@ export function SellerDashboard({
         <button
           className={`availability ${available ? 'online' : ''}`}
           type="button"
+          disabled={!sellerApproved}
           onClick={() => {
             setAvailable(!available);
             showNotice(available ? 'You are now offline.' : 'You are back online and visible to buyers.');
@@ -271,6 +278,27 @@ export function SellerDashboard({
           <i />{available ? 'Online and accepting jobs' : 'Offline'}
         </button>
       </div>
+
+      {!sellerApproved && (
+        <div className="pending-gate">
+          <div className="gate-content">
+            <strong>Approval required</strong>
+            <p>You cannot accept jobs until an operator verifies your application.</p>
+            <button
+              type="button"
+              className="outline-button"
+              onClick={async () => {
+                const result = await refreshSellerApproval();
+                if (result?.ok && result.approved) {
+                  await completeSellerApproval();
+                }
+              }}
+            >
+              Check approval status
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="seller-tabs">
         <button className={activeTab === 'jobs' ? 'active' : ''} onClick={() => setActiveTab('jobs')}>Job Queue</button>
@@ -294,9 +322,14 @@ export function SellerDashboard({
             </button>
           </div>
 
-          {activeJobs.length === 0 ? (
-            <p className="empty-feed">No active jobs. New orders will appear here when buyers book.</p>
-          ) : (
+        {activeJobs.length === 0 ? (
+          <p className="empty-feed">
+            {!sellerApproved
+              ? 'You cannot accept jobs until your seller application is approved by an operator.'
+              : 'No active jobs. New orders will appear here when buyers book.'
+            }
+          </p>
+        ) : (
             <div className="job-list">
               {activeJobs.map((order) => (
                 <JobCard
