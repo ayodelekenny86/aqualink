@@ -7,8 +7,17 @@ import usePredictiveAnalytics from '../hooks/usePredictiveAnalytics';
 import useDynamicPricing from '../hooks/useDynamicPricing';
 import useSellerInventory from '../hooks/useSellerInventory';
 import useLoadBalancing from '../hooks/useLoadBalancing';
+import usePredictiveInventory from '../hooks/usePredictiveInventory';
+import useRouteOptimization from '../hooks/useRouteOptimization';
+import useCustomerIntelligence from '../hooks/useCustomerIntelligence';
 import { useSellerRatings } from '../hooks/useRatings';
 import WaterQualityPanel from './WaterQualityPanel';
+import PredictiveInventoryPanel from './PredictiveInventoryPanel';
+import RouteOptimizationPanel from './RouteOptimizationPanel';
+import CustomerIntelligencePanel from './CustomerIntelligencePanel';
+import DemandForecastingPanel from './DemandForecastingPanel';
+import DriverPerformancePanel from './DriverPerformancePanel';
+import AutomatedDispatchPanel from './AutomatedDispatchPanel';
 
 function JobCard({ order, driver, onAccept, onStart, onComplete, onView }) {
   const statusColors = {
@@ -191,6 +200,11 @@ export function SellerDashboard({
   const { pricing, experiments, customerProfile, loading: pricingLoading, refresh: refreshPricing, getPriceForVolume, getPriceExplanation, summary: pricingSummary } = useDynamicPricing({ orders, driverPositions: driverLocations, customerId: sellerProfile?.identifier, region: sellerProfile?.region });
   const { inventory, equipment, lowInventory, pendingMaintenance, reorderRecommendations, summary: inventorySummary, loading: inventoryLoading, recordDelivery, recordRestock, recordMaintenance } = useSellerInventory({ sellerProfile, orders, driverPositions: driverLocations, forecast });
   const { zoneLoads, driverWorkloads, rebalancingSuggestions, autoRebalanceEnabled, setAutoRebalanceEnabled, surgeMode, activateSurge, fleetSummary, refreshLoads } = useLoadBalancing({ orders, driverPositions: driverLocations, onNotice: showNotice });
+
+  // Advanced AI features
+  const { inventory: predInventory, predictions, alerts: invAlerts, summary: predInvSummary, recordRestock: predRecordRestock } = usePredictiveInventory({ sellerProfile, orders, driverPositions: driverLocations, forecast, onNotice: showNotice });
+  const { zoneLoads: routeZones, optimizationQueue: routeOptimizations, rebalancingSuggestions: routeRebalancing, fleetSummary: routeFleet, optimizeRoutes: runOptimization, applyOptimization: routeApplyOptimization, applyRebalancing } = useRouteOptimization({ orders, driverPositions: driverLocations, onNotice: showNotice });
+  const { customers: enrichedCustomers, churnAnalysis: custChurnAnalysis, ltvPredictions: custLTV, anomalies: custAnomalies, summary: custSummary } = useCustomerIntelligence({ orders, customers: [], driverPositions: driverLocations, onNotice: showNotice });
 
   const [activeTab, setActiveTab] = useState('jobs');
   const [smartTab, setSmartTab] = useState('forecast');
@@ -491,8 +505,14 @@ export function SellerDashboard({
             <button className={smartTab === 'analytics' ? 'active' : ''} onClick={() => setSmartTab('analytics')}>Predictive Analytics</button>
             <button className={smartTab === 'pricing' ? 'active' : ''} onClick={() => setSmartTab('pricing')}>Dynamic Pricing</button>
             <button className={smartTab === 'waterquality' ? 'active' : ''} onClick={() => setSmartTab('waterquality')}>Water Quality</button>
+            <button className={smartTab === 'inventory' ? 'active' : ''} onClick={() => setSmartTab('inventory')}>Predictive Inventory</button>
+            <button className={smartTab === 'routing' ? 'active' : ''} onClick={() => setSmartTab('routing')}>Route Optimization</button>
+            <button className={smartTab === 'customers' ? 'active' : ''} onClick={() => setSmartTab('customers')}>Customer Intelligence</button>
             <button className={smartTab === 'notifications' ? 'active' : ''} onClick={() => setSmartTab('notifications')}>Smart Alerts</button>
             <button className={smartTab === 'loadbalance' ? 'active' : ''} onClick={() => setSmartTab('loadbalance')}>Load Balancing</button>
+            <button className={smartTab === 'demand-forecasting' ? 'active' : ''} onClick={() => setSmartTab('demand-forecasting')}>Demand Forecasting</button>
+            <button className={smartTab === 'driver-performance' ? 'active' : ''} onClick={() => setSmartTab('driver-performance')}>Driver Performance</button>
+            <button className={smartTab === 'automated-dispatch' ? 'active' : ''} onClick={() => setSmartTab('automated-dispatch')}>Automated Dispatch</button>
           </div>
 
           {smartTab === 'forecast' && (
@@ -823,12 +843,67 @@ export function SellerDashboard({
                     ))}
                   </div>
                 </>
-              )}
+)}
             </div>
           )}
+
+          {smartTab === 'inventory' && (
+            <PredictiveInventoryPanel 
+              orders={orders} 
+              onNotice={showNotice} 
+              sellerProfile={sellerProfile}
+              driverPositions={driverLocations}
+              forecast={forecast}
+            />
+          )}
+
+          {smartTab === 'routing' && (
+            <RouteOptimizationPanel 
+              orders={orders} 
+              onNotice={showNotice} 
+              driverPositions={driverLocations}
+            />
+          )}
+
+          {smartTab === 'customers' && (
+            <CustomerIntelligencePanel 
+              orders={orders} 
+              onNotice={showNotice} 
+              customers={enrichedCustomers}
+              driverPositions={driverLocations}
+            />
+          )}
+
+          {smartTab === 'demand-forecasting' && (
+            <DemandForecastingPanel 
+              orders={orders} 
+              weather="clear" 
+              weatherForecast={[]}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'driver-performance' && (
+            <DriverPerformancePanel 
+              drivers={fleetDrivers} 
+              orders={orders} 
+              driverLocations={driverLocations}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'automated-dispatch' && (
+            <AutomatedDispatchPanel 
+              orders={orders} 
+              drivers={fleetDrivers} 
+              driverLocations={driverLocations}
+              zoneLoads={zoneLoads}
+              onNotice={showNotice}
+            />
+          )}
+
         </section>
       )}
-
       {activeTab === 'profile' && (
         <section className="panel">
           <div className="panel-title">

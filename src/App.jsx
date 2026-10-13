@@ -36,11 +36,17 @@ import { useRatings, useRatedOrders, useDriverRatings, useRatingsByBuyer } from 
 import SmartSchedulingPanel from './components/SmartSchedulingPanel';
 import WaterQualityPanel from './components/WaterQualityPanel';
 import DynamicPricingConsole from './components/DynamicPricingConsole';
+import DemandForecastingPanel from './components/DemandForecastingPanel';
+import DriverPerformancePanel from './components/DriverPerformancePanel';
+import AutomatedDispatchPanel from './components/AutomatedDispatchPanel';
 
 // Smart feature hooks
 import useSmartScheduling from './hooks/useSmartScheduling';
 import useWaterQuality from './hooks/useWaterQuality';
 import useDynamicPricing from './hooks/useDynamicPricing';
+import { useDemandForecasting } from './hooks/useDemandForecasting';
+import { useDriverPerformance } from './hooks/useDriverPerformance';
+import { useAutomatedDispatch } from './hooks/useAutomatedDispatch';
 
 // Admin-only and overlay surfaces load on demand. A buyer who never opens the
 // admin console never downloads it, which keeps the initial bundle small.
@@ -251,6 +257,23 @@ function App() {
   const { records: waterQualityRecords } = useWaterQuality({ orders, onNotice: showNotice, sellers: sellerRanked });
   const { rules: pricingRules, activeSurge } = useDynamicPricing({ orders, sellerRanked, onNotice: showNotice });
 
+  // Advanced AI feature hooks
+  const { 
+    weeklyForecast: demandForecast, 
+    highPotentialZones: demandPotential,
+    heatmapData: demandHeatmap 
+  } = useDemandForecasting({ orders, onNotice: showNotice });
+  const { 
+    leaderboard: driverLeaderboard, 
+    coachingAlerts: driverCoaching,
+    metrics: driverMetrics 
+  } = useDriverPerformance({ drivers: fleetDrivers, orders, driverLocations, onNotice: showNotice });
+  const { 
+    dispatchPlan, 
+    dispatchHistory: autoDispatchHistory,
+    stats: dispatchStats 
+  } = useAutomatedDispatch({ orders, drivers: fleetDrivers, driverLocations, zoneLoads: {}, onNotice: showNotice });
+
   // Reliability is a second opinion on seller performance, aimed at the
   // operator question "how dependable is this seller, and how long do they
   // usually take?". The SLA is the median of observed delivery windows and is
@@ -279,6 +302,34 @@ function App() {
   // stamped with their number. `driverCodeOrder` is the order whose delivery is
   // being closed, so the handover dialog has somewhere to point.
   const fleetDrivers = useMemo(() => list('drivers'), []);
+  
+  // Build driver locations map from fleet drivers for AI features
+  const driverLocations = useMemo(() => {
+    const locations = {};
+    fleetDrivers.forEach(driver => {
+      if (driver.lat && driver.lng) {
+        locations[driver.id] = {
+          lat: driver.lat,
+          lng: driver.lng,
+          lastOrderTime: driver.lastOrderTime,
+          fuelUsed: driver.fuelUsed,
+          currentOrders: driver.currentOrders || 0,
+        };
+      }
+    });
+    return locations;
+  }, [fleetDrivers]);
+  
+  // Build zone loads from orders for dispatch optimization
+  const zoneLoads = useMemo(() => {
+    const loads = {};
+    orders.filter(o => ['Pending', 'Confirmed', 'Assigned', 'En Route'].includes(o.status)).forEach(order => {
+      const zone = order.zone || 'zone_1';
+      loads[zone] = (loads[zone] || 0) + 1;
+    });
+    return loads;
+  }, [orders]);
+  
   const [driverCodeOrderId, setDriverCodeOrderId] = useState(null);
   const [busyDriverOrderId, setBusyDriverOrderId] = useState(null);
   const driverCodeOrder = driverCodeOrderId
@@ -535,6 +586,15 @@ function App() {
             issueDeliveryCode={issueDeliveryCode}
             sellerProfile={sellerProfile}
             setSellerProfile={setSellerProfile}
+            demandForecast={demandForecast}
+            demandPotential={demandPotential}
+            demandHeatmap={demandHeatmap}
+            driverLeaderboard={driverLeaderboard}
+            driverMetrics={driverMetrics}
+            dispatchPlan={dispatchPlan}
+            dispatchStats={dispatchStats}
+            fleetDrivers={fleetDrivers}
+            driverLocations={driverLocations}
           />
         ) : (
           <SellerAccessGate
@@ -607,7 +667,17 @@ function App() {
           </Suspense>
         )}
         {role === 'institution' && (
-          <InstitutionDashboard orders={orders} showNotice={showNotice} />
+          <InstitutionDashboard 
+            orders={orders} 
+            showNotice={showNotice}
+            demandForecast={demandForecast}
+            demandPotential={demandPotential}
+            demandHeatmap={demandHeatmap}
+            driverLeaderboard={driverLeaderboard}
+            driverMetrics={driverMetrics}
+            fleetDrivers={fleetDrivers}
+            driverLocations={driverLocations}
+          />
         )}
         {ready && role === 'ops' && (adminAuthenticated ? <Suspense fallback={null}><OpsView orders={orders} downloadReport={downloadReport} opsToken={opsToken} showNotice={showNotice} sellerPerfSummary={sellerPerfSummary} sellerRanked={sellerRanked} reliabilitySummary={reliabilitySummaryData} reliabilityRanked={reliabilityRanked} driverRatingsSummary={driverRatingsSummary} /></Suspense> : <AdminAccessGate onSignIn={signInWithPassword} error={signInError} onGoogle={signInWithGoogleIdentity} onMeta={signInWithMetaIdentity} showNotice={showNotice} />)}
         {ready && role === 'ops' && adminAuthenticated && <ReportActions downloadReport={downloadReport} />}

@@ -5,7 +5,14 @@ import useDemandForecast from '../hooks/useDemandForecast';
 import usePredictiveAnalytics from '../hooks/usePredictiveAnalytics';
 import useDynamicPricing from '../hooks/useDynamicPricing';
 import useWaterQuality from '../hooks/useWaterQuality';
+import usePredictiveInventory from '../hooks/usePredictiveInventory';
+import useCustomerIntelligence from '../hooks/useCustomerIntelligence';
 import SmartSchedulingPanel from './SmartSchedulingPanel';
+import PredictiveInventoryPanel from './PredictiveInventoryPanel';
+import CustomerIntelligencePanel from './CustomerIntelligencePanel';
+import DemandForecastingPanel from './DemandForecastingPanel';
+import DriverPerformancePanel from './DriverPerformancePanel';
+import AutomatedDispatchPanel from './AutomatedDispatchPanel';
 
 function ScheduleCard({ schedule, onToggle, onDelete, onEdit }) {
   const freqLabels = {
@@ -99,7 +106,7 @@ function BudgetAlert({ alert }) {
   );
 }
 
-export function InstitutionDashboard({ orders, showNotice }) {
+export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], driverLocations = {} }) {
   const {
     schedules,
     upsertSchedule,
@@ -121,6 +128,20 @@ export function InstitutionDashboard({ orders, showNotice }) {
   const { churnAnalysis, ltvPredictions, segments, anomalies: predAnomalies, revenueForecast, summary: analyticsSummary, loading: analyticsLoading, refresh: refreshAnalytics } = usePredictiveAnalytics({ orders, customers: [], driverPositions: {} });
   const { pricing, customerProfile, loading: pricingLoading, refresh: refreshPricing, getPriceForVolume, getPriceExplanation, summary: pricingSummary } = useDynamicPricing({ orders, driverPositions: {}, customerId: null, region: 'ACCRA' });
   const { records: waterRecords, compliance, trends, forecasts, certificates, sourceRisks, alerts, summary: qualitySummary, loading: qualityLoading, addQualityRecord: addWaterQualityRecord, getSourceSummary, refresh: refreshWaterQuality } = useWaterQuality({ qualityRecords, sources: [...new Set(qualityRecords.map(r => r.source))], onNotice: showNotice });
+
+  // Advanced AI features
+  const { inventory: predInventory, predictions: invPredictions, alerts: invAlerts, summary: predInvSummary, recordRestock } = usePredictiveInventory({ sellerProfile: { identifier: 'institution' }, orders, driverPositions: {}, forecast, onNotice: showNotice });
+  const { customers: enrichedCustomers, churnAnalysis: instChurn, ltvPredictions: instLTV, anomalies: instAnomalies, summary: instCustSummary } = useCustomerIntelligence({ orders, customers: [], driverPositions: {}, onNotice: showNotice });
+
+  // Zone loads for automated dispatch
+  const zoneLoads = useMemo(() => {
+    const loads = {};
+    orders.filter(o => ['Pending', 'Confirmed', 'Assigned', 'En Route'].includes(o.status)).forEach(order => {
+      const zone = order.zone || 'zone_1';
+      loads[zone] = (loads[zone] || 0) + 1;
+    });
+    return loads;
+  }, [orders]);
 
   const [activeTab, setActiveTab] = useState('overview');
   const [smartTab, setSmartTab] = useState('forecast');
@@ -185,7 +206,9 @@ export function InstitutionDashboard({ orders, showNotice }) {
         <button className={activeTab === 'overview' ? 'active' : ''} onClick={() => setActiveTab('overview')}>Overview</button>
         <button className={activeTab === 'schedules' ? 'active' : ''} onClick={() => setActiveTab('schedules')}>Schedules</button>
         <button className={activeTab === 'smart-scheduling' ? 'active' : ''} onClick={() => setActiveTab('smart-scheduling')}>Smart Scheduling</button>
+        <button className={activeTab === 'inventory' ? 'active' : ''} onClick={() => setActiveTab('inventory')}>Predictive Inventory</button>
         <button className={activeTab === 'quality' ? 'active' : ''} onClick={() => setActiveTab('quality')}>Quality</button>
+        <button className={activeTab === 'customers' ? 'active' : ''} onClick={() => setActiveTab('customers')}>Customer Intelligence</button>
         <button className={activeTab === 'budget' ? 'active' : ''} onClick={() => setActiveTab('budget')}>Budget</button>
         <button className={activeTab === 'analytics' ? 'active' : ''} onClick={() => setActiveTab('analytics')}>Analytics</button>
         <button className={activeTab === 'smart' ? 'active' : ''} onClick={() => setActiveTab('smart')}>Smart Hub</button>
@@ -405,6 +428,25 @@ export function InstitutionDashboard({ orders, showNotice }) {
         </section>
       )}
 
+      {activeTab === 'inventory' && (
+        <PredictiveInventoryPanel 
+          orders={orders} 
+          onNotice={showNotice} 
+          sellerProfile={{ identifier: 'institution' }}
+          driverPositions={{}}
+          forecast={forecast}
+        />
+      )}
+
+      {activeTab === 'customers' && (
+        <CustomerIntelligencePanel 
+          orders={orders} 
+          onNotice={showNotice} 
+          customers={enrichedCustomers}
+          driverPositions={{}}
+        />
+      )}
+
       {activeTab === 'budget' && (
         <section className="panel">
           <div className="panel-toolbar">
@@ -528,6 +570,9 @@ export function InstitutionDashboard({ orders, showNotice }) {
             <button className={smartTab === 'pricing' ? 'active' : ''} onClick={() => setSmartTab('pricing')}>Dynamic Pricing</button>
             <button className={smartTab === 'waterquality' ? 'active' : ''} onClick={() => setSmartTab('waterquality')}>Water Quality</button>
             <button className={smartTab === 'notifications' ? 'active' : ''} onClick={() => setSmartTab('notifications')}>Smart Alerts</button>
+            <button className={smartTab === 'demand-forecasting' ? 'active' : ''} onClick={() => setSmartTab('demand-forecasting')}>Demand Forecasting</button>
+            <button className={smartTab === 'driver-performance' ? 'active' : ''} onClick={() => setSmartTab('driver-performance')}>Driver Performance</button>
+            <button className={smartTab === 'automated-dispatch' ? 'active' : ''} onClick={() => setSmartTab('automated-dispatch')}>Automated Dispatch</button>
           </div>
 
           {smartTab === 'forecast' && (
@@ -818,6 +863,34 @@ export function InstitutionDashboard({ orders, showNotice }) {
                 ))}
               </div>
             </div>
+          )}
+
+          {smartTab === 'demand-forecasting' && (
+            <DemandForecastingPanel 
+              orders={orders} 
+              weather="clear" 
+              weatherForecast={[]}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'driver-performance' && (
+            <DriverPerformancePanel 
+              drivers={fleetDrivers} 
+              orders={orders} 
+              driverLocations={driverLocations}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'automated-dispatch' && (
+            <AutomatedDispatchPanel 
+              orders={orders} 
+              drivers={fleetDrivers} 
+              driverLocations={driverLocations}
+              zoneLoads={zoneLoads || {}}
+              onNotice={showNotice}
+            />
           )}
         </section>
       )}
