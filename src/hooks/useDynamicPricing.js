@@ -1,228 +1,449 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { list } from '../lib/collections';
-import { DEFAULT_PRICING, DEFAULT_SPLIT, priceOrder, quotePrice } from '../lib/money';
+import { list, replaceAll } from '../lib/collections';
+import { formatCedi } from '../lib/money';
+
+const STORAGE_KEY = 'dynamic_pricing_rules';
 
 /**
- * Dynamic pricing hook: real-time price optimization based on demand, supply, and customer behavior.
- * 
- * Adjusts prices based on:
- * - Time of day / day of week demand patterns
- * - Driver availability (supply)
- * - Customer segment (loyalty, volume)
- * - Regional competition
- * - Inventory levels
+ * Dynamic Pricing hook: manages demand-based, time-based, and supply-based
+ * pricing adjustments. Includes surge pricing, volume discounts, loyalty pricing,
+ * and regional adjustments.
  */
-export function useDynamicPricing({ orders, driverPositions = {}, customerId, region }) {
-  const [pricing, setPricing] = useState({});
-  const [experiments, setExperiments] = useState([]);
-  const [customerProfile, setCustomerProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState(null);
+export function useDynamicPricing({ orders = [], sellerRanked = [], onNotice }) {
+  const [rules, setRules] = useState(() => list(STORAGE_KEY));
+  const [activeSurge, setActiveSurge] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  // Base pricing config (would come from server in production)
-  const basePricing = useMemo(() => ({
-    listPrice: 600, // GHS per 1000 gallons
-    discountPercent: 50,
-    surgePercent: 0,
-    surgeReason: '',
-  }), []);
+  // Default pricing rules
+  const DEFAULT_RULES = [
+    {
+      id: 'base',
+      name: 'Base Pricing',
+      type: 'base',
+      priority: 0,
+      active: true,
+      config: {
+        pricePer1000Gal: 15000, // 150 GHS per 1000 gallons in minor units
+        minOrder: 1000,
+        maxOrder: 5000,
+      },
+    },
+    {
+      id: 'volume_discount',
+      name: 'Volume Discount',
+      type: 'volume_discount',
+      priority: 10,
+      active: true,
+      config: {
+        tiers: [
+          { minVolume: 1000, maxVolume: 1999, discount: 0 },
+          { minVolume: 2000, maxVolume: 2999, discount: 5 }, // 5%
+          { minVolume: 3000, maxVolume: 3999, discount: 8 }, // 8%
+          { minVolume: 4000, maxVolume: 5000, discount: 12 }, // 12%
+        ],
+      },
+    },
+    {
+      id: 'loyalty_pricing',
+      name: 'Loyalty Tier Pricing',
+      type: 'loyalty',
+      priority: 20,
+      active: true,
+      config: {
+        Bronze: { discount: 0, cashback: 1 },
+        Silver: { discount: 3, cashback: 2 },
+        Gold: { discount: 5, cashback: 3 },
+        Platinum: { discount: 8, cashback: 5 },
+      },
+    },
+    {
+      id: 'time_of_day',
+      name: 'Time-of-Day Pricing',
+      type: 'time_based',
+      priority: 30,
+      active: true,
+      config: {
+        peakHours: { start: 6, end: 10, multiplier: 1.15 }, // 6-10 AM
+        offPeakHours: { start: 22, end: 5, multiplier: 0.9 }, // 10 PM - 5 AM
+        normalMultiplier: 1.0,
+      },
+    },
+    {
+      id: 'demand_surge',
+      name: 'Demand Surge Pricing',
+      type: 'surge',
+      priority: 100,
+      active: false, // Activated manually or by load balancing
+      config: {
+        triggerThreshold: 2.5, // orders per available driver
+        maxMultiplier: 2.0,
+        rampUpMinutes: 15,
+        rampDownMinutes: 30,
+      },
+    },
+    {
+      id: 'regional_adjustment',
+      name: 'Regional Adjustment',
+      type: 'regional',
+      priority: 40,
+      active: true,
+      config: {
+        Accra: { multiplier: 1.0 },
+        Kumasi: { multiplier: 0.95 },
+        Takoradi: { multiplier: 0.92 },
+        Tema: { multiplier: 1.05 },
+        Lagos: { multiplier: 1.1 },
+        Abidjan: { multiplier: 1.08 },
+      },
+    },
+    {
+      id: 'seller_performance',
+      name: 'Seller Performance Pricing',
+      type: 'seller_performance',
+      priority: 50,
+      active: true,
+      config: {
+        // Top performers get preferential pricing (lower platform fee)
+        topPerformerDiscount: 2, // 2% platform fee reduction
+        thresholdScore: 80,
+      },
+    },
+  ];
 
-  // Calculate demand intensity from recent orders
-  const demandIntensity = useMemo(() => {
-    const now = Date.now();
-    const last24h = orders.filter(o => now - new Date(o.createdAt).getTime() < 24 * 60 * 60 * 1000);
-    const lastHour = orders.filter(o => now - new Date(o.createdAt).getTime() < 60 * 60 * 1000);
-    
-    const hourlyRate = lastHour.length;
-    const dailyRate = last24h.length;
-    
-    // Normalize: 10 orders/hour = high demand, 1 order/hour = low
-    return Math.min(2, hourlyRate / 5);
-  }, [orders]);
-
-  // Calculate supply availability
-  const supplyAvailability = useMemo(() => {
-    const { drivers } = require('../lib/fleet').getFleet();
-    const onlineDrivers = drivers.filter(d => d.status === 'online').length;
-    const totalCapacity = drivers
-      .filter(d => d.status === 'online')
-      .reduce((sum, d) => sum + (d.capacityGallons || 1000), 0);
-    
-    return { onlineDrivers, totalCapacity, utilization: onlineDrivers > 0 ? 1 - (totalCapacity / (onlineDrivers * 5000)) : 1 };
-  }, [driverPositions]);
-
-  // Customer profile for personalized pricing
-  const buildCustomerProfile = useCallback(() => {
-    if (!customerId) return null;
-    
-    const customerOrders = orders.filter(o => o.customerId === customerId || o.phone === customerId || o.email === customerId);
-    if (customerOrders.length === 0) return null;
-    
-    const totalVolume = customerOrders.reduce((s, o) => s + parseFloat(o.volume?.replace(/[^0-9.]/g, '') || '0'), 0);
-    const totalRevenue = customerOrders.reduce((s, o) => s + (o.chargedMinor || 0), 0);
-    const avgOrderValue = totalRevenue / customerOrders.length;
-    const lastOrder = customerOrders.reduce((latest, o) => 
-      new Date(o.createdAt) > new Date(latest.createdAt) ? o : latest
-    );
-    const daysSinceLastOrder = (Date.now() - new Date(lastOrder.createdAt).getTime()) / (1000 * 60 * 60 * 24);
-    
-    let segment = 'new';
-    if (customerOrders.length >= 10 && daysSinceLastOrder < 30) segment = 'vip';
-    else if (customerOrders.length >= 5 && daysSinceLastOrder < 60) segment = 'loyal';
-    else if (customerOrders.length >= 2) segment = 'regular';
-    
-    const profile = {
-      customerId,
-      segment,
-      totalOrders: customerOrders.length,
-      totalVolume,
-      totalRevenue,
-      avgOrderValue,
-      daysSinceLastOrder,
-      preferredVolume: totalVolume / customerOrders.length,
-      priceSensitivity: segment === 'vip' ? 'low' : segment === 'loyal' ? 'medium' : 'high',
-    };
-    
-    setCustomerProfile(profile);
-    return profile;
-  }, [orders, customerId]);
-
-  // Generate dynamic prices for different volumes
-  const generatePricing = useCallback(() => {
-    const volumes = [500, 1000, 2000, 5000, 10000];
-    const newPricing = {};
-    
-    volumes.forEach(volume => {
-      const demandMultiplier = 1 + (demandIntensity * 0.3); // Up to 30% increase
-      const supplyMultiplier = supplyAvailability.utilization > 0.8 ? 1.2 : 1; // Up to 20% increase if low supply
-      const timeMultiplier = getTimeMultiplier();
-      const customerMultiplier = getCustomerMultiplier();
-      
-      const totalMultiplier = demandMultiplier * supplyMultiplier * timeMultiplier * customerMultiplier;
-      const finalMultiplier = Math.min(1.5, Math.max(0.7, totalMultiplier)); // Cap between 0.7x and 1.5x
-      
-      const quote = quotePrice({
-        ...basePricing,
-        surgePercent: (finalMultiplier - 1) * 100,
-      });
-      
-      newPricing[volume] = {
-        basePrice: quote.discounted / 100, // Convert to major units
-        finalPrice: quote.totalMinor / 100,
-        multiplier: Number(finalMultiplier.toFixed(2)),
-        demandFactor: Number(demandMultiplier.toFixed(2)),
-        supplyFactor: Number(supplyMultiplier.toFixed(2)),
-        timeFactor: Number(timeMultiplier.toFixed(2)),
-        customerFactor: Number(customerMultiplier.toFixed(2)),
-      };
-    });
-    
-    setPricing(newPricing);
-    return newPricing;
-  }, [demandIntensity, supplyAvailability, basePricing]);
-
-  // Time-based multiplier
-  const getTimeMultiplier = useCallback(() => {
-    const hour = new Date().getHours();
-    const day = new Date().getDay();
-    
-    // Peak hours: 6-9 AM, 5-8 PM
-    const isPeakHour = (hour >= 6 && hour <= 9) || (hour >= 17 && hour <= 20);
-    // Weekend
-    const isWeekend = day === 0 || day === 6;
-    
-    if (isPeakHour && isWeekend) return 1.15;
-    if (isPeakHour) return 1.1;
-    if (isWeekend) return 1.05;
-    return 1.0;
-  }, []);
-
-  // Customer-based multiplier
-  const getCustomerMultiplier = useCallback(() => {
-    if (!customerProfile) return 1.0;
-    
-    switch (customerProfile.segment) {
-      case 'vip': return 0.9; // 10% discount for VIP
-      case 'loyal': return 0.95; // 5% discount
-      case 'regular': return 1.0;
-      default: return 1.0;
+  // Initialize with defaults if empty
+  useEffect(() => {
+    if (rules.length === 0) {
+      const withDefaults = DEFAULT_RULES.map((r, i) => ({
+        ...r,
+        id: r.id,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }));
+      setRules(withDefaults);
+      replaceAll(STORAGE_KEY, withDefaults);
     }
-  }, [customerProfile]);
+  }, [rules.length]);
 
-  // Get price for a specific volume
-  const getPriceForVolume = useCallback((volume) => {
-    const volKey = volumes.find(v => v >= volume) || volumes[volumes.length - 1];
-    return pricing[volKey] || { finalPrice: 0, multiplier: 1 };
-  }, [pricing]);
+  // Calculate base price for volume
+  const calculateBasePrice = useCallback((volumeGallons) => {
+    const baseRule = rules.find(r => r.type === 'base' && r.active);
+    if (!baseRule) return { price: 0, breakdown: [] };
 
-  // Get human-readable price explanation
-  const getPriceExplanation = useCallback((volume) => {
-    const priceData = getPriceForVolume(volume);
-    const factors = [];
+    const pricePer1000 = baseRule.config.pricePer1000Gal || 15000;
+    const basePrice = Math.round((volumeGallons / 1000) * pricePer1000);
     
-    if (priceData.demandFactor > 1.05) factors.push('High demand in your area');
-    if (priceData.supplyFactor > 1.05) factors.push('Limited driver availability');
-    if (priceData.timeFactor > 1.05) factors.push('Peak hour pricing');
-    if (priceData.customerFactor < 0.95) factors.push('Loyalty discount applied');
-    if (priceData.customerFactor > 1.05) factors.push('New customer rate');
+    return {
+      price: basePrice,
+      breakdown: [{
+        rule: 'Base Pricing',
+        amount: basePrice,
+        description: `${volumeGallons} gal × ${formatCedi(pricePer1000)}/1000 gal`,
+      }],
+    };
+  }, [rules]);
+
+  // Apply volume discount
+  const applyVolumeDiscount = useCallback((basePrice, volumeGallons) => {
+    const rule = rules.find(r => r.type === 'volume_discount' && r.active);
+    if (!rule) return { discount: 0, discountedPrice: basePrice, breakdown: [] };
+
+    const tier = rule.config.tiers.find(t => 
+      volumeGallons >= t.minVolume && volumeGallons <= t.maxVolume
+    );
     
-    return factors.length > 0 ? factors.join('; ') : 'Standard pricing';
-  }, [getPriceForVolume]);
+    if (!tier || tier.discount === 0) {
+      return { discount: 0, discountedPrice: basePrice, breakdown: [] };
+    }
 
-  const volumes = [500, 1000, 2000, 5000, 10000];
+    const discountAmount = Math.round(basePrice * tier.discount / 100);
+    return {
+      discount: tier.discount,
+      discountAmount,
+      discountedPrice: basePrice - discountAmount,
+      breakdown: [{
+        rule: 'Volume Discount',
+        amount: -discountAmount,
+        description: `${tier.discount}% off for ${volumeGallons} gal order`,
+      }],
+    };
+  }, [rules]);
 
-  // Summary for UI
-  const summary = useMemo(() => {
-    const prices = Object.values(pricing);
-    if (prices.length === 0) return { avgMultiplier: 1, surgeActive: false, discountActive: false };
+  // Apply loyalty pricing
+  const applyLoyaltyPricing = useCallback((price, tier) => {
+    const rule = rules.find(r => r.type === 'loyalty' && r.active);
+    if (!rule || !tier) return { discount: 0, cashback: 0, finalPrice: price, breakdown: [] };
+
+    const tierConfig = rule.config[tier];
+    if (!tierConfig) return { discount: 0, cashback: 0, finalPrice: price, breakdown: [] };
+
+    const discountAmount = Math.round(price * (tierConfig.discount || 0) / 100);
+    const cashbackAmount = Math.round(price * (tierConfig.cashback || 0) / 100);
     
-    const avgMultiplier = prices.reduce((s, p) => s + p.multiplier, 0) / prices.length;
-    const surgeActive = prices.some(p => p.multiplier > 1.1);
-    const discountActive = prices.some(p => p.multiplier < 0.95);
+    return {
+      discount: tierConfig.discount || 0,
+      discountAmount,
+      cashback: tierConfig.cashback || 0,
+      cashbackAmount,
+      finalPrice: price - discountAmount,
+      breakdown: [
+        tierConfig.discount > 0 && {
+          rule: `Loyalty Discount (${tier})`,
+          amount: -discountAmount,
+          description: `${tierConfig.discount}% loyalty discount`,
+        },
+        tierConfig.cashback > 0 && {
+          rule: `Cashback (${tier})`,
+          amount: -cashbackAmount,
+          description: `${tierConfig.cashback}% cashback to wallet`,
+        },
+      ].filter(Boolean),
+    };
+  }, [rules]);
+
+  // Apply time-of-day pricing
+  const applyTimePricing = useCallback((price) => {
+    const rule = rules.find(r => r.type === 'time_based' && r.active);
+    if (!rule) return { multiplier: 1.0, finalPrice: price, breakdown: [] };
+
+    const hour = new Date().getHours();
+    const { peakHours, offPeakHours, normalMultiplier } = rule.config;
     
-    return { avgMultiplier: Number(avgMultiplier.toFixed(2)), surgeActive, discountActive };
-  }, [pricing]);
+    let multiplier = normalMultiplier;
+    let period = 'normal';
+    
+    if (hour >= peakHours.start && hour < peakHours.end) {
+      multiplier = peakHours.multiplier;
+      period = 'peak';
+    } else if (hour >= offPeakHours.start || hour < offPeakHours.end) {
+      multiplier = offPeakHours.multiplier;
+      period = 'off_peak';
+    }
 
-  // Refresh pricing
-  const refresh = useCallback(() => {
-    setLoading(true);
-    buildCustomerProfile();
-    const timer = setTimeout(() => {
-      generatePricing();
-      setLastUpdated(new Date().toISOString());
-      setLoading(false);
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [buildCustomerProfile, generatePricing]);
+    const adjustedPrice = Math.round(price * multiplier);
+    const adjustment = adjustedPrice - price;
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+    return {
+      multiplier,
+      period,
+      finalPrice: adjustedPrice,
+      breakdown: adjustment !== 0 ? [{
+        rule: `Time-of-Day (${period})`,
+        amount: adjustment,
+        description: `${period === 'peak' ? 'Peak hours' : period === 'off_peak' ? 'Off-peak hours' : 'Normal'} pricing (${multiplier}x)`,
+      }] : [],
+    };
+  }, [rules]);
 
-  // A/B testing experiments (placeholder for future)
-  const refreshExperiments = useCallback(() => {
-    // In production, would fetch from server
-    setExperiments([
-      { id: 'exp-surge-threshold', name: 'Surge Threshold Test', variant: 'control', status: 'running' },
-      { id: 'exp-loyalty-discount', name: 'Loyalty Discount Depth', variant: 'treatment', status: 'running' },
-    ]);
-  }, []);
+  // Apply regional pricing
+  const applyRegionalPricing = useCallback((price, region) => {
+    const rule = rules.find(r => r.type === 'regional' && r.active);
+    if (!rule || !region) return { multiplier: 1.0, finalPrice: price, breakdown: [] };
 
-  useEffect(() => {
-    refreshExperiments();
-  }, [refreshExperiments]);
+    const config = rule.config[region] || rule.config.Accra || { multiplier: 1.0 };
+    const multiplier = config.multiplier;
+    const adjustedPrice = Math.round(price * multiplier);
+    const adjustment = adjustedPrice - price;
+
+    return {
+      multiplier,
+      finalPrice: adjustedPrice,
+      breakdown: adjustment !== 0 ? [{
+        rule: `Regional Adjustment (${region})`,
+        amount: adjustment,
+        description: `${region} pricing (${multiplier}x)`,
+      }] : [],
+    };
+  }, [rules]);
+
+  // Apply seller performance pricing
+  const applySellerPricing = useCallback((price, sellerId) => {
+    const rule = rules.find(r => r.type === 'seller_performance' && r.active);
+    if (!rule || !sellerId) return { discount: 0, finalPrice: price, breakdown: [] };
+
+    const seller = sellerRanked.find(s => s.sellerId === sellerId);
+    if (!seller || (seller.score || 0) < rule.config.thresholdScore) {
+      return { discount: 0, finalPrice: price, breakdown: [] };
+    }
+
+    const discount = rule.config.topPerformerDiscount || 0;
+    const discountAmount = Math.round(price * discount / 100);
+
+    return {
+      discount,
+      discountAmount,
+      finalPrice: price - discountAmount,
+      breakdown: discount > 0 ? [{
+        rule: 'Top Seller Discount',
+        amount: -discountAmount,
+        description: `${discount}% platform fee reduction (score: ${seller.score})`,
+      }] : [],
+    };
+  }, [rules, sellerRanked]);
+
+  // Calculate surge multiplier based on demand/supply
+  const calculateSurgeMultiplier = useCallback(() => {
+    const rule = rules.find(r => r.type === 'surge');
+    if (!rule || !rule.active) return { active: false, multiplier: 1.0 };
+
+    // Calculate current demand/supply ratio
+    const pendingOrders = orders.filter(o => o.status === 'Awaiting payment').length;
+    const availableDrivers = sellerRanked.filter(s => s.status === 'online' && s.activeJobs < 3).length;
+    
+    const ratio = availableDrivers > 0 ? pendingOrders / availableDrivers : 999;
+    const { triggerThreshold, maxMultiplier } = rule.config;
+
+    if (ratio < triggerThreshold) {
+      if (activeSurge) setActiveSurge(null);
+      return { active: false, multiplier: 1.0, ratio };
+    }
+
+    // Calculate surge multiplier (linear ramp from threshold to max)
+    const surgeMultiplier = Math.min(
+      1 + (ratio - triggerThreshold) / triggerThreshold * (maxMultiplier - 1),
+      maxMultiplier
+    );
+
+    if (!activeSurge) setActiveSurge({ ratio, multiplier: surgeMultiplier });
+
+    return {
+      active: true,
+      multiplier: surgeMultiplier,
+      ratio,
+      triggerThreshold,
+      maxMultiplier,
+    };
+  }, [rules, orders, sellerRanked, activeSurge]);
+
+  // Main pricing calculator
+  const calculatePrice = useCallback((params) => {
+    const {
+      volumeGallons = 1000,
+      region = 'Accra',
+      loyaltyTier = null,
+      sellerId = null,
+      includeSurge = true,
+    } = params;
+
+    const surge = includeSurge ? calculateSurgeMultiplier() : { active: false, multiplier: 1.0 };
+    const allBreakdown = [];
+
+    // Base price
+    let { price, breakdown } = calculateBasePrice(volumeGallons);
+    allBreakdown.push(...breakdown);
+
+    // Volume discount
+    const vol = applyVolumeDiscount(price, volumeGallons);
+    price = vol.discountedPrice;
+    allBreakdown.push(...vol.breakdown);
+
+    // Loyalty
+    const loy = applyLoyaltyPricing(price, loyaltyTier);
+    price = loy.finalPrice;
+    allBreakdown.push(...loy.breakdown);
+
+    // Time of day
+    const time = applyTimePricing(price);
+    price = time.finalPrice;
+    allBreakdown.push(...time.breakdown);
+
+    // Regional
+    const regional = applyRegionalPricing(price, region);
+    price = regional.finalPrice;
+    allBreakdown.push(...regional.breakdown);
+
+    // Seller performance
+    const seller = applySellerPricing(price, sellerId);
+    price = seller.finalPrice;
+    allBreakdown.push(...seller.breakdown);
+
+    // Surge
+    let surgeAmount = 0;
+    if (surge.active) {
+      const preSurgePrice = price;
+      price = Math.round(price * surge.multiplier);
+      surgeAmount = price - preSurgePrice;
+      allBreakdown.push({
+        rule: 'Demand Surge',
+        amount: surgeAmount,
+        description: `Surge pricing active (${surge.multiplier.toFixed(2)}x)`,
+      });
+    }
+
+    return {
+      finalPrice: price,
+      basePrice: calculateBasePrice(volumeGallons).price,
+      surgeActive: surge.active,
+      surgeMultiplier: surge.multiplier,
+      surgeAmount,
+      breakdown: allBreakdown,
+      formatted: formatCedi(price),
+    };
+  }, [
+    calculateBasePrice, 
+    applyVolumeDiscount, 
+    applyLoyaltyPricing, 
+    applyTimePricing, 
+    applyRegionalPricing, 
+    applySellerPricing, 
+    calculateSurgeMultiplier
+  ]);
+
+  // Get price preview for UI
+  const getPricePreview = useCallback((volumeGallons, region, loyaltyTier) => {
+    return calculatePrice({ volumeGallons, region, loyaltyTier });
+  }, [calculatePrice]);
+
+  // Toggle rule
+  const toggleRule = useCallback((ruleId) => {
+    const updated = rules.map(r => 
+      r.id === ruleId ? { ...r, active: !r.active, updatedAt: new Date().toISOString() } : r
+    );
+    setRules(updated);
+    replaceAll(STORAGE_KEY, updated);
+    onNotice?.(`Pricing rule ${updated.find(r => r.id === ruleId).active ? 'activated' : 'deactivated'}`);
+  }, [rules, onNotice]);
+
+  // Update rule config
+  const updateRule = useCallback((ruleId, config) => {
+    const updated = rules.map(r => 
+      r.id === ruleId ? { ...r, config: { ...r.config, ...config }, updatedAt: new Date().toISOString() } : r
+    );
+    setRules(updated);
+    replaceAll(STORAGE_KEY, updated);
+    onNotice?.('Pricing rule updated');
+  }, [rules, onNotice]);
+
+  // Add custom rule
+  const addRule = useCallback((rule) => {
+    const newRule = {
+      ...rule,
+      id: `rule-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    const updated = [...rules, newRule];
+    setRules(updated);
+    replaceAll(STORAGE_KEY, updated);
+    onNotice?.('Custom pricing rule added');
+    return newRule;
+  }, [rules, onNotice]);
 
   return {
-    pricing,
-    experiments,
-    customerProfile,
+    rules,
+    activeSurge,
     loading,
-    lastUpdated,
-    refresh,
-    refreshPricing: refresh,
-    getPriceForVolume,
-    getPriceExplanation,
-    summary,
+    DEFAULT_RULES,
+    calculatePrice,
+    getPricePreview,
+    calculateSurgeMultiplier,
+    toggleRule,
+    updateRule,
+    addRule,
+    applyVolumeDiscount,
+    applyLoyaltyPricing,
+    applyTimePricing,
+    applyRegionalPricing,
+    applySellerPricing,
   };
 }
 

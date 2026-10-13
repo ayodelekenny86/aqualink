@@ -10,6 +10,7 @@ import {
   validateSplit,
 } from '../lib/money';
 import { getRatings, computeAverages, computeDistribution } from '../lib/ratings';
+import DynamicPricingConsole from './DynamicPricingConsole';
 
 /**
  * Admin pricing control.
@@ -364,6 +365,8 @@ export default function AdminPricingConsole({ onNotice, onPricingChange, opsToke
         <p className="empty-feed">No ratings have been submitted yet.</p>
       )}
     </section>
+
+    <DynamicPricingConsole orders={[]} sellerRanked={[]} onNotice={onNotice} />
     </>
   );
 }

@@ -25,6 +25,8 @@ const COLLECTIONS = {
   qualityRecords: 'db.quality_records',
   institutionBudget: 'db.institution_budget',
   ratings: 'db.ratings',
+  dynamicPricingRules: 'db.dynamic_pricing_rules',
+  dynamic_pricing_rules: 'db.dynamic_pricing_rules',
 };
 
 export const COLLECTION_NAMES = Object.keys(COLLECTIONS);

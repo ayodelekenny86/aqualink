@@ -5,6 +5,7 @@ import useDemandForecast from '../hooks/useDemandForecast';
 import usePredictiveAnalytics from '../hooks/usePredictiveAnalytics';
 import useDynamicPricing from '../hooks/useDynamicPricing';
 import useWaterQuality from '../hooks/useWaterQuality';
+import SmartSchedulingPanel from './SmartSchedulingPanel';
 
 function ScheduleCard({ schedule, onToggle, onDelete, onEdit }) {
   const freqLabels = {
@@ -183,6 +184,7 @@ export function InstitutionDashboard({ orders, showNotice }) {
       <div className="institution-tabs">
         <button className={activeTab === 'overview' ? 'active' : ''} onClick={() => setActiveTab('overview')}>Overview</button>
         <button className={activeTab === 'schedules' ? 'active' : ''} onClick={() => setActiveTab('schedules')}>Schedules</button>
+        <button className={activeTab === 'smart-scheduling' ? 'active' : ''} onClick={() => setActiveTab('smart-scheduling')}>Smart Scheduling</button>
         <button className={activeTab === 'quality' ? 'active' : ''} onClick={() => setActiveTab('quality')}>Quality</button>
         <button className={activeTab === 'budget' ? 'active' : ''} onClick={() => setActiveTab('budget')}>Budget</button>
         <button className={activeTab === 'analytics' ? 'active' : ''} onClick={() => setActiveTab('analytics')}>Analytics</button>
@@ -329,6 +331,10 @@ export function InstitutionDashboard({ orders, showNotice }) {
             </div>
           )}
         </section>
+      )}
+
+      {activeTab === 'smart-scheduling' && (
+        <SmartSchedulingPanel orders={orders} showNotice={showNotice} customers={[]} />
       )}
 
       {activeTab === 'quality' && (

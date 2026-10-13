@@ -32,6 +32,16 @@ import { initWebVitals, trackEvent, EVENTS } from './lib/analytics';
 import RatingModal from './components/RatingModal';
 import { useRatings, useRatedOrders, useDriverRatings, useRatingsByBuyer } from './hooks/useRatings';
 
+// Smart feature components
+import SmartSchedulingPanel from './components/SmartSchedulingPanel';
+import WaterQualityPanel from './components/WaterQualityPanel';
+import DynamicPricingConsole from './components/DynamicPricingConsole';
+
+// Smart feature hooks
+import useSmartScheduling from './hooks/useSmartScheduling';
+import useWaterQuality from './hooks/useWaterQuality';
+import useDynamicPricing from './hooks/useDynamicPricing';
+
 // Admin-only and overlay surfaces load on demand. A buyer who never opens the
 // admin console never downloads it, which keeps the initial bundle small.
 const AdminPricingConsole = lazy(() => import('./components/AdminPricingConsole'));
@@ -235,6 +245,11 @@ function App() {
   // performance. The summary carries the full ratings list, so the console can
   // rank drivers without mounting a hook per driver.
   const { summary: driverRatingsSummary } = useDriverRatings(null);
+
+  // Smart feature hooks
+  const { stats: schedulingStats } = useSmartScheduling({ orders, onNotice: showNotice });
+  const { records: waterQualityRecords } = useWaterQuality({ orders, onNotice: showNotice, sellers: sellerRanked });
+  const { rules: pricingRules, activeSurge } = useDynamicPricing({ orders, sellerRanked, onNotice: showNotice });
 
   // Reliability is a second opinion on seller performance, aimed at the
   // operator question "how dependable is this seller, and how long do they

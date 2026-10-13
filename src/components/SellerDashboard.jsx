@@ -8,6 +8,7 @@ import useDynamicPricing from '../hooks/useDynamicPricing';
 import useSellerInventory from '../hooks/useSellerInventory';
 import useLoadBalancing from '../hooks/useLoadBalancing';
 import { useSellerRatings } from '../hooks/useRatings';
+import WaterQualityPanel from './WaterQualityPanel';
 
 function JobCard({ order, driver, onAccept, onStart, onComplete, onView }) {
   const statusColors = {
@@ -489,6 +490,7 @@ export function SellerDashboard({
             <button className={smartTab === 'assignment' ? 'active' : ''} onClick={() => setSmartTab('assignment')}>Auto-Assignment</button>
             <button className={smartTab === 'analytics' ? 'active' : ''} onClick={() => setSmartTab('analytics')}>Predictive Analytics</button>
             <button className={smartTab === 'pricing' ? 'active' : ''} onClick={() => setSmartTab('pricing')}>Dynamic Pricing</button>
+            <button className={smartTab === 'waterquality' ? 'active' : ''} onClick={() => setSmartTab('waterquality')}>Water Quality</button>
             <button className={smartTab === 'notifications' ? 'active' : ''} onClick={() => setSmartTab('notifications')}>Smart Alerts</button>
             <button className={smartTab === 'loadbalance' ? 'active' : ''} onClick={() => setSmartTab('loadbalance')}>Load Balancing</button>
           </div>
@@ -705,6 +707,10 @@ export function SellerDashboard({
                 </>
               )}
             </div>
+          )}
+
+          {smartTab === 'waterquality' && (
+            <WaterQualityPanel orders={orders} onNotice={showNotice} sellers={[]} />
           )}
 
           {smartTab === 'notifications' && (
