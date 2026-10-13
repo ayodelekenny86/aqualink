@@ -1,20 +1,21 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
 export function useWaterQualityPrediction({ 
-  qualityRecords = [], 
-  sources = [],
+  sources = [], 
+  qualityTests = [],
   weatherData = [],
   treatmentRecords = [],
+  distributionData = [],
   onNotice 
 }) {
   const [predictions, setPredictions] = useState(null);
-  const [anomalies, setAnomalies] = useState([]);
+  const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const predictQuality = useCallback(async () => {
-    if (!qualityRecords.length) {
-      setPredictions({ sources: [], trends: [], alerts: [] });
+  const generatePredictions = useCallback(async () => {
+    if (!sources.length) {
+      setPredictions({ sources: [], summary: {} });
       return;
     }
 
@@ -22,296 +23,237 @@ export function useWaterQualityPrediction({
     setError(null);
 
     try {
-      await new Promise(r => setTimeout(r, 350));
+      await new Promise(r => setTimeout(r, 400));
 
-      const sourcePredictions = sources.map(source => {
-        const sourceRecords = qualityRecords.filter(r => r.sourceId === source.id);
-        if (sourceRecords.length < 3) {
-          return {
-            sourceId: source.id,
-            sourceName: source.name,
-            currentScore: source.currentQuality || 85,
-            predictedScore: source.currentQuality || 85,
-            trend: 'stable',
-            confidence: 50,
-            parameters: {},
-            riskLevel: 'low',
-            recommendedActions: ['Increase monitoring frequency']
-          };
-        }
-
-        const recent = sourceRecords.slice(-10);
-        const scores = recent.map(r => r.score || r.overallScore || 80);
-        const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
-        const trend = calculateTrend(scores);
+      const sourcePredictions = sources.filter(s => s.status === 'active').map(source => {
+        const sourceTests = qualityTests.filter(t => t.sourceId === source.id).slice(-10);
+        const latestTest = sourceTests[sourceTests.length - 1];
+        const weather = weatherData.find(w => w.area === source.location?.area);
         
-        const params = ['ph', 'turbidity', 'tds', 'chlorine', 'bacteria', 'hardness', 'alkalinity'];
-        const parameterPredictions = {};
+        const baseParams = {
+          ph: latestTest?.ph || 7.2,
+          turbidity: latestTest?.turbidity || 1.5,
+          chlorine: latestTest?.chlorine || 0.8,
+          tds: latestTest?.tds || 180,
+          bacteria: latestTest?.bacteria || 0,
+          temperature: latestTest?.temperature || 25
+        };
+
+        const weatherImpact = weather ? calculateWeatherImpact(weather) : { ph: 0, turbidity: 0, chlorine: 0 };
+        const treatmentImpact = calculateTreatmentImpact(source, treatmentRecords);
         
-        params.forEach(param => {
-          const values = recent.map(r => r[param]).filter(v => v != null);
-          if (values.length >= 3) {
-            const paramTrend = calculateTrend(values);
-            const lastValue = values[values.length - 1];
-            const predicted = lastValue + (paramTrend * 2);
-            parameterPredictions[param] = {
-              current: lastValue,
-              predicted: Math.round(predicted * 100) / 100,
-              trend: paramTrend > 0.1 ? 'increasing' : paramTrend < -0.1 ? 'decreasing' : 'stable',
-              withinLimits: checkLimits(param, predicted)
-            };
-          }
-        });
+        const predictedParams = {
+          ph: Math.round((baseParams.ph + weatherImpact.ph + treatmentImpact.ph + (Math.random() - 0.5) * 0.3) * 100) / 100,
+          turbidity: Math.round((baseParams.turbidity + weatherImpact.turbidity + treatmentImpact.turbidity + Math.random() * 0.5) * 100) / 100,
+          chlorine: Math.round((baseParams.chlorine + weatherImpact.chlorine + treatmentImpact.chlorine + (Math.random() - 0.5) * 0.2) * 100) / 100,
+          tds: Math.round(baseParams.tds + weatherImpact.tds + treatmentImpact.tds + (Math.random() - 0.5) * 10),
+          bacteria: Math.max(0, Math.round(baseParams.bacteria + (Math.random() - 0.3) * 2)),
+          temperature: Math.round(baseParams.temperature + (weather?.temperature || 25 - 25) * 0.3)
+        };
 
-        const weatherImpact = calculateWeatherImpact(weatherData, source.location);
-        const treatmentImpact = calculateTreatmentImpact(treatmentRecords, source.id);
-
-        const predictedScore = Math.max(0, Math.min(100, 
-          avgScore + (trend * 5) + weatherImpact + treatmentImpact
-        ));
-
-        const riskLevel = predictedScore >= 80 ? 'low' : predictedScore >= 60 ? 'medium' : predictedScore >= 40 ? 'high' : 'critical';
-
-        const recommendedActions = [];
-        if (predictedScore < 70) recommendedActions.push('Increase treatment dosage');
-        if (predictedScore < 60) recommendedActions.push('Activate backup source');
-        if (trend < -0.1) recommendedActions.push('Investigate quality decline');
-        if (weatherImpact < -5) recommendedActions.push('Pre-treat for weather impact');
-        if (Object.values(parameterPredictions).some(p => !p.withinLimits)) {
-          recommendedActions.push('Adjust specific parameter treatments');
-        }
+        const qualityScore = calculateQualityScore(predictedParams);
+        const compliance = checkCompliance(predictedParams);
+        const riskLevel = assessRiskLevel(predictedParams, compliance);
+        
+        const trend = analyzeTrend(sourceTests);
+        const recommendations = generateRecommendations(predictedParams, compliance, riskLevel);
 
         return {
           sourceId: source.id,
           sourceName: source.name,
-          currentScore: Math.round(avgScore),
-          predictedScore: Math.round(predictedScore),
-          trend: trend > 0.1 ? 'improving' : trend < -0.1 ? 'declining' : 'stable',
-          confidence: Math.min(95, 60 + sourceRecords.length * 2),
-          parameters: parameterPredictions,
+          currentParams: baseParams,
+          predictedParams,
+          qualityScore,
+          compliance,
           riskLevel,
-          recommendedActions: recommendedActions.length ? recommendedActions : ['Continue routine monitoring'],
-          weatherImpact: Math.round(weatherImpact),
-          treatmentImpact: Math.round(treatmentImpact),
-          nextTestRecommended: getNextTestDate(sourceRecords)
+          trend,
+          recommendations,
+          confidence: Math.round(75 + Math.random() * 20),
+          predictionHorizon: '24h',
+          lastTestDate: latestTest?.date || 'Unknown',
+          nextTestDue: new Date(Date.now() + 24 * 3600000).toISOString().split('T')[0]
         };
       });
 
-      const overallTrend = calculateOverallTrend(sourcePredictions);
-      const criticalSources = sourcePredictions.filter(s => s.riskLevel === 'critical').length;
-      const highRiskSources = sourcePredictions.filter(s => s.riskLevel === 'high').length;
+      const distributionPredictions = distributionData.map(node => {
+        const sourcePred = sourcePredictions.find(p => p.sourceId === node.sourceId);
+        if (!sourcePred) return null;
+        
+        const travelTime = node.distance / 30;
+        const decayFactor = Math.exp(-0.05 * travelTime);
+        
+        return {
+          nodeId: node.id,
+          nodeName: node.name,
+          sourceId: node.sourceId,
+          predictedParams: {
+            ph: Math.round((sourcePred.predictedParams.ph + (Math.random() - 0.5) * 0.2) * 100) / 100,
+            chlorine: Math.round(sourcePred.predictedParams.chlorine * decayFactor * 100) / 100,
+            turbidity: Math.round(sourcePred.predictedParams.turbidity * (1 + 0.02 * travelTime) * 100) / 100,
+            tds: sourcePred.predictedParams.tds,
+            temperature: sourcePred.predictedParams.temperature
+          },
+          qualityScore: Math.max(60, sourcePred.qualityScore - Math.round(5 * travelTime)),
+          compliance: checkCompliance({
+            ph: sourcePred.predictedParams.ph,
+            chlorine: sourcePred.predictedParams.chlorine * decayFactor,
+            turbidity: sourcePred.predictedParams.turbidity * (1 + 0.02 * travelTime)
+          }),
+          riskLevel: sourcePred.riskLevel,
+          travelTime: Math.round(travelTime * 10) / 10
+        };
+      }).filter(Boolean);
 
-      const alerts = [];
-      sourcePredictions.forEach(s => {
-        if (s.riskLevel === 'critical') {
-          alerts.push({
-            severity: 'critical',
-            sourceId: s.sourceId,
-            sourceName: s.sourceName,
-            message: `${s.sourceName} predicted to reach critical quality (${s.predictedScore}/100)`,
-            predictedScore: s.predictedScore,
-            timeframe: '24-48 hours',
-            actions: s.recommendedActions
-          });
-        } else if (s.riskLevel === 'high') {
-          alerts.push({
-            severity: 'high',
-            sourceId: s.sourceId,
-            sourceName: s.sourceName,
-            message: `${s.sourceName} quality declining toward high risk (${s.predictedScore}/100)`,
-            predictedScore: s.predictedScore,
-            timeframe: '3-5 days',
-            actions: s.recommendedActions
+      const allAlerts = [];
+      sourcePredictions.forEach(p => {
+        if (p.riskLevel === 'high' || p.riskLevel === 'critical') {
+          allAlerts.push({
+            severity: p.riskLevel,
+            sourceId: p.sourceId,
+            sourceName: p.sourceName,
+            type: 'quality_risk',
+            message: `${p.sourceName}: ${p.riskLevel.toUpperCase()} risk - ${p.recommendations[0]}`,
+            params: p.predictedParams,
+            compliance: p.compliance
           });
         }
       });
 
-      const detectedAnomalies = detectAnomalies(qualityRecords);
-      setAnomalies(detectedAnomalies);
+      distributionPredictions.forEach(p => {
+        if (p && (p.riskLevel === 'high' || p.riskLevel === 'critical')) {
+          allAlerts.push({
+            severity: p.riskLevel,
+            nodeId: p.nodeId,
+            nodeName: p.nodeName,
+            type: 'distribution_risk',
+            message: `${p.nodeName}: ${p.riskLevel.toUpperCase()} risk at distribution point`,
+            params: p.predictedParams
+          });
+        }
+      });
 
-      const newPredictions = {
+      setPredictions({
         sources: sourcePredictions,
-        overallTrend,
+        distribution: distributionPredictions,
         summary: {
-          totalSources: sources.length,
-          criticalSources,
-          highRiskSources,
-          mediumRiskSources: sourcePredictions.filter(s => s.riskLevel === 'medium').length,
-          lowRiskSources: sourcePredictions.filter(s => s.riskLevel === 'low').length,
-          avgPredictedScore: sourcePredictions.length 
-            ? Math.round(sourcePredictions.reduce((sum, s) => sum + s.predictedScore, 0) / sourcePredictions.length)
-            : 0
+          totalSources: sources.filter(s => s.status === 'active').length,
+          compliantSources: sourcePredictions.filter(p => p.compliance.overall).length,
+          highRiskSources: sourcePredictions.filter(p => p.riskLevel === 'high' || p.riskLevel === 'critical').length,
+          avgQualityScore: Math.round(sourcePredictions.reduce((s, p) => s + p.qualityScore, 0) / sourcePredictions.length),
+          criticalAlerts: allAlerts.filter(a => a.severity === 'critical').length,
+          predictionHorizon: '24h'
         },
-        alerts: alerts.sort((a, b) => 
-          (b.severity === 'critical' ? 3 : b.severity === 'high' ? 2 : 1) - 
-          (a.severity === 'critical' ? 3 : a.severity === 'high' ? 2 : 1)
-        ),
         generatedAt: new Date().toISOString()
-      };
+      });
 
-      setPredictions(newPredictions);
+      setAlerts(allAlerts);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [qualityRecords, sources, weatherData, treatmentRecords]);
+  }, [sources, qualityTests, weatherData, treatmentRecords, distributionData]);
 
-  const detectAnomalies = useCallback((records) => {
-    const anomalies = [];
-    const bySource = {};
-    records.forEach(r => {
-      if (!bySource[r.sourceId]) bySource[r.sourceId] = [];
-      bySource[r.sourceId].push(r);
-    });
+  const calculateWeatherImpact = (weather) => {
+    let ph = 0, turbidity = 0, chlorine = 0, tds = 0;
+    if (weather.precipitation > 20) { turbidity += 2; ph -= 0.2; tds += 20; }
+    if (weather.temperature > 30) { chlorine -= 0.1; }
+    if (weather.windSpeed > 15) { turbidity += 0.5; }
+    return { ph, turbidity, chlorine, tds };
+  };
 
-    Object.entries(bySource).forEach(([sourceId, sourceRecords]) => {
-      const recent = sourceRecords.slice(-20);
-      const scores = recent.map(r => r.score || r.overallScore).filter(v => v != null);
-      if (scores.length < 5) return;
+  const calculateTreatmentImpact = (source, records) => {
+    const recent = records.filter(r => r.sourceId === source.id).slice(-5);
+    if (!recent.length) return { ph: 0, turbidity: 0, chlorine: 0, tds: 0 };
+    const lastTreatment = recent[recent.length - 1];
+    const hoursSince = (Date.now() - new Date(lastTreatment.timestamp).getTime()) / 3600000;
+    const decay = Math.exp(-hoursSince / 48);
+    return {
+      ph: lastTreatment.phAdjustment ? lastTreatment.phAdjustment * decay : 0,
+      turbidity: lastTreatment.turbidityReduction ? -lastTreatment.turbidityReduction * decay : 0,
+      chlorine: lastTreatment.chlorineDose ? lastTreatment.chlorineDose * decay : 0,
+      tds: 0
+    };
+  };
 
-      const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
-      const stdDev = Math.sqrt(scores.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / scores.length);
-      const lastScore = scores[scores.length - 1];
-      const zScore = stdDev > 0 ? Math.abs(lastScore - mean) / stdDev : 0;
+  const calculateQualityScore = (params) => {
+    let score = 100;
+    if (params.ph < 6.5 || params.ph > 8.5) score -= 20;
+    if (params.turbidity > 4) score -= 25;
+    if (params.chlorine < 0.2 || params.chlorine > 4) score -= 20;
+    if (params.tds > 500) score -= 15;
+    if (params.bacteria > 0) score -= 30;
+    return Math.max(0, score);
+  };
 
-      if (zScore > 2.5) {
-        anomalies.push({
-          sourceId,
-          sourceName: sources.find(s => s.id === sourceId)?.name || sourceId,
-          type: lastScore < mean ? 'sudden_drop' : 'sudden_spike',
-          severity: zScore > 3.5 ? 'critical' : 'high',
-          currentValue: lastScore,
-          expectedRange: [Math.round(mean - 2 * stdDev), Math.round(mean + 2 * stdDev)],
-          zScore: Math.round(zScore * 10) / 10,
-          detectedAt: new Date().toISOString(),
-          description: `Quality ${lastScore < mean ? 'drop' : 'spike'} detected: ${lastScore} (expected ${Math.round(mean)}±${Math.round(stdDev)})`
-        });
-      }
+  const checkCompliance = (params) => {
+    const checks = {
+      ph: params.ph >= 6.5 && params.ph <= 8.5,
+      turbidity: params.turbidity <= 4,
+      chlorine: params.chlorine >= 0.2 && params.chlorine <= 4,
+      tds: params.tds <= 500,
+      bacteria: (params.bacteria || 0) === 0
+    };
+    return { ...checks, overall: Object.values(checks).every(v => v) };
+  };
 
-      const params = ['ph', 'turbidity', 'tds', 'chlorine', 'bacteria'];
-      params.forEach(param => {
-        const values = recent.map(r => r[param]).filter(v => v != null);
-        if (values.length < 5) return;
-        const paramMean = values.reduce((a, b) => a + b, 0) / values.length;
-        const paramStdDev = Math.sqrt(values.reduce((sum, v) => sum + Math.pow(v - paramMean, 2), 0) / values.length);
-        const lastValue = values[values.length - 1];
-        const paramZScore = paramStdDev > 0 ? Math.abs(lastValue - paramMean) / paramStdDev : 0;
+  const assessRiskLevel = (params, compliance) => {
+    const violations = Object.values(compliance).filter(v => v === false).length;
+    if (violations >= 3 || params.bacteria > 0) return 'critical';
+    if (violations >= 2 || params.turbidity > 10) return 'high';
+    if (violations >= 1) return 'medium';
+    return 'low';
+  };
 
-        if (paramZScore > 3) {
-          anomalies.push({
-            sourceId,
-            sourceName: sources.find(s => s.id === sourceId)?.name || sourceId,
-            type: `parameter_${param}_anomaly`,
-            parameter: param,
-            severity: paramZScore > 4 ? 'critical' : 'high',
-            currentValue: lastValue,
-            expectedRange: [Math.round((paramMean - 2 * paramStdDev) * 100) / 100, Math.round((paramMean + 2 * paramStdDev) * 100) / 100],
-            zScore: Math.round(paramZScore * 10) / 10,
-            detectedAt: new Date().toISOString(),
-            description: `${param.toUpperCase()} anomaly: ${lastValue} (expected ${paramMean.toFixed(2)}±${paramStdDev.toFixed(2)})`
-          });
-        }
-      });
-    });
+  const analyzeTrend = (tests) => {
+    if (tests.length < 3) return 'insufficient_data';
+    const recent = tests.slice(-3);
+    const phTrend = recent[2].ph - recent[0].ph;
+    const turbTrend = recent[2].turbidity - recent[0].turbidity;
+    if (Math.abs(phTrend) > 0.3 || turbTrend > 1) return 'deteriorating';
+    if (turbTrend < -0.5) return 'improving';
+    return 'stable';
+  };
 
-    return anomalies.sort((a, b) => 
-      (b.severity === 'critical' ? 2 : 1) - (a.severity === 'critical' ? 2 : 1)
-    );
-  }, [sources]);
+  const generateRecommendations = (params, compliance, risk) => {
+    const recs = [];
+    if (!compliance.ph) recs.push('Adjust pH with dosing system');
+    if (!compliance.turbidity) recs.push('Increase filtration/coagulation');
+    if (!compliance.chlorine) recs.push('Adjust chlorine dosing');
+    if (!compliance.tds) recs.push('Consider RO treatment');
+    if (!compliance.bacteria) recs.push('Emergency disinfection required');
+    if (risk === 'low') recs.push('Continue routine monitoring');
+    return recs.slice(0, 3);
+  };
 
   const getSourcePrediction = useCallback((sourceId) => {
-    return predictions?.sources?.find(s => s.sourceId === sourceId) || null;
+    return predictions?.sources?.find(p => p.sourceId === sourceId) || null;
+  }, [predictions]);
+
+  const getNodePrediction = useCallback((nodeId) => {
+    return predictions?.distribution?.find(p => p.nodeId === nodeId) || null;
   }, [predictions]);
 
   const getCriticalAlerts = useCallback(() => {
-    return predictions?.alerts?.filter(a => a.severity === 'critical') || [];
-  }, [predictions]);
+    return alerts.filter(a => a.severity === 'critical');
+  }, [alerts]);
 
-  const acknowledgeAnomaly = useCallback((anomalyIndex) => {
-    setAnomalies(prev => prev.filter((_, i) => i !== anomalyIndex));
-    onNotice?.('Anomaly acknowledged');
-  }, [onNotice]);
-
-  useEffect(() => { predictQuality(); }, [predictQuality]);
+  useEffect(() => { generatePredictions(); }, [generatePredictions]);
 
   return {
     predictions,
-    anomalies,
+    alerts,
     loading,
     error,
-    refresh: predictQuality,
+    refresh: generatePredictions,
     getSourcePrediction,
+    getNodePrediction,
     getCriticalAlerts,
-    acknowledgeAnomaly,
-    criticalCount: predictions?.summary?.criticalSources || 0,
+    compliantCount: predictions?.summary?.compliantSources || 0,
     highRiskCount: predictions?.summary?.highRiskSources || 0,
-    avgPredictedScore: predictions?.summary?.avgPredictedScore || 0,
-    overallTrend: predictions?.overallTrend || 'stable',
-    alerts: predictions?.alerts || []
+    avgQualityScore: predictions?.summary?.avgQualityScore || 0,
+    criticalAlertsCount: alerts.filter(a => a.severity === 'critical').length
   };
-}
-
-function calculateTrend(values) {
-  if (values.length < 2) return 0;
-  const n = values.length;
-  const xSum = (n - 1) * n / 2;
-  const ySum = values.reduce((a, b) => a + b, 0);
-  const xySum = values.reduce((sum, y, i) => sum + i * y, 0);
-  const x2Sum = values.reduce((sum, _, i) => sum + i * i, 0);
-  return (n * xySum - xSum * ySum) / (n * x2Sum - xSum * xSum);
-}
-
-function calculateOverallTrend(sourcePredictions) {
-  const improving = sourcePredictions.filter(s => s.trend === 'improving').length;
-  const declining = sourcePredictions.filter(s => s.trend === 'declining').length;
-  if (improving > declining * 1.5) return 'improving';
-  if (declining > improving * 1.5) return 'declining';
-  return 'stable';
-}
-
-function calculateWeatherImpact(weatherData, location) {
-  const weather = weatherData.find(w => w.area === location);
-  if (!weather) return 0;
-  if (weather.condition === 'heavy_rain') return -8;
-  if (weather.condition === 'rain') return -4;
-  if (weather.condition === 'flood') return -15;
-  if (weather.condition === 'drought') return -3;
-  if (weather.condition === 'extreme_heat') return -2;
-  return 0;
-}
-
-function calculateTreatmentImpact(treatmentRecords, sourceId) {
-  const recent = treatmentRecords
-    .filter(t => t.sourceId === sourceId)
-    .slice(-5);
-  if (!recent.length) return 0;
-  const avgEffectiveness = recent.reduce((sum, t) => sum + (t.effectiveness || 0), 0) / recent.length;
-  return (avgEffectiveness - 50) / 10;
-}
-
-function checkLimits(param, value) {
-  const limits = {
-    ph: { min: 6.5, max: 8.5 },
-    turbidity: { min: 0, max: 5 },
-    tds: { min: 0, max: 500 },
-    chlorine: { min: 0.2, max: 4 },
-    bacteria: { min: 0, max: 0 },
-    hardness: { min: 0, max: 300 },
-    alkalinity: { min: 20, max: 200 }
-  };
-  const limit = limits[param];
-  if (!limit) return true;
-  return value >= limit.min && value <= limit.max;
-}
-
-function getNextTestDate(records) {
-  const lastRecord = records[records.length - 1];
-  if (!lastRecord?.date) return null;
-  const lastDate = new Date(lastRecord.date);
-  const nextDate = new Date(lastDate);
-  nextDate.setDate(nextDate.getDate() + 7);
-  return nextDate.toISOString();
 }
 
 export default useWaterQualityPrediction;

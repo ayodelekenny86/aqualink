@@ -1,207 +1,149 @@
 import React, { useState } from 'react';
 
 export function WaterQualityPredictionPanel({ 
-  qualityRecords = [], 
-  sources = [],
+  sources = [], 
+  qualityTests = [],
   weatherData = [],
   treatmentRecords = [],
+  distributionData = [],
   onNotice 
 }) {
-  const [activeTab, setActiveTab] = useState('predictions');
+  const [activeTab, setActiveTab] = useState('sources');
+  const [filterRisk, setFilterRisk] = useState('all');
 
   const { 
-    predictions, anomalies, loading, error, refresh,
-    criticalCount, highRiskCount, avgPredictedScore, overallTrend, alerts,
-    getSourcePrediction
+    predictions, alerts, loading, error, refresh,
+    getSourcePrediction, getNodePrediction, getCriticalAlerts,
+    compliantCount, highRiskCount, avgQualityScore, criticalAlertsCount
   } = React.useMemo(() => {
-    const sourcePredictions = sources.map(source => {
-      const sourceRecords = qualityRecords.filter(r => r.sourceId === source.id);
-      const avgScore = sourceRecords.length
-        ? sourceRecords.reduce((sum, r) => sum + (r.score || 80), 0) / sourceRecords.length
-        : 85;
-      const trend = sourceRecords.length > 5 ? 'stable' : 'insufficient_data';
-      
-      return {
-        sourceId: source.id,
-        sourceName: source.name,
-        currentScore: Math.round(avgScore),
-        predictedScore: Math.round(avgScore + (Math.random() - 0.5) * 10),
-        trend: trend === 'stable' ? (Math.random() > 0.5 ? 'improving' : 'declining') : 'stable',
-        confidence: Math.min(95, 60 + sourceRecords.length * 3),
-        riskLevel: avgScore >= 80 ? 'low' : avgScore >= 60 ? 'medium' : 'high',
-        parameters: {
-          ph: { current: 7.2, predicted: 7.1, trend: 'stable', withinLimits: true },
-          turbidity: { current: 2.1, predicted: 2.3, trend: 'increasing', withinLimits: true },
-          tds: { current: 180, predicted: 185, trend: 'stable', withinLimits: true },
-          chlorine: { current: 1.2, predicted: 1.1, trend: 'stable', withinLimits: true }
-        }
-      };
-    });
+    const mockSources = sources.filter(s => s.status === 'active').slice(0, 8).map((s, i) => ({
+      sourceId: s.id,
+      sourceName: s.name,
+      currentParams: { ph: 7.2, turbidity: 1.5, chlorine: 0.8, tds: 180, bacteria: 0, temperature: 25 },
+      predictedParams: { 
+        ph: Math.round((7.0 + Math.random() * 0.5) * 100) / 100,
+        turbidity: Math.round((0.5 + Math.random() * 2) * 100) / 100,
+        chlorine: Math.round((0.5 + Math.random() * 1) * 100) / 100,
+        tds: Math.round(150 + Math.random() * 100),
+        bacteria: Math.random() > 0.95 ? 1 : 0,
+        temperature: Math.round(22 + Math.random() * 6)
+      },
+      qualityScore: Math.floor(70 + Math.random() * 30),
+      compliance: { ph: true, turbidity: Math.random() > 0.1, chlorine: true, tds: true, bacteria: Math.random() > 0.05, overall: Math.random() > 0.1 },
+      riskLevel: Math.random() > 0.8 ? 'high' : Math.random() > 0.5 ? 'medium' : 'low',
+      trend: Math.random() > 0.7 ? 'improving' : Math.random() > 0.4 ? 'stable' : 'deteriorating',
+      recommendations: ['Continue monitoring', 'Adjust chlorine dosing'],
+      confidence: Math.round(80 + Math.random() * 15),
+      lastTestDate: new Date(Date.now() - Math.random() * 7 * 86400000).toISOString().split('T')[0]
+    }));
 
-    const mockAnomalies = [];
-    if (sources.length > 0) {
-      mockAnomalies.push({
-        sourceId: sources[0].id,
-        sourceName: sources[0].name,
-        type: 'sudden_drop',
-        severity: 'high',
-        currentValue: 72,
-        expectedRange: [78, 88],
-        detectedAt: new Date().toISOString()
-      });
-    }
+    const mockAlerts = mockSources.filter(s => s.riskLevel === 'high' || s.riskLevel === 'critical').map(s => ({
+      severity: s.riskLevel,
+      sourceId: s.sourceId,
+      sourceName: s.sourceName,
+      type: 'quality_risk',
+      message: `${s.sourceName}: ${s.riskLevel.toUpperCase()} risk - ${s.recommendations[0]}`,
+      params: s.predictedParams,
+      compliance: s.compliance
+    }));
 
     return {
-      predictions: {
-        sources: sourcePredictions,
-        summary: {
-          totalSources: sources.length,
-          criticalSources: sourcePredictions.filter(s => s.riskLevel === 'critical').length,
-          highRiskSources: sourcePredictions.filter(s => s.riskLevel === 'high').length,
-          avgPredictedScore: Math.round(sourcePredictions.reduce((sum, s) => sum + s.predictedScore, 0) / (sourcePredictions.length || 1))
-        },
-        alerts: sourcePredictions
-          .filter(s => s.riskLevel === 'critical' || s.riskLevel === 'high')
-          .map(s => ({
-            severity: s.riskLevel === 'critical' ? 'critical' : 'high',
-            sourceName: s.sourceName,
-            message: `${s.sourceName} predicted at ${s.predictedScore}/100 (${s.riskLevel} risk)`
-          }))
-      },
-      anomalies: mockAnomalies,
+      predictions: { sources: mockSources, distribution: [], summary: { totalSources: mockSources.length, compliantSources: mockSources.filter(p => p.compliance.overall).length, highRiskSources: mockSources.filter(p => p.riskLevel === 'high' || p.riskLevel === 'critical').length, avgQualityScore: Math.round(mockSources.reduce((s, p) => s + p.qualityScore, 0) / mockSources.length) } },
+      alerts: mockAlerts,
       loading: false, error: null, refresh: () => {},
-      criticalCount: sourcePredictions.filter(s => s.riskLevel === 'critical').length,
-      highRiskCount: sourcePredictions.filter(s => s.riskLevel === 'high').length,
-      avgPredictedScore: Math.round(sourcePredictions.reduce((sum, s) => sum + s.predictedScore, 0) / (sourcePredictions.length || 1)),
-      overallTrend: 'stable',
-      alerts: sourcePredictions.filter(s => s.riskLevel === 'high' || s.riskLevel === 'critical').map(s => ({
-        severity: s.riskLevel === 'critical' ? 'critical' : 'high',
-        sourceName: s.sourceName,
-        message: `${s.sourceName} predicted at ${s.predictedScore}/100`
-      })),
-      getSourcePrediction: (id) => sourcePredictions.find(s => s.sourceId === id)
+      getSourcePrediction: (id) => mockSources.find(p => p.sourceId === id),
+      getNodePrediction: (id) => null,
+      getCriticalAlerts: () => mockAlerts.filter(a => a.severity === 'critical'),
+      compliantCount: mockSources.filter(p => p.compliance.overall).length,
+      highRiskCount: mockSources.filter(p => p.riskLevel === 'high' || p.riskLevel === 'critical').length,
+      avgQualityScore: Math.round(mockSources.reduce((s, p) => s + p.qualityScore, 0) / mockSources.length),
+      criticalAlertsCount: mockAlerts.filter(a => a.severity === 'critical').length
     };
-  }, [qualityRecords, sources, weatherData, treatmentRecords]);
+  }, [sources, qualityTests, weatherData, treatmentRecords, distributionData]);
 
   if (loading) return <div className="panel-loading">Predicting water quality...</div>;
   if (error) return <div className="panel-error">Error: {error}</div>;
 
+  const filteredSources = predictions?.sources?.filter(s => 
+    filterRisk === 'all' || s.riskLevel === filterRisk
+  ) || [];
+
   return (
-    <div className="water-quality-prediction-panel">
+    <div className="water-quality-panel">
       <div className="panel-header">
         <h3>Water Quality Prediction</h3>
         <button className="btn-refresh" onClick={refresh} disabled={loading}>↻ Refresh</button>
       </div>
 
-      <div className="prediction-summary">
-        <div className="metric-card">
-          <h4>Avg Predicted Score</h4>
-          <div className="metric-value">{avgPredictedScore}/100</div>
-        </div>
-        <div className="metric-card">
-          <h4>Overall Trend</h4>
-          <div className="metric-value trend">{overallTrend.toUpperCase()}</div>
-        </div>
-        <div className="metric-card">
-          <h4>Critical Sources</h4>
-          <div className="metric-value critical">{criticalCount}</div>
-        </div>
-        <div className="metric-card">
-          <h4>High Risk</h4>
-          <div className="metric-value warning">{highRiskCount}</div>
-        </div>
+      <div className="quality-metrics">
+        <div className="metric-card"><h4>Sources Monitored</h4><div className="metric-value">{predictions?.summary?.totalSources || 0}</div></div>
+        <div className="metric-card"><h4>Compliant</h4><div className="metric-value success">{compliantCount}</div></div>
+        <div className="metric-card"><h4>High Risk</h4><div className="metric-value warning">{highRiskCount}</div></div>
+        <div className="metric-card"><h4>Avg Quality Score</h4><div className="metric-value">{avgQualityScore}/100</div></div>
+        <div className="metric-card"><h4>Critical Alerts</h4><div className="metric-value critical">{criticalAlertsCount}</div></div>
       </div>
 
-      <div className="prediction-tabs">
-        <button className={activeTab === 'predictions' ? 'active' : ''} onClick={() => setActiveTab('predictions')}>Predictions</button>
-        <button className={activeTab === 'anomalies' ? 'active' : ''} onClick={() => setActiveTab('anomalies')}>Anomalies ({anomalies.length})</button>
+      <div className="quality-tabs">
+        <button className={activeTab === 'sources' ? 'active' : ''} onClick={() => setActiveTab('sources')}>Sources</button>
+        <button className={activeTab === 'distribution' ? 'active' : ''} onClick={() => setActiveTab('distribution')}>Distribution</button>
         <button className={activeTab === 'alerts' ? 'active' : ''} onClick={() => setActiveTab('alerts')}>Alerts ({alerts.length})</button>
       </div>
 
-      {activeTab === 'predictions' && (
-        <div className="predictions-table">
-          <table>
-            <thead>
-              <tr><th>Source</th><th>Current</th><th>Predicted</th><th>Trend</th><th>Confidence</th><th>Risk</th><th>Actions</th></tr>
-            </thead>
-            <tbody>
-              {predictions?.sources?.map(s => (
-                <tr key={s.sourceId} className={s.riskLevel}>
-                  <td>{s.sourceName}</td>
-                  <td>{s.currentScore}</td>
-                  <td><strong>{s.predictedScore}</strong></td>
-                  <td><span className={`trend-${s.trend}`}>{s.trend}</span></td>
-                  <td>{s.confidence}%</td>
-                  <td><span className={`risk-badge ${s.riskLevel}`}>{s.riskLevel.toUpperCase()}</span></td>
-                  <td>
-                    {s.recommendedActions?.map((a, i) => (
-                      <span key={i} className="action-tag">{a}</span>
-                    ))}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <div className="risk-filter">
+        <select value={filterRisk} onChange={e => setFilterRisk(e.target.value)}>
+          <option value="all">All Risk Levels</option>
+          <option value="critical">Critical</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
 
-      {activeTab === 'anomalies' && (
-        <div className="anomalies-list">
-          {anomalies.length === 0 ? (
-            <div className="no-data">No anomalies detected</div>
-          ) : (
-            anomalies.map((anomaly, i) => (
-              <div key={i} className={`anomaly-card ${anomaly.severity}`}>
-                <div className="anomaly-header">
-                  <span className={`severity-badge ${anomaly.severity}`}>{anomaly.severity.toUpperCase()}</span>
-                  <h4>{anomaly.sourceName}</h4>
-                </div>
-                <p>{anomaly.description}</p>
-                <div className="anomaly-details">
-                  <span>Current: {anomaly.currentValue}</span>
-                  <span>Expected: {anomaly.expectedRange.join(' - ')}</span>
-                  <span>Z-Score: {anomaly.zScore}</span>
-                </div>
+      {activeTab === 'sources' && (
+        <div className="sources-grid">
+          {filteredSources.map(source => (
+            <div key={source.sourceId} className={`source-card ${source.riskLevel}`}>
+              <div className="source-header">
+                <h4>{source.sourceName}</h4>
+                <span className={`risk-badge ${source.riskLevel}`}>{source.riskLevel.toUpperCase()}</span>
               </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {activeTab === 'alerts' && (
-        <div className="alerts-list">
-          {alerts.map((alert, i) => (
-            <div key={i} className={`alert-card ${alert.severity}`}>
-              <span className={`severity-badge ${alert.severity}`}>{alert.severity.toUpperCase()}</span>
-              <strong>{alert.sourceName}</strong>
-              <p>{alert.message}</p>
+              <div className="quality-score">Score: {source.qualityScore}/100</div>
+              <div className="params-grid">
+                <div className="param"><span>pH</span><strong>{source.predictedParams.ph}</strong> {source.compliance.ph ? '✓' : '✗'}</div>
+                <div className="param"><span>Turbidity</span><strong>{source.predictedParams.turbidity} NTU</strong> {source.compliance.turbidity ? '✓' : '✗'}</div>
+                <div className="param"><span>Chlorine</span><strong>{source.predictedParams.chlorine} mg/L</strong> {source.compliance.chlorine ? '✓' : '✗'}</div>
+                <div className="param"><span>TDS</span><strong>{source.predictedParams.tds} ppm</strong> {source.compliance.tds ? '✓' : '✗'}</div>
+                <div className="param"><span>Bacteria</span><strong>{source.predictedParams.bacteria} CFU</strong> {source.compliance.bacteria ? '✓' : '✗'}</div>
+              </div>
+              <div className="trend">Trend: {source.trend}</div>
+              <div className="recommendations">
+                {source.recommendations?.map((r, i) => <div key={i} className="rec-item">• {r}</div>)}
+              </div>
             </div>
           ))}
         </div>
       )}
 
-      {predictions?.sources && (
-        <div className="parameter-details">
-          <h4>Parameter Predictions (Sample)</h4>
-          <table>
-            <thead>
-              <tr><th>Source</th><th>Parameter</th><th>Current</th><th>Predicted</th><th>Trend</th><th>Within Limits</th></tr>
-            </thead>
-            <tbody>
-              {predictions.sources.slice(0, 3).flatMap(s => 
-                Object.entries(s.parameters).map(([param, data]) => (
-                  <tr key={`${s.sourceId}-${param}`}>
-                    <td>{s.sourceName}</td>
-                    <td>{param.toUpperCase()}</td>
-                    <td>{data.current}</td>
-                    <td>{data.predicted}</td>
-                    <td><span className={`trend-${data.trend}`}>{data.trend}</span></td>
-                    <td>{data.withinLimits ? '✓' : '✗'}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+      {activeTab === 'distribution' && (
+        <div className="distribution-nodes">
+          <p>Distribution node predictions would appear here</p>
+        </div>
+      )}
+
+      {activeTab === 'alerts' && (
+        <div className="quality-alerts">
+          {alerts.map((alert, i) => (
+            <div key={i} className={`alert-card ${alert.severity}`}>
+              <div className="alert-header">
+                <span className={`severity-badge ${alert.severity}`}>{alert.severity.toUpperCase()}</span>
+                <strong>{alert.sourceName}</strong>
+              </div>
+              <p>{alert.message}</p>
+              <div className="alert-params">
+                pH: {alert.params.ph} | Turbidity: {alert.params.turbidity} | Chlorine: {alert.params.chlorine}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
