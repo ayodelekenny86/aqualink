@@ -179,24 +179,24 @@ describe('account status and lockout', () => {
 
 describe('password sign-in', () => {
   beforeEach(async () => {
-    await createAccount({ identifier: 'ops@aqualink.gh', role: 'ops', password: PASSWORD });
+    await createAccount({ identifier: 'ops@nautica.gh', role: 'ops', password: PASSWORD });
   });
 
   test('accepts the right password and records the login', async () => {
-    const result = await authenticateWithPassword('ops@aqualink.gh', PASSWORD);
+    const result = await authenticateWithPassword('ops@nautica.gh', PASSWORD);
     expect(result.ok).toBe(true);
     expect(result.account.lastLoginAt).toBeTruthy();
     expect(result.account.failedAttempts).toBe(0);
   });
 
   test('is case-insensitive about the identifier but not the password', async () => {
-    await expect(authenticateWithPassword('  OPS@AQUALINK.GH ', PASSWORD)).resolves.toMatchObject({ ok: true });
-    await expect(authenticateWithPassword('ops@aqualink.gh', 'CORRECT-HORSE-BATTERY')).resolves.toMatchObject({ ok: false });
+    await expect(authenticateWithPassword('  OPS@NAUTICA.GH ', PASSWORD)).resolves.toMatchObject({ ok: true });
+    await expect(authenticateWithPassword('ops@nautica.gh', 'CORRECT-HORSE-BATTERY')).resolves.toMatchObject({ ok: false });
   });
 
   test('gives the same reason for an unknown account and a wrong password', async () => {
     const unknown = await authenticateWithPassword('nobody@example.com', PASSWORD);
-    const wrong = await authenticateWithPassword('ops@aqualink.gh', 'wrong');
+    const wrong = await authenticateWithPassword('ops@nautica.gh', 'wrong');
     expect(unknown.reason).toBe('invalid');
     expect(wrong.reason).toBe('invalid');
     // Details may differ for usability, but the machine-readable reason must not.
@@ -205,26 +205,26 @@ describe('password sign-in', () => {
 
   test('counts down remaining attempts then locks the account', async () => {
     for (let attempt = 1; attempt < MAX_FAILED_ATTEMPTS; attempt += 1) {
-      const result = await authenticateWithPassword('ops@aqualink.gh', `wrong-${attempt}`);
+      const result = await authenticateWithPassword('ops@nautica.gh', `wrong-${attempt}`);
       expect(result.ok).toBe(false);
       expect(result.detail).toMatch(/attempt\(s\) left/);
     }
 
-    const locked = await authenticateWithPassword('ops@aqualink.gh', 'wrong-final');
+    const locked = await authenticateWithPassword('ops@nautica.gh', 'wrong-final');
     expect(locked.ok).toBe(false);
     expect(locked.detail).toMatch(/too many failed attempts/i);
 
     // Even the correct password is refused while locked.
-    const correct = await authenticateWithPassword('ops@aqualink.gh', PASSWORD);
+    const correct = await authenticateWithPassword('ops@nautica.gh', PASSWORD);
     expect(correct.ok).toBe(false);
-    expect(isAccountLocked(findAccount('ops@aqualink.gh'))).toBe(true);
+    expect(isAccountLocked(findAccount('ops@nautica.gh'))).toBe(true);
   });
 
   test('a successful login clears the failure counter', async () => {
-    await authenticateWithPassword('ops@aqualink.gh', 'wrong');
-    await authenticateWithPassword('ops@aqualink.gh', 'wrong');
-    await expect(authenticateWithPassword('ops@aqualink.gh', PASSWORD)).resolves.toMatchObject({ ok: true });
-    expect(findAccount('ops@aqualink.gh').failedAttempts).toBe(0);
+    await authenticateWithPassword('ops@nautica.gh', 'wrong');
+    await authenticateWithPassword('ops@nautica.gh', 'wrong');
+    await expect(authenticateWithPassword('ops@nautica.gh', PASSWORD)).resolves.toMatchObject({ ok: true });
+    expect(findAccount('ops@nautica.gh').failedAttempts).toBe(0);
   });
 
   test('refuses suspended accounts even with the right password', async () => {
@@ -312,15 +312,15 @@ describe('account provisioning', () => {
   });
 
   test('a registered password is hashed, never stored in the clear', async () => {
-    await registerAccount({ identifier: 'ops@aqualink.gh', role: 'ops', displayName: 'Operations', password: 'a-long-enough-password' });
+    await registerAccount({ identifier: 'ops@nautica.gh', role: 'ops', displayName: 'Operations', password: 'a-long-enough-password' });
     const raw = JSON.stringify(listAccounts());
     expect(raw).not.toContain('a-long-enough-password');
     expect(listAccounts()[0].passwordHash).toMatch(/^[0-9a-f]{64}$/);
   });
 
   test('a registered password actually authenticates', async () => {
-    await registerAccount({ identifier: 'ops@aqualink.gh', role: 'ops', password: 'a-long-enough-password' });
-    await expect(authenticateWithPassword('ops@aqualink.gh', 'a-long-enough-password')).resolves.toMatchObject({ ok: true });
+    await registerAccount({ identifier: 'ops@nautica.gh', role: 'ops', password: 'a-long-enough-password' });
+    await expect(authenticateWithPassword('ops@nautica.gh', 'a-long-enough-password')).resolves.toMatchObject({ ok: true });
   });
 });
 

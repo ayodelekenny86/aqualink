@@ -196,12 +196,12 @@ describe('ops session tokens', () => {
   });
 
   test('refuses a token signed with a different secret', () => {
-    const token = signOpsToken({ email: 'ops@aqualink.gh', secret: SECRET, now: NOW });
+    const token = signOpsToken({ email: 'ops@nautica.gh', secret: SECRET, now: NOW });
     expect(verifyOpsToken(token, 'another-secret', { now: NOW }).valid).toBe(false);
   });
 
   test('refuses a tampered payload', () => {
-    const token = signOpsToken({ email: 'ops@aqualink.gh', secret: SECRET, now: NOW });
+    const token = signOpsToken({ email: 'ops@nautica.gh', secret: SECRET, now: NOW });
     const [body, signature] = token.split('.');
     const forged = Buffer.from(JSON.stringify({ sub: 'attacker@evil.test', role: 'ops', exp: NOW / 1000 + 9999 }))
       .toString('base64')
