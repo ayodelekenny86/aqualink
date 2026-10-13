@@ -45,6 +45,10 @@ import CustomerChurnPredictionPanel from './components/CustomerChurnPredictionPa
 import RevenueOptimizationPanel from './components/RevenueOptimizationPanel';
 import QualityAssurancePanel from './components/QualityAssurancePanel';
 import FleetUtilizationPanel from './components/FleetUtilizationPanel';
+import MarketIntelligencePanel from './components/MarketIntelligencePanel';
+import EnergyOptimizationPanel from './components/EnergyOptimizationPanel';
+import SubscriptionManagementPanel from './components/SubscriptionManagementPanel';
+import SustainabilityTrackingPanel from './components/SustainabilityTrackingPanel';
 
 // Smart feature hooks
 import useSmartScheduling from './hooks/useSmartScheduling';
@@ -59,6 +63,10 @@ import { useCustomerChurnPrediction } from './hooks/useCustomerChurnPrediction';
 import { useRevenueOptimization } from './hooks/useRevenueOptimization';
 import { useQualityAssurance } from './hooks/useQualityAssurance';
 import { useFleetUtilization } from './hooks/useFleetUtilization';
+import { useMarketIntelligence } from './hooks/useMarketIntelligence';
+import { useEnergyOptimization } from './hooks/useEnergyOptimization';
+import { useSubscriptionManagement } from './hooks/useSubscriptionManagement';
+import { useSustainabilityTracking } from './hooks/useSustainabilityTracking';
 
 // Admin-only and overlay surfaces load on demand. A buyer who never opens the
 // admin console never downloads it, which keeps the initial bundle small.
@@ -319,6 +327,38 @@ function App() {
     zoneUtilization,
     recommendations: fleetRecommendations 
   } = useFleetUtilization({ fleetDrivers, orders, driverLocations, onNotice: showNotice });
+
+  // Additional advanced AI features
+  const { 
+    marketData, 
+    competitorAnalysis, 
+    pricingIntelligence, 
+    trendForecasts, 
+    summary: marketSummary 
+  } = useMarketIntelligence({ orders, customers: [], competitors: [], onNotice: showNotice });
+  const { 
+    energyData, 
+    efficiencyRecommendations, 
+    evTransitionPlan, 
+    carbonFootprint, 
+    summary: energySummary 
+  } = useEnergyOptimization({ fleetDrivers, orders, driverLocations, vehicles: [], onNotice: showNotice });
+  const { 
+    subscriptionData, 
+    churnRisk, 
+    upsellOpportunities, 
+    revenueForecast: subscriptionForecast, 
+    lifecycleMetrics, 
+    summary: subscriptionSummary 
+  } = useSubscriptionManagement({ customers: [], orders, subscriptions: [], onNotice: showNotice });
+  const { 
+    sustainabilityData, 
+    waterFootprint, 
+    circularEconomy, 
+    sdgAlignment, 
+    certifications, 
+    summary: sustainabilitySummary 
+  } = useSustainabilityTracking({ orders, qualityRecords: waterQualityRecords, sources: [], fleetDrivers, vehicles: [], onNotice: showNotice });
 
   // Reliability is a second opinion on seller performance, aimed at the
   // operator question "how dependable is this seller, and how long do they
@@ -661,6 +701,28 @@ function App() {
             fleetSummary={fleetSummary}
             zoneUtilization={zoneUtilization}
             fleetRecommendations={fleetRecommendations}
+            marketData={marketData}
+            competitorAnalysis={competitorAnalysis}
+            pricingIntelligence={pricingIntelligence}
+            trendForecasts={trendForecasts}
+            marketSummary={marketSummary}
+            energyData={energyData}
+            efficiencyRecommendations={efficiencyRecommendations}
+            evTransitionPlan={evTransitionPlan}
+            carbonFootprint={carbonFootprint}
+            energySummary={energySummary}
+            subscriptionData={subscriptionData}
+            churnRisk={churnRisk}
+            upsellOpportunities={upsellOpportunities}
+            subscriptionForecast={subscriptionForecast}
+            lifecycleMetrics={lifecycleMetrics}
+            subscriptionSummary={subscriptionSummary}
+            sustainabilityData={sustainabilityData}
+            waterFootprint={waterFootprint}
+            circularEconomy={circularEconomy}
+            sdgAlignment={sdgAlignment}
+            certifications={certifications}
+            sustainabilitySummary={sustainabilitySummary}
           />
         ) : (
           <SellerAccessGate
@@ -763,6 +825,28 @@ function App() {
             fleetSummary={fleetSummary}
             zoneUtilization={zoneUtilization}
             fleetRecommendations={fleetRecommendations}
+            marketData={marketData}
+            competitorAnalysis={competitorAnalysis}
+            pricingIntelligence={pricingIntelligence}
+            trendForecasts={trendForecasts}
+            marketSummary={marketSummary}
+            energyData={energyData}
+            efficiencyRecommendations={efficiencyRecommendations}
+            evTransitionPlan={evTransitionPlan}
+            carbonFootprint={carbonFootprint}
+            energySummary={energySummary}
+            subscriptionData={subscriptionData}
+            churnRisk={churnRisk}
+            upsellOpportunities={upsellOpportunities}
+            subscriptionForecast={subscriptionForecast}
+            lifecycleMetrics={lifecycleMetrics}
+            subscriptionSummary={subscriptionSummary}
+            sustainabilityData={sustainabilityData}
+            waterFootprint={waterFootprint}
+            circularEconomy={circularEconomy}
+            sdgAlignment={sdgAlignment}
+            certifications={certifications}
+            sustainabilitySummary={sustainabilitySummary}
           />
         )}
         {ready && role === 'ops' && (adminAuthenticated ? <Suspense fallback={null}><OpsView orders={orders} downloadReport={downloadReport} opsToken={opsToken} showNotice={showNotice} sellerPerfSummary={sellerPerfSummary} sellerRanked={sellerRanked} reliabilitySummary={reliabilitySummaryData} reliabilityRanked={reliabilityRanked} driverRatingsSummary={driverRatingsSummary} /></Suspense> : <AdminAccessGate onSignIn={signInWithPassword} error={signInError} onGoogle={signInWithGoogleIdentity} onMeta={signInWithMetaIdentity} showNotice={showNotice} />)}

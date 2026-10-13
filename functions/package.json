@@ -1,5 +1,5 @@
 {
-  "name": "aqualink-functions",
+  "name": "nautica-functions",
   "description": "AquaLink server. Owns order pricing and all payment-provider secrets.",
   "private": true,
   "type": "module",

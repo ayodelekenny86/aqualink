@@ -27,11 +27,11 @@ function buildStamp() {
   }
 
   return {
-    name: 'aqualink-build-stamp',
+    name: 'nautica-build-stamp',
     transformIndexHtml(html) {
       const tag = [
-        `<meta name="aqualink-build" content="${stamp.commit}${stamp.dirty ? '-dirty' : ''}" />`,
-        `<meta name="aqualink-built" content="${stamp.builtAt}" />`,
+        `<meta name="nautica-build" content="${stamp.commit}${stamp.dirty ? '-dirty' : ''}" />`,
+        `<meta name="nautica-built" content="${stamp.builtAt}" />`,
       ].join('\n    ');
       return html.includes('</head>') ? html.replace('</head>', `    ${tag}\n  </head>`) : html;
     },

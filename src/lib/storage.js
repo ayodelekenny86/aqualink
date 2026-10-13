@@ -1,4 +1,4 @@
-const PREFIX = 'aqualink.v1.';
+const PREFIX = 'nautica.v1.';
 
 /**
  * Tiny JSON wrapper over localStorage so the app keeps its own state across

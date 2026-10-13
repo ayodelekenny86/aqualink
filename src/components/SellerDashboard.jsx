@@ -25,6 +25,10 @@ import CustomerChurnPredictionPanel from './CustomerChurnPredictionPanel';
 import RevenueOptimizationPanel from './RevenueOptimizationPanel';
 import QualityAssurancePanel from './QualityAssurancePanel';
 import FleetUtilizationPanel from './FleetUtilizationPanel';
+import MarketIntelligencePanel from './MarketIntelligencePanel';
+import EnergyOptimizationPanel from './EnergyOptimizationPanel';
+import SubscriptionManagementPanel from './SubscriptionManagementPanel';
+import SustainabilityTrackingPanel from './SustainabilityTrackingPanel';
 
 function JobCard({ order, driver, onAccept, onStart, onComplete, onView }) {
   const statusColors = {
@@ -531,6 +535,10 @@ export function SellerDashboard({
             <button className={smartTab === 'revenue-optimization' ? 'active' : ''} onClick={() => setSmartTab('revenue-optimization')}>Revenue Optimization</button>
             <button className={smartTab === 'quality-assurance' ? 'active' : ''} onClick={() => setSmartTab('quality-assurance')}>Quality Assurance</button>
             <button className={smartTab === 'fleet-utilization' ? 'active' : ''} onClick={() => setSmartTab('fleet-utilization')}>Fleet Utilization</button>
+            <button className={smartTab === 'market-intelligence' ? 'active' : ''} onClick={() => setSmartTab('market-intelligence')}>Market Intelligence</button>
+            <button className={smartTab === 'energy-optimization' ? 'active' : ''} onClick={() => setSmartTab('energy-optimization')}>Energy Optimization</button>
+            <button className={smartTab === 'subscription-management' ? 'active' : ''} onClick={() => setSmartTab('subscription-management')}>Subscription Mgmt</button>
+            <button className={smartTab === 'sustainability-tracking' ? 'active' : ''} onClick={() => setSmartTab('sustainability-tracking')}>Sustainability</button>
           </div>
 
           {smartTab === 'forecast' && (
@@ -968,6 +976,45 @@ export function SellerDashboard({
               fleetDrivers={fleetDrivers} 
               orders={orders} 
               driverLocations={driverLocations}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'market-intelligence' && (
+            <MarketIntelligencePanel 
+              orders={orders} 
+              customers={[]}
+              competitors={[]}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'energy-optimization' && (
+            <EnergyOptimizationPanel 
+              fleetDrivers={fleetDrivers} 
+              orders={orders} 
+              driverLocations={driverLocations}
+              vehicles={[]}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'subscription-management' && (
+            <SubscriptionManagementPanel 
+              customers={[]}
+              orders={orders} 
+              subscriptions={[]}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'sustainability-tracking' && (
+            <SustainabilityTrackingPanel 
+              orders={orders} 
+              qualityRecords={[]}
+              sources={[]}
+              fleetDrivers={fleetDrivers}
+              vehicles={[]}
               onNotice={showNotice}
             />
           )}
