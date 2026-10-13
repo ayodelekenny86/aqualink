@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-const projectRef = import.meta.env?.VITE_SUPABASE_PROJECT_REF;
-const anonKey = import.meta.env?.VITE_SUPABASE_ANON_KEY;
-const explicitUrl = import.meta.env?.VITE_SUPABASE_URL;
+const projectRef = import.meta.env.VITE_SUPABASE_PROJECT_REF;
+const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const explicitUrl = import.meta.env.VITE_SUPABASE_URL;
 
 const supabaseUrl = explicitUrl || (projectRef ? `https://${projectRef}.supabase.co` : '');
 

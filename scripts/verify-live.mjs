@@ -188,22 +188,32 @@ async function probeBuild(site, html, origin) {
     return;
   }
 
-  let source;
-  try {
-    const response = await fetch(new URL(bundle, site), { redirect: 'follow' });
-    if (!response.ok) {
-      record('the served bundle could be read', false, `HTTP ${response.status} for ${bundle}`, origin);
-      return;
+  // Collect all JS bundle URLs from the HTML (entry script + modulepreload links)
+  const scriptUrls = [...html.matchAll(/<script[^>]+src="([^"]*\.js)"/g)].map((m) => m[1]);
+  const preloadUrls = [...html.matchAll(/<link[^>]+rel="modulepreload"[^>]+href="([^"]*\.js)"/g)].map((m) => m[1]);
+  const bundleUrls = [...new Set([...scriptUrls, ...preloadUrls])];
+
+  let combinedSource = '';
+  for (const bundleUrl of bundleUrls) {
+    try {
+      const response = await fetch(new URL(bundleUrl, site), { redirect: 'follow' });
+      if (response.ok) {
+        const source = await response.text();
+        combinedSource += source + '\n';
+      }
+    } catch {
+      // Ignore individual chunk fetch failures
     }
-    source = await response.text();
-  } catch (error) {
-    record('the served bundle could be read', false, String(error.message || error), origin);
+  }
+
+  if (!combinedSource) {
+    record('the served bundle could be read', false, 'No JS bundles could be fetched', origin);
     return;
   }
 
-  record('the served bundle could be read', true, `${Math.round(source.length / 1024)} kB`, origin);
+  record('the served bundle could be read', true, `${Math.round(combinedSource.length / 1024)} kB`, origin);
 
-  const found = DEMO_TELLS.filter((tell) => tell.pattern.test(source)).map((tell) => tell.label);
+  const found = DEMO_TELLS.filter((tell) => tell.pattern.test(combinedSource)).map((tell) => tell.label);
   record(
     'the served bundle contains no fabricated claims',
     found.length === 0,
@@ -213,7 +223,7 @@ async function probeBuild(site, html, origin) {
 
   // A bundle with no backend in it cannot take a payment or price an order, so it
   // will happily display the offline path and look like a working checkout.
-  const hasApi = projectRef ? source.includes(projectRef) : /supabase\.co|\/api\//.test(source);
+  const hasApi = projectRef ? combinedSource.includes(projectRef) : /supabase\.co|\/api\//.test(combinedSource);
   record('the served bundle is built against the server', hasApi, hasApi ? '' : `No reference to ${projectRef || 'any API origin'}, so this build makes no server calls at all`, origin);
 }
 
