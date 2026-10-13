@@ -194,7 +194,7 @@ export default defineConfig(({ mode }) => {
         // not set the env vars — it keeps the same `/functions/v1/...` paths
         // reachable from the dev server's origin.
         '/functions': {
-          target: loadEnv(mode, process.cwd(), '').NAUTLINK_SUPABASE_TARGET || 'http://127.0.0.1:54321',
+          target: loadEnv(mode, process.cwd(), '').NAUTICAL_SUPABASE_TARGET || 'http://127.0.0.1:54321',
           changeOrigin: true,
           secure: false,
         },
@@ -204,7 +204,7 @@ export default defineConfig(({ mode }) => {
         // response" and the Paystack redirect could never be initialised, so
         // payments were impossible to exercise locally.
         '/api': {
-          target: loadEnv(mode, process.cwd(), '').NAUTLINK_API_TARGET || DEFAULT_API_TARGET,
+          target: loadEnv(mode, process.cwd(), '').NAUTICAL_API_TARGET || DEFAULT_API_TARGET,
           changeOrigin: true,
           // Never buffer or rewrite the body. The Paystack webhook is validated
           // against the exact bytes received, and the emulator's own routing
@@ -219,12 +219,12 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       proxy: {
         '/functions': {
-          target: process.env.NAUTLINK_SUPABASE_TARGET || 'http://127.0.0.1:54321',
+          target: process.env.NAUTICAL_SUPABASE_TARGET || 'http://127.0.0.1:54321',
           changeOrigin: true,
           secure: false,
         },
         '/api': {
-          target: process.env.NAUTLINK_API_TARGET || DEFAULT_API_TARGET,
+          target: process.env.NAUTICAL_API_TARGET || DEFAULT_API_TARGET,
           changeOrigin: true,
           secure: false,
         },

@@ -245,7 +245,7 @@ describe('the reference allowlist', () => {
   // If `newReference` changes shape, this fails — which is the point. An
   // allowlist that rejects real references is worse than none: every payment
   // would fail to verify.
-  const REFERENCE_PATTERN = /^aq[a-z0-9]{0,64}-[0-9a-f]{16,64}$/;
+  const REFERENCE_PATTERN = /^naut[a-z0-9]{0,64}-[0-9a-f]{16,64}$/;
 
   test('accepts every reference the server actually issues', () => {
     for (let i = 0; i < 200; i += 1) {
@@ -280,6 +280,6 @@ describe('the reference allowlist', () => {
     // something else.
     const { readFile } = await import('node:fs/promises');
     const source = await readFile('supabase/functions/_lib/utils.ts', 'utf8');
-    expect(source).toContain('/^aq[a-z0-9]{0,64}-[0-9a-f]{16,64}$/');
+    expect(source).toContain('/^naut[a-z0-9]{0,64}-[0-9a-f]{16,64}$/');
   });
 });

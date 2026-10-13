@@ -57,7 +57,7 @@ not have caught a missing action anyway: `orders/create` answering 405 proves
 `orders` is deployed, not that `orders/verify` exists.
 
 It exits non-zero and lists each failure, prefixed with the host it came from. Set
-`NAUTLINK_SITE_URLS` to a comma-separated list to check origins beyond the two
+`NAUTICAL_SITE_URLS` to a comma-separated list to check origins beyond the two
 defaults (`nauticalgh1.vercel.app` and `nautical.web.app`).
 
 Deploying to Vercel needs no extra config: `vercel.json` carries the same security

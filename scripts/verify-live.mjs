@@ -53,10 +53,10 @@ const anonKey = env.VITE_SUPABASE_ANON_KEY || '';
 /**
  * Every origin this project is served from. A deployment that is not listed here
  * is a deployment nobody checks, which is how a live URL went unexamined for a
- * month; `NAUTLINK_SITE_URLS` (comma-separated) adds more.
+ * month; `NAUTICAL_SITE_URLS` (comma-separated) adds more.
  */
 const sites = (
-  process.env.NAUTLINK_SITE_URLS
+  process.env.NAUTICAL_SITE_URLS
     || 'https://nautical.web.app'
 ).split(',').map((value) => value.trim()).filter(Boolean);
 
