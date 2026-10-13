@@ -265,35 +265,35 @@ export default function CustomerIntelligencePanel({
       </div>
 
       <div className="summary-stats">
-        <article className="stat-card">
+        <article className="summary-card">
           <span>Total Customers</span>
           <strong>{summary.totalCustomers}</strong>
         </article>
-        <article className={summary.atRiskCustomers > 0 ? 'stat-card warning' : 'stat-card good'}>
+        <article className={summary.atRiskCustomers > 0 ? 'summary-card warning' : 'summary-card good'}>
           <span>At Risk</span>
           <strong>{summary.atRiskCustomers}</strong>
         </article>
-        <article className="stat-card highlight">
+        <article className="summary-card highlight">
           <span>VIP Customers</span>
           <strong>{summary.vipCustomers}</strong>
         </article>
-        <article className="stat-card info">
+        <article className="summary-card info">
           <span>New This Period</span>
           <strong>{summary.newCustomers}</strong>
         </article>
-        <article className="stat-card">
+        <article className="summary-card">
           <span>Total Predicted LTV</span>
           <strong>{formatCedi(Math.round(summary.totalPredictedLTV * 100))}</strong>
         </article>
-        <article className="stat-card">
+        <article className="summary-card">
           <span>30-Day Revenue</span>
           <strong>{formatCedi(Math.round(summary.revenueForecast30d * 100))}</strong>
         </article>
-        <article className={summary.criticalAnomalies > 0 ? 'stat-card critical' : 'stat-card good'}>
+        <article className={summary.criticalAnomalies > 0 ? 'summary-card critical' : 'summary-card good'}>
           <span>Critical Anomalies</span>
           <strong>{summary.criticalAnomalies}</strong>
         </article>
-        <article className="stat-card">
+        <article className="summary-card">
           <span>Avg Health</span>
           <strong>{summary.avgHealthScore}/100</strong>
         </article>

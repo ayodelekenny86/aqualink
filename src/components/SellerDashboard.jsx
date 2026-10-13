@@ -920,6 +920,58 @@ export function SellerDashboard({
             />
           )}
 
+          {smartTab === 'predictive-maintenance' && (
+            <PredictiveMaintenancePanel 
+              vehicles={[]} 
+              orders={orders} 
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'supply-chain' && (
+            <SupplyChainOptimizationPanel 
+              suppliers={[]} 
+              warehouses={[]} 
+              orders={orders} 
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'churn-prediction' && (
+            <CustomerChurnPredictionPanel 
+              customers={enrichedCustomers} 
+              orders={orders} 
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'revenue-optimization' && (
+            <RevenueOptimizationPanel 
+              orders={orders} 
+              pricing={pricing} 
+              customers={enrichedCustomers}
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'quality-assurance' && (
+            <QualityAssurancePanel 
+              qualityRecords={waterQualityRecords} 
+              sources={[]} 
+              orders={orders} 
+              onNotice={showNotice}
+            />
+          )}
+
+          {smartTab === 'fleet-utilization' && (
+            <FleetUtilizationPanel 
+              fleetDrivers={fleetDrivers} 
+              orders={orders} 
+              driverLocations={driverLocations}
+              onNotice={showNotice}
+            />
+          )}
+
         </section>
       )}
       {activeTab === 'profile' && (

@@ -197,23 +197,23 @@ export default function RouteOptimizationPanel({
       </div>
 
       <div className="fleet-summary">
-        <article className="stat-card">
+        <article className="summary-card">
           <span>Online Drivers</span>
           <strong>{fleetSummary.onlineDrivers}</strong>
         </article>
-        <article className="stat-card">
+        <article className="summary-card">
           <span>On Job</span>
           <strong>{fleetSummary.onJobDrivers}</strong>
         </article>
-        <article className="stat-card">
+        <article className="summary-card">
           <span>Pending Orders</span>
           <strong>{fleetSummary.totalPendingOrders}</strong>
         </article>
-        <article className="stat-card">
+        <article className="summary-card">
           <span>Avg Utilization</span>
           <strong>{fleetSummary.avgZoneUtilization}%</strong>
         </article>
-        <article className={fleetSummary.surgeActive ? 'stat-card warning' : 'stat-card'}>
+        <article className={fleetSummary.surgeActive ? 'summary-card warning' : 'summary-card'}>
           <span>Surge Mode</span>
           <strong>{fleetSummary.surgeActive ? 'ACTIVE' : 'OFF'}</strong>
         </article>

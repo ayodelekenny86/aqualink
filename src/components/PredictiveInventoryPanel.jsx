@@ -199,27 +199,27 @@ export default function PredictiveInventoryPanel({
       <AlertBanner alerts={alerts} onNotice={onNotice} />
 
       <div className="summary-stats">
-        <article className="stat-card">
+        <article className="summary-card">
           <span>Items Tracked</span>
           <strong>{summary.itemsTracked}</strong>
         </article>
-        <article className="stat-card">
+        <article className="summary-card">
           <span>Total Value</span>
           <strong>{formatCedi(summary.totalValue * 100)}</strong>
         </article>
-        <article className={summary.criticalCount > 0 ? 'stat-card critical' : 'stat-card good'}>
+        <article className={summary.criticalCount > 0 ? 'summary-card critical' : 'summary-card good'}>
           <span>Critical Items</span>
           <strong>{summary.criticalCount}</strong>
         </article>
-        <article className={summary.lowStockCount > 0 ? 'stat-card warning' : 'stat-card'}>
+        <article className={summary.lowStockCount > 0 ? 'summary-card warning' : 'summary-card'}>
           <span>Low Stock</span>
           <strong>{summary.lowStockCount}</strong>
         </article>
-        <article className="stat-card good">
+        <article className="summary-card good">
           <span>Healthy</span>
           <strong>{summary.healthyCount}</strong>
         </article>
-        <article className={summary.reorderRecommendations > 0 ? 'stat-card warning' : 'stat-card'}>
+        <article className={summary.reorderRecommendations > 0 ? 'summary-card warning' : 'summary-card'}>
           <span>Reorder Queue</span>
           <strong>{summary.reorderRecommendations}</strong>
         </article>

@@ -276,19 +276,19 @@ export default function SmartSchedulingPanel({ orders = [], onNotice, customers 
       </div>
 
       <div className="stats-bar">
-        <article className="stat-card {stats.active > 0 ? 'good' : ''}">
+        <article className="summary-card {stats.active > 0 ? 'good' : ''}">
           <span>Active Schedules</span>
           <strong>{stats.active}</strong>
         </article>
-        <article className="stat-card {stats.dueToday > 0 ? 'critical' : 'good'}">
+        <article className="summary-card {stats.dueToday > 0 ? 'critical' : 'good'}">
           <span>Due Today</span>
           <strong>{stats.dueToday}</strong>
         </article>
-        <article className="stat-card">
+        <article className="summary-card">
           <span>Total Deliveries</span>
           <strong>{stats.totalDeliveries}</strong>
         </article>
-        <article className="stat-card">
+        <article className="summary-card">
           <span>Total Schedules</span>
           <strong>{stats.total}</strong>
         </article>
