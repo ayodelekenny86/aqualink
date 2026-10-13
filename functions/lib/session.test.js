@@ -12,14 +12,14 @@ const SECRET = 'ops-session-signing-secret';
 const NOW = Date.UTC(2026, 8, 27, 12, 0, 0);
 
 function okToken(overrides = {}) {
-  return signOpsToken({ email: 'ops@aqualink.gh', secret: SECRET, now: NOW, ...overrides });
+  return signOpsToken({ email: 'ops@nautica.gh', secret: SECRET, now: NOW, ...overrides });
 }
 
 describe('issuing ops tokens', () => {
   test('produces a token that verifies', () => {
     const result = verifyOpsToken(okToken(), SECRET, { now: NOW });
     expect(result.valid).toBe(true);
-    expect(result.payload.sub).toBe('ops@aqualink.gh');
+    expect(result.payload.sub).toBe('ops@nautica.gh');
     expect(result.payload.role).toBe('ops');
   });
 
