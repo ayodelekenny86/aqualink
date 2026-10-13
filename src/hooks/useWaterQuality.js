@@ -169,6 +169,109 @@ export function useWaterQuality({ orders = [], onNotice }) {
     };
   }, [getAllSourcesCompliance]);
 
+  const compliance = useMemo(() => {
+    const result = {};
+    const sources = new Map();
+    records.forEach(r => {
+      const key = r.sourceId || r.sellerId || r.source || 'unknown';
+      if (!sources.has(key)) sources.set(key, []);
+      sources.get(key).push(r);
+    });
+    sources.forEach((sourceRecords, source) => {
+      const latest = sourceRecords[0];
+      const test = checkCompliance(latest);
+      const total = test.results.length;
+      const passed = test.results.filter(r => r.status === 'pass').length;
+      const score = total > 0 ? Math.round((passed / total) * 100) : 0;
+      let classification = 'poor';
+      if (score >= 90) classification = 'excellent';
+      else if (score >= 70) classification = 'good';
+      else if (score >= 50) classification = 'fair';
+      const params = {};
+      test.results.forEach(r => {
+        params[r.parameter.toLowerCase().replace(/\s+/g, '')] = {
+          value: r.value,
+          status: r.status,
+          standard: r.unit ? { unit: r.unit } : undefined,
+        };
+      });
+      result[source] = { classification, score, parameters: params };
+    });
+    return result;
+  }, [records, checkCompliance]);
+
+  const certificates = useMemo(() => {
+    return records
+      .filter(r => r.certified)
+      .map(r => ({
+        source: r.source || r.sourceId || r.sellerId || 'unknown',
+        classification: compliance[r.sourceId || r.sellerId || r.source || 'unknown']?.classification || 'fair',
+        averageScore: compliance[r.sourceId || r.sellerId || r.source || 'unknown']?.score || 0,
+        testsPerformed: 1,
+        period: { start: r.testedAt, end: r.expiresAt },
+        certificateId: r.certificateNumber,
+      }));
+  }, [records, compliance]);
+
+  const alerts = useMemo(() => {
+    const result = [];
+    records.forEach(r => {
+      const source = r.sourceId || r.sellerId || r.source || 'unknown';
+      const test = checkCompliance(r);
+      test.results.forEach(param => {
+        if (param.status === 'fail' && param.critical) {
+          result.push({
+            source,
+            type: `${param.parameter.toLowerCase()}_failure`,
+            severity: 'critical',
+          });
+        }
+      });
+    });
+    return result;
+  }, [records, checkCompliance]);
+
+  const summary = useMemo(() => {
+    const allCompliance = getAllSourcesCompliance();
+    const sourcesMonitored = allCompliance.length;
+    const totalTests = records.length;
+    const passingTests = records.filter(r => checkCompliance(r).compliant).length;
+    const passingRate = totalTests > 0 ? Math.round((passingTests / totalTests) * 100) : 0;
+    const scores = allCompliance.map(c => c.compliant === true ? 100 : c.compliant === false ? 0 : 50);
+    const avgScore = scores.length > 0 ? Math.round(scores.reduce((s, n) => s + n, 0) / scores.length) : 0;
+    const criticalAlerts = alerts.filter(a => a.severity === 'critical').length;
+    const highRiskSources = allCompliance.filter(c => c.compliant === false).length;
+    return {
+      sourcesMonitored,
+      totalTests,
+      passingRate,
+      avgScore,
+      criticalAlerts,
+      highRiskSources,
+    };
+  }, [records, getAllSourcesCompliance, alerts, checkCompliance]);
+
+  const getSourceSummary = useCallback((source) => {
+    const sourceRecords = records.filter(r => r.sourceId === source || r.sellerId === source || r.source === source);
+    const latest = sourceRecords[0];
+    if (!latest) return { compliant: null, latestTest: null, expiryStatus: 'no_data' };
+    const test = checkCompliance(latest);
+    return {
+      compliant: test.compliant,
+      latestTest: latest.testedAt,
+      certificateNumber: latest.certificateNumber,
+      certified: latest.certified,
+      sourceCompliance: compliance[source],
+      failedParameters: test.results.filter(r => r.status === 'fail'),
+    };
+  }, [records, checkCompliance, compliance]);
+
+  const refresh = useCallback(() => {
+    const saved = list(STORAGE_KEY);
+    setRecords(saved);
+    return saved;
+  }, []);
+
   return {
     records,
     loading,
@@ -182,6 +285,16 @@ export function useWaterQuality({ orders = [], onNotice }) {
     getAllSourcesCompliance,
     getExpiringCertificates,
     generateComplianceReport,
+    compliance,
+    certificates,
+    alerts,
+    summary,
+    addQualityRecord: addRecord,
+    getSourceSummary,
+    refresh,
+    trends: [],
+    forecasts: [],
+    sourceRisks: [],
   };
 }
 
