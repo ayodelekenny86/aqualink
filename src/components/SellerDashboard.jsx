@@ -19,6 +19,12 @@ import CustomerIntelligencePanel from './CustomerIntelligencePanel';
 import DemandForecastingPanel from './DemandForecastingPanel';
 import DriverPerformancePanel from './DriverPerformancePanel';
 import AutomatedDispatchPanel from './AutomatedDispatchPanel';
+import PredictiveMaintenancePanel from './PredictiveMaintenancePanel';
+import SupplyChainOptimizationPanel from './SupplyChainOptimizationPanel';
+import CustomerChurnPredictionPanel from './CustomerChurnPredictionPanel';
+import RevenueOptimizationPanel from './RevenueOptimizationPanel';
+import QualityAssurancePanel from './QualityAssurancePanel';
+import FleetUtilizationPanel from './FleetUtilizationPanel';
 
 function JobCard({ order, driver, onAccept, onStart, onComplete, onView }) {
   const statusColors = {
@@ -519,6 +525,12 @@ export function SellerDashboard({
             <button className={smartTab === 'demand-forecasting' ? 'active' : ''} onClick={() => setSmartTab('demand-forecasting')}>Demand Forecasting</button>
             <button className={smartTab === 'driver-performance' ? 'active' : ''} onClick={() => setSmartTab('driver-performance')}>Driver Performance</button>
             <button className={smartTab === 'automated-dispatch' ? 'active' : ''} onClick={() => setSmartTab('automated-dispatch')}>Automated Dispatch</button>
+            <button className={smartTab === 'predictive-maintenance' ? 'active' : ''} onClick={() => setSmartTab('predictive-maintenance')}>Predictive Maintenance</button>
+            <button className={smartTab === 'supply-chain' ? 'active' : ''} onClick={() => setSmartTab('supply-chain')}>Supply Chain</button>
+            <button className={smartTab === 'churn-prediction' ? 'active' : ''} onClick={() => setSmartTab('churn-prediction')}>Churn Prediction</button>
+            <button className={smartTab === 'revenue-optimization' ? 'active' : ''} onClick={() => setSmartTab('revenue-optimization')}>Revenue Optimization</button>
+            <button className={smartTab === 'quality-assurance' ? 'active' : ''} onClick={() => setSmartTab('quality-assurance')}>Quality Assurance</button>
+            <button className={smartTab === 'fleet-utilization' ? 'active' : ''} onClick={() => setSmartTab('fleet-utilization')}>Fleet Utilization</button>
           </div>
 
           {smartTab === 'forecast' && (

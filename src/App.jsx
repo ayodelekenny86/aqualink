@@ -39,6 +39,12 @@ import DynamicPricingConsole from './components/DynamicPricingConsole';
 import DemandForecastingPanel from './components/DemandForecastingPanel';
 import DriverPerformancePanel from './components/DriverPerformancePanel';
 import AutomatedDispatchPanel from './components/AutomatedDispatchPanel';
+import PredictiveMaintenancePanel from './components/PredictiveMaintenancePanel';
+import SupplyChainOptimizationPanel from './components/SupplyChainOptimizationPanel';
+import CustomerChurnPredictionPanel from './components/CustomerChurnPredictionPanel';
+import RevenueOptimizationPanel from './components/RevenueOptimizationPanel';
+import QualityAssurancePanel from './components/QualityAssurancePanel';
+import FleetUtilizationPanel from './components/FleetUtilizationPanel';
 
 // Smart feature hooks
 import useSmartScheduling from './hooks/useSmartScheduling';
@@ -47,6 +53,12 @@ import useDynamicPricing from './hooks/useDynamicPricing';
 import { useDemandForecasting } from './hooks/useDemandForecasting';
 import { useDriverPerformance } from './hooks/useDriverPerformance';
 import { useAutomatedDispatch } from './hooks/useAutomatedDispatch';
+import { usePredictiveMaintenance } from './hooks/usePredictiveMaintenance';
+import { useSupplyChainOptimization } from './hooks/useSupplyChainOptimization';
+import { useCustomerChurnPrediction } from './hooks/useCustomerChurnPrediction';
+import { useRevenueOptimization } from './hooks/useRevenueOptimization';
+import { useQualityAssurance } from './hooks/useQualityAssurance';
+import { useFleetUtilization } from './hooks/useFleetUtilization';
 
 // Admin-only and overlay surfaces load on demand. A buyer who never opens the
 // admin console never downloads it, which keeps the initial bundle small.
@@ -273,6 +285,40 @@ function App() {
     dispatchHistory: autoDispatchHistory,
     stats: dispatchStats 
   } = useAutomatedDispatch({ orders, drivers: fleetDrivers, driverLocations, zoneLoads: {}, onNotice: showNotice });
+
+  // New advanced features
+  const { 
+    predictions: maintenancePredictions, 
+    alerts: maintenanceAlerts,
+    summary: maintenanceSummary 
+  } = usePredictiveMaintenance({ vehicles: [], orders, onNotice: showNotice });
+  const { 
+    supplyChain, 
+    warehouseStatus, 
+    optimizations: supplyChainOptimizations,
+    summary: supplyChainSummary 
+  } = useSupplyChainOptimization({ suppliers: [], warehouses: [], orders, onNotice: showNotice });
+  const { 
+    churnPredictions, 
+    atRiskCustomers, 
+    summary: churnSummary 
+  } = useCustomerChurnPrediction({ customers: [], orders, onNotice: showNotice });
+  const { 
+    revenueAnalysis, 
+    recommendations: revenueRecommendations,
+    summary: revenueSummary 
+  } = useRevenueOptimization({ orders, pricing: pricingRules, customers: [], onNotice: showNotice });
+  const { 
+    sourceAnalysis: qualitySources, 
+    alerts: qualityAlerts,
+    summary: qualitySummary 
+  } = useQualityAssurance({ qualityRecords: waterQualityRecords, sources: [], orders, onNotice: showNotice });
+  const { 
+    utilization: fleetUtilization, 
+    fleetSummary, 
+    zoneUtilization,
+    recommendations: fleetRecommendations 
+  } = useFleetUtilization({ fleetDrivers, orders, driverLocations, onNotice: showNotice });
 
   // Reliability is a second opinion on seller performance, aimed at the
   // operator question "how dependable is this seller, and how long do they
@@ -595,6 +641,26 @@ function App() {
             dispatchStats={dispatchStats}
             fleetDrivers={fleetDrivers}
             driverLocations={driverLocations}
+            maintenancePredictions={maintenancePredictions}
+            maintenanceAlerts={maintenanceAlerts}
+            maintenanceSummary={maintenanceSummary}
+            supplyChain={supplyChain}
+            warehouseStatus={warehouseStatus}
+            supplyChainOptimizations={supplyChainOptimizations}
+            supplyChainSummary={supplyChainSummary}
+            churnPredictions={churnPredictions}
+            atRiskCustomers={atRiskCustomers}
+            churnSummary={churnSummary}
+            revenueAnalysis={revenueAnalysis}
+            revenueRecommendations={revenueRecommendations}
+            revenueSummary={revenueSummary}
+            qualitySources={qualitySources}
+            qualityAlerts={qualityAlerts}
+            qualitySummary={qualitySummary}
+            fleetUtilization={fleetUtilization}
+            fleetSummary={fleetSummary}
+            zoneUtilization={zoneUtilization}
+            fleetRecommendations={fleetRecommendations}
           />
         ) : (
           <SellerAccessGate
@@ -677,6 +743,26 @@ function App() {
             driverMetrics={driverMetrics}
             fleetDrivers={fleetDrivers}
             driverLocations={driverLocations}
+            maintenancePredictions={maintenancePredictions}
+            maintenanceAlerts={maintenanceAlerts}
+            maintenanceSummary={maintenanceSummary}
+            supplyChain={supplyChain}
+            warehouseStatus={warehouseStatus}
+            supplyChainOptimizations={supplyChainOptimizations}
+            supplyChainSummary={supplyChainSummary}
+            churnPredictions={churnPredictions}
+            atRiskCustomers={atRiskCustomers}
+            churnSummary={churnSummary}
+            revenueAnalysis={revenueAnalysis}
+            revenueRecommendations={revenueRecommendations}
+            revenueSummary={revenueSummary}
+            qualitySources={qualitySources}
+            qualityAlerts={qualityAlerts}
+            qualitySummary={qualitySummary}
+            fleetUtilization={fleetUtilization}
+            fleetSummary={fleetSummary}
+            zoneUtilization={zoneUtilization}
+            fleetRecommendations={fleetRecommendations}
           />
         )}
         {ready && role === 'ops' && (adminAuthenticated ? <Suspense fallback={null}><OpsView orders={orders} downloadReport={downloadReport} opsToken={opsToken} showNotice={showNotice} sellerPerfSummary={sellerPerfSummary} sellerRanked={sellerRanked} reliabilitySummary={reliabilitySummaryData} reliabilityRanked={reliabilityRanked} driverRatingsSummary={driverRatingsSummary} /></Suspense> : <AdminAccessGate onSignIn={signInWithPassword} error={signInError} onGoogle={signInWithGoogleIdentity} onMeta={signInWithMetaIdentity} showNotice={showNotice} />)}
