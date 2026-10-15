@@ -145,6 +145,10 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
     analytics,
     refreshData,
     refreshing,
+    qualityTrends,
+    complianceSummary,
+    supplyRisk,
+    savingsRecommendations,
   } = useInstitutionDashboard({ orders, onNotice: showNotice });
 
   // Smart features
@@ -167,11 +171,17 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
     return loads;
   }, [orders]);
 
+  // Keep the budget form field in sync when the stored budget changes
+  useEffect(() => {
+    setBudgetInput(budget.monthly / 100);
+  }, [budget.monthly]);
+
   const [activeTab, setActiveTab] = useState('overview');
   const [smartTab, setSmartTab] = useState('forecast');
   const [showScheduleForm, setShowScheduleForm] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(null);
   const [showQualityForm, setShowQualityForm] = useState(false);
+  const [budgetInput, setBudgetInput] = useState(budget.monthly / 100);
   const [scheduleForm, setScheduleForm] = useState({
     name: '',
     frequency: 'weekly',
@@ -240,6 +250,7 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
         <button className={activeTab === 'customers' ? 'active' : ''} onClick={() => setActiveTab('customers')}>Customer Intelligence</button>
         <button className={activeTab === 'budget' ? 'active' : ''} onClick={() => setActiveTab('budget')}>Budget</button>
         <button className={activeTab === 'analytics' ? 'active' : ''} onClick={() => setActiveTab('analytics')}>Analytics</button>
+        <button className={activeTab === 'insights' ? 'active' : ''} onClick={() => setActiveTab('insights')}>Insights</button>
         <button className={activeTab === 'smart' ? 'active' : ''} onClick={() => setActiveTab('smart')}>Smart Hub</button>
       </div>
 
@@ -290,6 +301,41 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
 
           <div className="panel-divider" />
 
+          <div className="overview-grid">
+            <article className="overview-card">
+              <span>TOTAL VOLUME DELIVERED</span>
+              <strong>{analytics.totalPaidVolume}</strong>
+              <small>Paid orders only</small>
+            </article>
+            <article className="overview-card highlight">
+              <span>TOTAL PAID SPEND</span>
+              <strong>{analytics.totalPaidSpend}</strong>
+              <small>Confirmed deliveries</small>
+            </article>
+            <article className="overview-card">
+              <span>AVG DAYS BETWEEN DELIVERIES</span>
+              <strong>{analytics.avgDaysBetweenDeliveries || '—'}</strong>
+              <small>{analytics.avgDaysBetweenDeliveries ? 'days' : 'Insufficient data'}</small>
+            </article>
+            <article className="overview-card">
+              <span>ACTIVE SCHEDULES</span>
+              <strong>{schedules.filter(s => s.active).length}</strong>
+              <small>{schedules.length} total</small>
+            </article>
+            <article className="overview-card">
+              <span>QUALITY TESTS</span>
+              <strong>{complianceSummary.totalTests}</strong>
+              <small>{complianceSummary.passRate.toFixed(1)}% pass rate</small>
+            </article>
+            <article className="overview-card">
+              <span>SOURCES MONITORED</span>
+              <strong>{complianceSummary.sourcesMonitored}</strong>
+              <small>Water sources</small>
+            </article>
+          </div>
+
+          <div className="panel-divider" />
+
           <div className="panel-title">
             <span className="section-kicker">UPCOMING DELIVERIES</span>
             <h2>Next 5 scheduled drops</h2>
@@ -307,6 +353,58 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
                   </div>
                   <span className="status status-online">Scheduled</span>
                 </div>
+              ))}
+            </div>
+          )}
+
+          <div className="panel-divider" />
+
+          <div className="panel-title">
+            <span className="section-kicker">TOP SELLERS</span>
+            <h2>By delivery volume for your institution</h2>
+          </div>
+          {analytics.sellerStats.length === 0 ? (
+            <p className="empty-feed">No seller data yet. Complete deliveries to see rankings.</p>
+          ) : (
+            <div className="seller-ranking">
+              {analytics.sellerStats.slice(0, 5).map((seller, i) => (
+                <div key={seller.name} className="ranking-item">
+                  <span className="rank">{i + 1}</span>
+                  <div className="ranking-info">
+                    <strong>{seller.name}</strong>
+                    <small>{seller.orders} orders · {seller.volume} gal · {seller.onTimeRate}% on-time</small>
+                  </div>
+                  <div className="ranking-value">
+                    <strong>{seller.avgOrderValue}</strong>
+                    <small>Avg/order</small>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="panel-divider" />
+
+          <div className="panel-title">
+            <span className="section-kicker">ZONE ANALYSIS</span>
+            <h2>Delivery distribution by zone</h2>
+          </div>
+          {analytics.zoneStats.length === 0 ? (
+            <p className="empty-feed">No zone data available.</p>
+          ) : (
+            <div className="zone-grid">
+              {analytics.zoneStats.map((zone) => (
+                <article key={zone.zone} className="zone-card panel">
+                  <div className="zone-header">
+                    <strong>{zone.zone}</strong>
+                    <span className="zone-orders">{zone.orders} orders</span>
+                  </div>
+                  <div className="zone-stats">
+                    <div><span>Volume:</span> <strong>{zone.volume} gal</strong></div>
+                    <div><span>Spend:</span> <strong>{formatCedi(zone.spend)}</strong></div>
+                    <div><span>Avg/Order:</span> <strong>{zone.avgOrderValue}</strong></div>
+                  </div>
+                </article>
               ))}
             </div>
           )}
@@ -396,10 +494,40 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
               <span className="section-kicker">WATER QUALITY & COMPLIANCE</span>
               <h2>Quality test records</h2>
             </div>
-            <button className="primary-button" type="button" onClick={() => setShowQualityForm(true)}>
-              + Add Test Record
-            </button>
+            <div className="toolbar-actions">
+              <button className="primary-button" type="button" onClick={() => setShowQualityForm(true)}>
+                + Add Test Record
+              </button>
+              {complianceSummary.totalTests > 0 && (
+                <button className="outline-button" type="button" onClick={() => showNotice('Quality compliance certificate generated.')}>
+                  Generate Certificate
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* Compliance Summary at Top */}
+          {complianceSummary.totalTests > 0 && (
+            <div className="compliance-overview">
+              <article className="compliance-stat-card">
+                <span>TOTAL TESTS</span>
+                <strong>{complianceSummary.totalTests}</strong>
+              </article>
+              <article className="compliance-stat-card highlight">
+                <span>OVERALL PASS RATE</span>
+                <strong>{complianceSummary.passRate.toFixed(1)}%</strong>
+              </article>
+              <article className="compliance-stat-card">
+                <span>SOURCES MONITORED</span>
+                <strong>{complianceSummary.sourcesMonitored}</strong>
+              </article>
+              <article className="compliance-stat-card warning">
+                <span>PARAMETERS FAILING</span>
+                <strong>{Object.values(complianceSummary.byParameter).filter(p => p.passRate < 100).length}</strong>
+              </article>
+            </div>
+            <div className="panel-divider" />
+          )}
 
           {showQualityForm && (
             <form className="quality-form panel" onSubmit={(event) => {
@@ -444,15 +572,48 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
 
           {qualityRecords.length === 0 ? (
             <div className="quality-empty">
+              <div className="empty-icon">💧</div>
               <p className="empty-feed">No quality records yet.</p>
               <p className="quality-note">This app does not store water-quality certificates by default. A seller or operator must supply test results before any quality claim is made. Add records above to build your compliance history.</p>
+              <button className="primary-button" type="button" onClick={() => setShowQualityForm(true)}>
+                Add First Test Record
+              </button>
             </div>
           ) : (
-            <div className="quality-list">
-              {qualityRecords.map((record) => (
-                <QualityCard key={record.id} record={record} onDelete={() => deleteQualityRecord(record.id)} />
-              ))}
-            </div>
+            <>
+              <div className="quality-list">
+                {qualityRecords.map((record) => (
+                  <QualityCard key={record.id} record={record} onDelete={() => deleteQualityRecord(record.id)} />
+                ))}
+              </div>
+              
+              <div className="panel-divider" />
+              
+              <div className="panel-title">
+                <span className="section-kicker">PARAMETER COMPLIANCE</span>
+                <h2>WHO / Ghana Standards compliance by parameter</h2>
+              </div>
+              <div className="compliance-grid">
+                {Object.entries(complianceSummary.byParameter).map(([param, data]) => (
+                  <article key={param} className="compliance-card panel">
+                    <div className="compliance-header">
+                      <strong>{param.toUpperCase()}</strong>
+                      <span className={`status ${data.passRate >= 90 ? 'status-delivered' : data.passRate >= 70 ? 'status-online' : 'status-cancelled'}`}>
+                        {data.passRate}% PASS
+                      </span>
+                    </div>
+                    <div className="compliance-stats">
+                      <div><span>Tests:</span> <strong>{data.total}</strong></div>
+                      <div><span>Passed:</span> <strong>{data.passed}</strong></div>
+                      <div><span>Failed:</span> <strong>{data.total - data.passed}</strong></div>
+                    </div>
+                    <div className="compliance-bar">
+                      <div className="compliance-fill" style={{ width: `${data.passRate}%` }} />
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </>
           )}
         </section>
       )}
@@ -485,37 +646,133 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
             </div>
           </div>
 
-          <div className="budget-summary">
-            <article className="budget-card">
-              <span>MONTHLY BUDGET</span>
-              <strong>GH₵{formatCedi(budget.monthly)}</strong>
+          {/* Budget Alerts */}
+          {budget.alerts.length > 0 && (
+            <div className="budget-alerts">
+              {budget.alerts.map((alert, i) => (
+                <BudgetAlert key={i} alert={alert} />
+              ))}
+            </div>
+          )}
+
+           <div className="budget-summary">
+             <article className="budget-card">
+               <span>MONTHLY BUDGET</span>
+               <strong>{formatCedi(budget.monthly)}</strong>
+             </article>
+             <article className="budget-card highlight">
+               <span>SPENT THIS MONTH</span>
+               <strong>{formatCedi(budget.spent)}</strong>
+             </article>
+             <article className="budget-card">
+               <span>REMAINING</span>
+               <strong>{formatCedi(Math.max(0, budget.monthly - budget.spent))}</strong>
+             </article>
+             <article className="budget-card">
+               <span>UTILIZATION</span>
+               <strong>{analytics.budgetUtilization}%</strong>
+             </article>
+           </div>
+
+          {/* Budget Progress Bar */}
+          {budget.monthly > 0 && (
+            <div className="budget-progress">
+              <div className="progress-bar">
+                <div 
+                  className="progress-fill" 
+                  style={{ 
+                    width: `${Math.min(100, (budget.spent / budget.monthly) * 100)}%`,
+                    background: budget.spent > budget.monthly ? 'linear-gradient(90deg, var(--coral), #f88)' : 
+                                budget.spent > budget.monthly * 0.9 ? 'linear-gradient(90deg, #f0a202, #fdd)' : 
+                                'linear-gradient(90deg, var(--teal), var(--mint))'
+                  }} 
+                />
+              </div>
+              <div className="progress-labels">
+                <span>0%</span>
+                <span>50%</span>
+                <span>90%</span>
+                <span>100%</span>
+              </div>
+            </div>
+          )}
+
+          <div className="panel-divider" />
+
+          {/* Budget Forecasting */}
+          <div className="panel-title">
+            <span className="section-kicker">BUDGET FORECAST</span>
+            <h2>Projected spending based on current trends</h2>
+          </div>
+          <div className="budget-forecast">
+            <article className="forecast-card">
+              <span>Projected Monthly</span>
+              <strong>{analytics.monthlyOrders > 0 ? formatCedi(Math.round(budget.spent / Math.max(1, new Date().getDate()) * 30)) : '—'}</strong>
+              <small>Based on {new Date().getDate()} days of data</small>
             </article>
-            <article className="budget-card highlight">
-              <span>SPENT THIS MONTH</span>
-              <strong>GH₵{formatCedi(budget.spent)}</strong>
+            <article className="forecast-card">
+              <span>Avg Daily Spend</span>
+              <strong>{analytics.monthlyOrders > 0 ? formatCedi(Math.round(budget.spent / Math.max(1, new Date().getDate()))) : '—'}</strong>
+              <small>Per day this month</small>
             </article>
-            <article className="budget-card">
-              <span>REMAINING</span>
-              <strong>GH₵{formatCedi(Math.max(0, budget.monthly - budget.spent))}</strong>
+            <article className="forecast-card">
+              <span>Days Until Budget</span>
+              <strong>{budget.monthly > 0 && budget.spent > 0 ? Math.max(0, Math.floor((budget.monthly - budget.spent) / Math.max(1, budget.spent / new Date().getDate()))) : '—'}</strong>
+              <small>At current rate</small>
             </article>
-            <article className="budget-card">
-              <span>UTILIZATION</span>
-              <strong>{analytics.budgetUtilization}%</strong>
+            <article className="forecast-card">
+              <span>Projected Yearly</span>
+              <strong>{analytics.monthlyOrders > 0 ? formatCedi(Math.round(budget.spent / Math.max(1, new Date().getDate()) * 365)) : '—'}</strong>
+              <small>Extrapolated annually</small>
             </article>
           </div>
 
           <div className="panel-divider" />
 
-          <form className="budget-form" onSubmit={(event) => {
-            event.preventDefault();
-            const formData = new FormData(event.target);
-            updateBudget({ monthly: Number(formData.get('monthly')) * 100 });
-          }}>
-            <div className="form-row">
-              <label>Monthly budget (GH₵)<input type="number" name="monthly" value={budget.monthly / 100} onChange={(e) => {}} step="100" min="0" required /></label>
+          {/* Monthly Comparison */}
+          <div className="panel-title">
+            <span className="section-kicker">MONTHLY COMPARISON</span>
+            <h2>Budget vs actual spending (last 6 months)</h2>
+          </div>
+          <div className="monthly-comparison">
+            {analytics.monthlyTrend.map((month, i) => (
+              <div key={month.month} className="comparison-bar-group">
+                <div className="comparison-bars">
+                  <div 
+                    className="comparison-bar-budget" 
+                    style={{ height: `${Math.max(5, (budget.monthly / Math.max(...analytics.monthlyTrend.map(m => m.spend), budget.monthly)) * 100)}%` }}
+                    title={`Budget: ${formatCedi(budget.monthly)}`}
+                  />
+                  <div 
+                    className="comparison-bar-actual" 
+                    style={{ height: `${Math.max(5, (month.spend / Math.max(...analytics.monthlyTrend.map(m => m.spend), budget.monthly)) * 100)}%` }}
+                    title={`${month.month}: ${formatCedi(month.spend)}`}
+                  />
+                </div>
+                <span className="comparison-label">{month.month}</span>
+                <div className="comparison-values">
+                  <span className="budget-val">Budget: {formatCedi(budget.monthly)}</span>
+                  <span className="actual-val">Actual: {formatCedi(month.spend)}</span>
+                </div>
+              </div>
+            ))}
+            <div className="comparison-legend">
+              <span className="legend-item budget"><span className="legend-color budget"></span> Budget</span>
+              <span className="legend-item actual"><span className="legend-color actual"></span> Actual</span>
             </div>
-            <button className="primary-button" type="submit">Update Budget</button>
-          </form>
+          </div>
+
+          <div className="panel-divider" />
+
+           <form className="budget-form" onSubmit={(event) => {
+             event.preventDefault();
+             updateBudget({ monthly: Number(budgetInput) * 100 });
+           }}>
+             <div className="form-row">
+               <label>Monthly budget (GH₵)<input type="number" name="monthly" value={budgetInput} onChange={(e) => setBudgetInput(e.target.value)} step="100" min="0" required /></label>
+             </div>
+             <button className="primary-button" type="submit">Update Budget</button>
+           </form>
         </section>
       )}
 
@@ -582,6 +839,250 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
             </button>
           </div>
         </section>
+      )}
+
+      {activeTab === 'insights' && (
+        <section className="panel">
+          <div className="panel-toolbar">
+            <div className="panel-title">
+              <span className="section-kicker">DEEP INSIGHTS</span>
+              <h2>Advanced analytics for your institution</h2>
+            </div>
+          </div>
+
+          {/* Monthly Trend Chart */}
+          <div className="panel-title">
+            <span className="section-kicker">MONTHLY TREND (Last 6 Months)</span>
+            <h2>Order volume and spend over time</h2>
+          </div>
+          <div className="trend-chart">
+            {analytics.monthlyTrend.map((month, i) => (
+              <div key={month.month} className="trend-bar-group">
+                <div className="trend-bars">
+                  <div 
+                    className="trend-bar-volume" 
+                    style={{ height: `${Math.max(5, (month.volume / Math.max(...analytics.monthlyTrend.map(m => m.volume), 1)) * 100)}%` }}
+                    title={`${month.month}: ${month.volume} gal`}
+                  />
+                  <div 
+                    className="trend-bar-spend" 
+                    style={{ height: `${Math.max(5, (month.spend / Math.max(...analytics.monthlyTrend.map(m => m.spend), 1)) * 100)}%` }}
+                    title={`${month.month}: ${formatCedi(month.spend)}`}
+                  />
+                </div>
+                <span className="trend-label">{month.month}</span>
+                <div className="trend-values">
+                  <span className="volume-val">{month.volume} gal</span>
+                  <span className="spend-val">{formatCedi(month.spend)}</span>
+                </div>
+              </div>
+            ))}
+            <div className="trend-legend">
+              <span className="legend-item volume"><span className="legend-color volume"></span> Volume (gal)</span>
+              <span className="legend-item spend"><span className="legend-color spend"></span> Spend (GH₵)</span>
+            </div>
+          </div>
+
+          <div className="panel-divider" />
+
+          {/* Seller Performance Details */}
+          <div className="panel-title">
+            <span className="section-kicker">SELLER PERFORMANCE</span>
+            <h2>Detailed seller rankings for your institution</h2>
+          </div>
+          {analytics.sellerStats.length === 0 ? (
+            <p className="empty-feed">No seller performance data yet.</p>
+          ) : (
+            <div className="seller-performance-table">
+              <div className="table-header">
+                <span>Rank</span>
+                <span>Seller</span>
+                <span>Orders</span>
+                <span>Volume</span>
+                <span>Total Spend</span>
+                <span>Avg/Order</span>
+                <span>On-Time %</span>
+              </div>
+              {analytics.sellerStats.map((seller, i) => (
+                <div key={seller.name} className="table-row">
+                  <span className="rank">{i + 1}</span>
+                  <span>{seller.name}</span>
+                  <span>{seller.orders}</span>
+                  <span>{seller.volume} gal</span>
+                  <span>{formatCedi(seller.spend)}</span>
+                  <span>{seller.avgOrderValue}</span>
+                  <span className={seller.onTimeRate >= 90 ? 'good' : seller.onTimeRate >= 70 ? 'warning' : 'critical'}>
+                    {seller.onTimeRate}%
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="panel-divider" />
+
+          {/* Driver Performance Details */}
+          <div className="panel-title">
+            <span className="section-kicker">DRIVER PERFORMANCE</span>
+            <h2>Detailed driver rankings for your institution</h2>
+          </div>
+          {analytics.driverStats.length === 0 ? (
+            <p className="empty-feed">No driver performance data yet.</p>
+          ) : (
+            <div className="driver-performance-table">
+              <div className="table-header">
+                <span>Rank</span>
+                <span>Driver</span>
+                <span>Orders</span>
+                <span>Volume</span>
+                <span>Total Spend</span>
+                <span>Avg/Order</span>
+                <span>On-Time %</span>
+              </div>
+              {analytics.driverStats.map((driver, i) => (
+                <div key={driver.name} className="table-row">
+                  <span className="rank">{i + 1}</span>
+                  <span>{driver.name}</span>
+                  <span>{driver.orders}</span>
+                  <span>{driver.volume} gal</span>
+                  <span>{formatCedi(driver.spend)}</span>
+                  <span>{driver.avgOrderValue}</span>
+                  <span className={driver.onTimeRate >= 90 ? 'good' : driver.onTimeRate >= 70 ? 'warning' : 'critical'}>
+                    {driver.onTimeRate}%
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="panel-divider" />
+
+          {/* Water Quality Trends */}
+          <div className="panel-title">
+            <span className="section-kicker">WATER QUALITY TRENDS (90 Days)</span>
+            <h2>Parameter trends over time</h2>
+          </div>
+          {qualityTrends && Object.keys(qualityTrends).length > 0 ? (
+            <div className="quality-trends-grid">
+              {Object.entries(qualityTrends).map(([param, trend]) => (
+                <article key={param} className="quality-trend-card panel">
+                  <div className="trend-header">
+                    <strong>{param.toUpperCase()}</strong>
+                    <span className={`trend-direction ${trend.trend}`}>
+                      {trend.trend === 'increasing' ? '↑' : trend.trend === 'decreasing' ? '↓' : '→'}
+                      {trend.changePercent > 0 ? '+' : ''}{trend.changePercent}%
+                    </span>
+                  </div>
+                  <div className="trend-values">
+                    <div><span>Current:</span> <strong>{trend.current}</strong></div>
+                    <div><span>Previous:</span> <strong>{trend.previous}</strong></div>
+                    <div><span>Change:</span> <strong>{trend.change > 0 ? '+' : ''}{trend.change}</strong></div>
+                  </div>
+                  <div className="trend-mini-chart">
+                    {trend.values.slice(-10).map((v, i) => (
+                      <div key={i} className="mini-bar" style={{ height: `${Math.max(2, (v.value / 14) * 100)}%` }} title={`${v.date}: ${v.value}`} />
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="empty-feed">Add water quality records to see trend analysis.</p>
+          )}
+
+          <div className="panel-divider" />
+
+          {/* Compliance Summary */}
+          <div className="panel-title">
+            <span className="section-kicker">COMPLIANCE SUMMARY</span>
+            <h2>Parameter compliance rates</h2>
+          </div>
+           {complianceSummary.totalTests > 0 ? (
+             <div className="compliance-grid">
+               {Object.entries(complianceSummary.byParameter).map(([param, data]) => (
+                 <article key={param} className="compliance-card panel">
+                   <div className="compliance-header">
+                     <strong>{param.toUpperCase()}</strong>
+                     <span className={`status ${data.passRate >= 90 ? 'status-delivered' : data.passRate >= 70 ? 'status-online' : 'status-cancelled'}`}>
+                       {data.passRate}% PASS
+                     </span>
+                   </div>
+                   <div className="compliance-stats">
+                     <div><span>Tests:</span> <strong>{data.total}</strong></div>
+                     <div><span>Passed:</span> <strong>{data.passed}</strong></div>
+                     <div><span>Failed:</span> <strong>{data.total - data.passed}</strong></div>
+                   </div>
+                   <div className="compliance-bar">
+                     <div className="compliance-fill" style={{ width: `${data.passRate}%` }} />
+                   </div>
+                 </article>
+               ))}
+             </div>
+           ) : (
+             <p className="empty-feed">No water quality tests recorded yet.</p>
+           )}
+
+           {/* Supply Risk Assessment */}
+           {supplyRisk.length > 0 && (
+             <>
+               <div className="panel-divider" />
+               
+               <div className="panel-title">
+                 <span className="section-kicker">SUPPLY RISK ASSESSMENT</span>
+                 <h2>Supplier reliability and concentration risk</h2>
+               </div>
+               
+               <div className="supply-risk-grid">
+                 {supplyRisk.map((seller) => (
+                   <article key={seller.name} className="risk-card panel">
+                     <div className="risk-header">
+                       <strong>{seller.name}</strong>
+                       <span className={`risk-level ${seller.riskLevel}`}>
+                         {seller.riskLevel.toUpperCase()}
+                       </span>
+                     </div>
+                     <div className="risk-details">
+                       <div><span>Risk Score:</span> <strong>{seller.riskScore}/100</strong></div>
+                       <div><span>On-Time Rate:</span> <strong>{seller.onTimeRate}%</strong></div>
+                       <div><span>Spend Share:</span> <strong>{seller.spendShare}%</strong></div>
+                       <div><span>Orders:</span> <strong>{seller.orders}</strong></div>
+                     </div>
+                   </article>
+                 ))}
+               </div>
+             </>
+           )}
+
+           {/* Savings Recommendations */}
+           {savingsRecommendations.length > 0 && (
+             <>
+               <div className="panel-divider" />
+               
+               <div className="panel-title">
+                 <span className="section-kicker">SAVINGS RECOMMENDATIONS</span>
+                 <h2>Opportunities to optimize your water spending</h2>
+               </div>
+               
+               <div className="recommendations-list">
+                 {savingsRecommendations.map((rec) => (
+                   <article key={rec.id} className="recommendation-card panel">
+                     <div className="recommendation-header">
+                       <span className={`priority ${rec.priority}`}>{rec.priority.toUpperCase()}</span>
+                       <strong>{rec.title}</strong>
+                     </div>
+                     <p className="recommendation-description">{rec.description}</p>
+                     {rec.potentialSavings > 0 && (
+                       <div className="recommendation-savings">
+                         <span>Potential Savings:</span>
+                         <strong>{formatCedi(rec.potentialSavings)}</strong>
+                       </div>
+                     )}
+                   </article>
+                 ))}
+               </div>
+             </>
+           )}
+         </section>
       )}
 
       {activeTab === 'smart' && (
