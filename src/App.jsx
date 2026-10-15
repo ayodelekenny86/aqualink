@@ -32,71 +32,7 @@ import { initWebVitals, trackEvent, EVENTS } from './lib/analytics';
 import RatingModal from './components/RatingModal';
 import { useRatings, useRatedOrders, useDriverRatings, useRatingsByBuyer } from './hooks/useRatings';
 
-// Smart feature components
-import SmartSchedulingPanel from './components/SmartSchedulingPanel';
-import WaterQualityPanel from './components/WaterQualityPanel';
-import DynamicPricingConsole from './components/DynamicPricingConsole';
-import DemandForecastingPanel from './components/DemandForecastingPanel';
-import DriverPerformancePanel from './components/DriverPerformancePanel';
-import AutomatedDispatchPanel from './components/AutomatedDispatchPanel';
-import PredictiveMaintenancePanel from './components/PredictiveMaintenancePanel';
-import SupplyChainOptimizationPanel from './components/SupplyChainOptimizationPanel';
-import CustomerChurnPredictionPanel from './components/CustomerChurnPredictionPanel';
-import RevenueOptimizationPanel from './components/RevenueOptimizationPanel';
-import QualityAssurancePanel from './components/QualityAssurancePanel';
-import FleetUtilizationPanel from './components/FleetUtilizationPanel';
-import MarketIntelligencePanel from './components/MarketIntelligencePanel';
-import EnergyOptimizationPanel from './components/EnergyOptimizationPanel';
-import SubscriptionManagementPanel from './components/SubscriptionManagementPanel';
-import SustainabilityTrackingPanel from './components/SustainabilityTrackingPanel';
-import WaterSourceOptimizationPanel from './components/WaterSourceOptimizationPanel';
-import ComplianceMonitoringPanel from './components/ComplianceMonitoringPanel';
-import EmergencyResponsePanel from './components/EmergencyResponsePanel';
-import CarbonFootprintTrackingPanel from './components/CarbonFootprintTrackingPanel';
-import SmartDeliverySchedulingPanel from './components/SmartDeliverySchedulingPanel';
-import WaterQualityPredictionPanel from './components/WaterQualityPredictionPanel';
-import CustomerSentimentAnalysisPanel from './components/CustomerSentimentAnalysisPanel';
-import RevenueLeakDetectionPanel from './components/RevenueLeakDetectionPanel';
-import PredictivePricingPanel from './components/PredictivePricingPanel';
-import RouteOptimizationV2Panel from './components/RouteOptimizationV2Panel';
-import InventoryForecastingPanel from './components/InventoryForecastingPanel';
-import DriverBehaviorPanel from './components/DriverBehaviorPanel';
-import CustomerLifetimeValuePanel from './components/CustomerLifetimeValuePanel';
-import DemandSensingPanel from './components/DemandSensingPanel';
-
-// Smart feature hooks
-import useSmartScheduling from './hooks/useSmartScheduling';
-import useWaterQuality from './hooks/useWaterQuality';
-import useDynamicPricing from './hooks/useDynamicPricing';
-import { useDemandForecasting } from './hooks/useDemandForecasting';
-import { useDriverPerformance } from './hooks/useDriverPerformance';
-import { useAutomatedDispatch } from './hooks/useAutomatedDispatch';
-import { usePredictiveMaintenance } from './hooks/usePredictiveMaintenance';
-import { useSupplyChainOptimization } from './hooks/useSupplyChainOptimization';
-import { useCustomerChurnPrediction } from './hooks/useCustomerChurnPrediction';
-import { useRevenueOptimization } from './hooks/useRevenueOptimization';
-import { useQualityAssurance } from './hooks/useQualityAssurance';
-import { useFleetUtilization } from './hooks/useFleetUtilization';
-import { useMarketIntelligence } from './hooks/useMarketIntelligence';
-import { useEnergyOptimization } from './hooks/useEnergyOptimization';
-import { useSubscriptionManagement } from './hooks/useSubscriptionManagement';
-import { useSustainabilityTracking } from './hooks/useSustainabilityTracking';
-import { useWaterSourceOptimization } from './hooks/useWaterSourceOptimization';
-import { useComplianceMonitoring } from './hooks/useComplianceMonitoring';
-import { useEmergencyResponse } from './hooks/useEmergencyResponse';
-import { useCarbonFootprintTracking } from './hooks/useCarbonFootprintTracking';
-import { useSmartDeliveryScheduling } from './hooks/useSmartDeliveryScheduling';
-import { useWaterQualityPrediction } from './hooks/useWaterQualityPrediction';
-import { useCustomerSentimentAnalysis } from './hooks/useCustomerSentimentAnalysis';
-import { useRevenueLeakDetection } from './hooks/useRevenueLeakDetection';
-import { usePredictivePricing } from './hooks/usePredictivePricing';
-import { useRouteOptimizationV2 } from './hooks/useRouteOptimizationV2';
-import { useInventoryForecasting } from './hooks/useInventoryForecasting';
-import { useDriverBehavior } from './hooks/useDriverBehavior';
-import { useCustomerLifetimeValue } from './hooks/useCustomerLifetimeValue';
-import { useDemandSensing } from './hooks/useDemandSensing';
-
-// Admin-only and overlay surfaces load on demand. A buyer who never opens the
+// Admin-only and overlay surfaces load on demand.
 // admin console never downloads it, which keeps the initial bundle small.
 const AdminPricingConsole = lazy(() => import('./components/AdminPricingConsole'));
 const SellerApprovalQueue = lazy(() => import('./components/SellerApprovalQueue'));
@@ -113,7 +49,7 @@ const roles = [
   ['ops', 'Admin', 'Authorized operations access'],
 ];
 
-const ROLE_ICONS = { buyer: '⌂', seller: '↗', driver: '⇢', institution: '▦', ops: '◈' };
+const ROLE_ICONS = { buyer: '¦', seller: '?', driver: '?', institution: '?', ops: '?' };
 
 const SUPPORT_PHONE = '0545009046';
 
@@ -163,8 +99,8 @@ function identityFor(session, region) {
  * Money shown to buyers, sellers and institutions, computed from the orders that
  * actually exist.
  *
- * This was a literal object of invented figures: a seller "net GH₵6,904.40", an
- * institution on a "GH₵3,500 plan", a buyer fee of 15% when the configured
+ * This was a literal object of invented figures: a seller "net GH?6,904.40", an
+ * institution on a "GH?3,500 plan", a buyer fee of 15% when the configured
  * service charge is 10%. None of it came from an order, so a business reading
  * its own dashboard was reading fiction. Every figure now comes from
  * `summarise`, which sums real orders.
@@ -173,7 +109,7 @@ function identityFor(session, region) {
 /**
  * Ops headline figures, summed from real orders.
  *
- * This was four hardcoded tiles reading 124 orders, GH₵18,540 GMV, 1,248 buyers,
+ * This was four hardcoded tiles reading 124 orders, GH?18,540 GMV, 1,248 buyers,
  * 4 disputes and 92% quality badges. An operator has no way to tell invented
  * numbers from measured ones, which is exactly why a dashboard that fabricates
  * is worse than one that admits it has no data. There is no dispute or
@@ -300,15 +236,10 @@ function App() {
   // rank drivers without mounting a hook per driver.
   const { summary: driverRatingsSummary } = useDriverRatings(null);
 
-  // Smart feature hooks
-  const { stats: schedulingStats } = useSmartScheduling({ orders, onNotice: showNotice });
-  const { records: waterQualityRecords } = useWaterQuality({ orders, onNotice: showNotice, sellers: sellerRanked });
-  const { rules: pricingRules, activeSurge } = useDynamicPricing({ orders, sellerRanked, onNotice: showNotice });
-
-  // Fleet drivers data - must be defined before AI feature hooks that depend on it
+  // Fleet drivers data, used by the driver-facing and ops views.
   const fleetDrivers = useMemo(() => list('drivers'), []);
-  
-  // Build driver locations map from fleet drivers for AI features
+
+  // Build driver locations map for the driver and ops dashboards.
   const driverLocations = useMemo(() => {
     const locations = {};
     fleetDrivers.forEach(driver => {
@@ -325,355 +256,6 @@ function App() {
     return locations;
   }, [fleetDrivers]);
   
-  // Build zone loads from orders for dispatch optimization
-  const zoneLoads = useMemo(() => {
-    const loads = {};
-    orders.filter(o => ['Pending', 'Confirmed', 'Assigned', 'En Route'].includes(o.status)).forEach(order => {
-      const zone = order.zone || 'zone_1';
-      loads[zone] = (loads[zone] || 0) + 1;
-    });
-    return loads;
-  }, [orders]);
-
-  // Advanced AI feature hooks
-  const { 
-    weeklyForecast: demandForecast, 
-    highPotentialZones: demandPotential,
-    heatmapData: demandHeatmap 
-  } = useDemandForecasting({ orders, onNotice: showNotice });
-  const { 
-    leaderboard: driverLeaderboard, 
-    coachingAlerts: driverCoaching,
-    metrics: driverMetrics 
-  } = useDriverPerformance({ drivers: fleetDrivers, orders, driverLocations, onNotice: showNotice });
-  const { 
-    dispatchPlan, 
-    dispatchHistory: autoDispatchHistory,
-    stats: dispatchStats 
-  } = useAutomatedDispatch({ orders, drivers: fleetDrivers, driverLocations, zoneLoads: {}, onNotice: showNotice });
-
-  // New advanced features
-  const { 
-    predictions: maintenancePredictions, 
-    alerts: maintenanceAlerts,
-    summary: maintenanceSummary 
-  } = usePredictiveMaintenance({ vehicles: [], orders, onNotice: showNotice });
-  const { 
-    supplyChain, 
-    warehouseStatus, 
-    optimizations: supplyChainOptimizations,
-    summary: supplyChainSummary 
-  } = useSupplyChainOptimization({ suppliers: [], warehouses: [], orders, onNotice: showNotice });
-  const { 
-    churnPredictions, 
-    atRiskCustomers, 
-    summary: churnSummary 
-  } = useCustomerChurnPrediction({ customers: [], orders, onNotice: showNotice });
-  const { 
-    revenueAnalysis, 
-    recommendations: revenueRecommendations,
-    summary: revenueSummary 
-  } = useRevenueOptimization({ orders, pricing: pricingRules, customers: [], onNotice: showNotice });
-  const { 
-    sourceAnalysis: qualitySources, 
-    alerts: qualityAlerts,
-    summary: qualitySummary 
-  } = useQualityAssurance({ qualityRecords: waterQualityRecords, sources: [], orders, onNotice: showNotice });
-  const { 
-    utilization: fleetUtilization, 
-    fleetSummary, 
-    zoneUtilization,
-    recommendations: fleetRecommendations 
-  } = useFleetUtilization({ fleetDrivers, orders, driverLocations, onNotice: showNotice });
-
-  // Additional advanced AI features
-  const { 
-    marketData, 
-    competitorAnalysis, 
-    pricingIntelligence, 
-    trendForecasts, 
-    summary: marketSummary 
-  } = useMarketIntelligence({ orders, customers: [], competitors: [], onNotice: showNotice });
-  const { 
-    energyData, 
-    efficiencyRecommendations, 
-    evTransitionPlan, 
-    carbonFootprint, 
-    summary: energySummary 
-  } = useEnergyOptimization({ fleetDrivers, orders, driverLocations, vehicles: [], onNotice: showNotice });
-  const { 
-    subscriptionData, 
-    churnRisk, 
-    upsellOpportunities, 
-    revenueForecast: subscriptionForecast, 
-    lifecycleMetrics, 
-    summary: subscriptionSummary 
-  } = useSubscriptionManagement({ customers: [], orders, subscriptions: [], onNotice: showNotice });
-  const { 
-    sustainabilityData, 
-    waterFootprint, 
-    circularEconomy, 
-    sdgAlignment, 
-    certifications, 
-    summary: sustainabilitySummary 
-  } = useSustainabilityTracking({ orders, qualityRecords: waterQualityRecords, sources: [], fleetDrivers, vehicles: [], onNotice: showNotice });
-
-  // New advanced AI features - Water Source, Compliance, Emergency, Carbon, Smart Scheduling, Quality Prediction, Sentiment, Revenue Leaks
-  const { 
-    analysis: waterSourceAnalysis, 
-    primarySource, 
-    secondarySource, 
-    backupSources, 
-    alerts: sourceAlerts,
-    optimalMix 
-  } = useWaterSourceOptimization({ sources: [], orders, qualityRecords: waterQualityRecords });
-  
-  const { 
-    status: complianceStatus, 
-    overallScore: complianceScore, 
-    criticalAlerts: complianceCriticalAlerts, 
-    highAlerts: complianceHighAlerts,
-    summary: complianceSummary 
-  } = useComplianceMonitoring({ 
-    permits: [], 
-    inspections: [], 
-    regulations: [],
-    facilities: [],
-    onNotice: showNotice 
-  });
-  
-  const { 
-    emergencies, 
-    activeEmergency, 
-    responsePlans, 
-    activeCount: emergencyActiveCount, 
-    criticalCount: emergencyCriticalCount,
-    generateResponsePlan,
-    executeResponsePlan,
-    resolveEmergency
-  } = useEmergencyResponse({ 
-    orders, 
-    drivers: fleetDrivers, 
-    facilities: [], 
-    customers: [], 
-    weatherAlerts: [],
-    onNotice: showNotice 
-  });
-  
-  const { 
-    footprint: carbonFootprintData, 
-    totalEmissions, 
-    emissionsPerGallon, 
-    progressToTarget: carbonProgress,
-    reductionOpportunities,
-    monthlyTrend: carbonTrend
-  } = useCarbonFootprintTracking({ 
-    orders, 
-    drivers: fleetDrivers, 
-    vehicles: [], 
-    routes: [], 
-    facilities: [],
-    onNotice: showNotice 
-  });
-  
-  const { 
-    schedule: smartSchedule, 
-    optimization: scheduleOptimization, 
-    scheduledCount, 
-    conflictCount, 
-    efficiency: scheduleEfficiency,
-    distanceSaved 
-  } = useSmartDeliveryScheduling({ 
-    orders, 
-    drivers: fleetDrivers, 
-    vehicles: [], 
-    facilities: [], 
-    trafficData: [], 
-    weatherData: [],
-    onNotice: showNotice 
-  });
-  
-  const { 
-    predictions: qualityPredictions, 
-    anomalies: qualityAnomalies, 
-    criticalCount: qualityCriticalCount, 
-    highRiskCount: qualityHighRiskCount,
-    avgPredictedScore,
-    overallTrend: qualityTrend,
-    alerts: qualityPredictionAlerts
-  } = useWaterQualityPrediction({ 
-    qualityRecords: waterQualityRecords, 
-    sources: [],
-    weatherData: [],
-    treatmentRecords: [],
-    onNotice: showNotice 
-  });
-  
-  const { 
-    analysis: sentimentAnalysis, 
-    overallSentiment, 
-    nps, 
-    churnRiskCount, 
-    criticalAlerts: sentimentCriticalAlerts,
-    insights: sentimentInsights,
-    segments: sentimentSegments
-  } = useCustomerSentimentAnalysis({ 
-    customers: [], 
-    orders, 
-    ratings: [], 
-    messages: [], 
-    supportTickets: [],
-    onNotice: showNotice 
-  });
-  
-  const { 
-    leaks: revenueLeaks, 
-    summary: leakSummary, 
-    totalLeakAmount, 
-    netLeak, 
-    criticalCount: leakCriticalCount, 
-    highCount: leakHighCount 
-  } = useRevenueLeakDetection({ 
-    orders, 
-    payments: [], 
-    invoices: [], 
-    pricing: pricingRules, 
-    drivers: fleetDrivers, 
-    facilities: [],
-    onNotice: showNotice 
-  });
-
-  // New advanced hooks
-  const { 
-    analysis: predictivePricingAnalysis,
-    recommendations: pricingRecommendations,
-    loading: pricingLoading,
-    refresh: refreshPricing,
-    currentPrice,
-    optimalPrice,
-    elasticity
-  } = usePredictivePricing({
-    orders,
-    pricing: pricingRules,
-    competitors: [],
-    weatherData: [],
-    events: [],
-    historicalPricing: [],
-    onNotice: showNotice
-  });
-
-  const { 
-    optimization: routeV2Optimization,
-    routes: routeV2Routes,
-    loading: routeV2Loading,
-    error: routeV2Error,
-    refresh: refreshRouteV2,
-    reoptimizeRoute,
-    assignOrderToRoute,
-    totalSavings: routeV2Savings,
-    savingsPercent: routeV2SavingsPercent,
-    unassignedCount: routeV2Unassigned,
-    getDriverRoute: getRouteV2DriverRoute
-  } = useRouteOptimizationV2({
-    orders,
-    drivers: fleetDrivers,
-    vehicles: [],
-    facilities: [],
-    trafficData: [],
-    timeWindows: [],
-    onNotice: showNotice
-  });
-
-  const { 
-    forecasts: inventoryForecasts,
-    alerts: inventoryAlerts,
-    loading: inventoryLoading,
-    error: inventoryError,
-    refresh: refreshInventory,
-    placeOrder: placeInventoryOrder,
-    updateReorderPoint,
-    getProductForecast,
-    getCriticalAlerts: getInventoryCriticalAlerts,
-    getTotalInventoryValue,
-    criticalCount: inventoryCriticalCount,
-    highCount: inventoryHighCount,
-    atRiskProducts
-  } = useInventoryForecasting({
-    products: [],
-    orders,
-    suppliers: [],
-    warehouses: [],
-    usageHistory: [],
-    onNotice: showNotice
-  });
-
-  const { 
-    analysis: driverBehaviorAnalysis,
-    coachingAlerts: driverBehaviorCoachingAlerts,
-    loading: driverBehaviorLoading,
-    error: driverBehaviorError,
-    refresh: refreshDriverBehavior,
-    getDriverAnalysis,
-    getCoachingCandidates,
-    acknowledgeAlert: acknowledgeDriverAlert,
-    summary: driverBehaviorSummary,
-    criticalAlerts: driverBehaviorCriticalAlerts,
-    highAlerts: driverBehaviorHighAlerts
-  } = useDriverBehavior({
-    drivers: fleetDrivers,
-    trips: [],
-    vehicles: [],
-    fuelRecords: [],
-    maintenanceRecords: [],
-    onNotice: showNotice
-  });
-
-  const { 
-    segments: clvSegments,
-    clvAnalysis,
-    loading: clvLoading,
-    error: clvError,
-    refresh: refreshCLV,
-    getCustomerCLV,
-    getHighValueCustomers,
-    getChurnRiskCustomers,
-    getRetentionRecommendations,
-    summary: clvSummary,
-    topCustomers,
-    churnRiskCount: clvChurnRiskCount
-  } = useCustomerLifetimeValue({
-    customers: [],
-    orders,
-    payments: [],
-    subscriptions: [],
-    interactions: [],
-    onNotice: showNotice
-  });
-
-  const { 
-    demandForecast: demandSensingForecast,
-    anomalies: demandSensingAnomalies,
-    loading: demandSensingLoading,
-    error: demandSensingError,
-    refresh: refreshDemandSensing,
-    getDemandAtDate,
-    getWeeklyDemand,
-    adjustForecast,
-    totalForecast,
-    avgDailyDemand,
-    peakDemand,
-    anomalyCount: demandSensingAnomalyCount,
-    highSeverityAnomalies
-  } = useDemandSensing({
-    orders,
-    customers: [],
-    weatherForecast: [],
-    events: [],
-    historicalData: [],
-    marketIndicators: [],
-    onNotice: showNotice
-  });
-
   // Reliability is a second opinion on seller performance, aimed at the
   // operator question "how dependable is this seller, and how long do they
   // usually take?". The SLA is the median of observed delivery windows and is
@@ -798,7 +380,7 @@ function App() {
     <div className={`app-shell ${role === 'driver' ? 'is-driver' : ''}`}>
       <ErrorBoundary fallback={(error, reset) => (
         <div className="access-gate panel" style={{ maxWidth: '600px', margin: '60px auto', padding: '32px' }}>
-          <div className="error-icon" style={{ fontSize: '48px', textAlign: 'center', marginBottom: '16px' }}>⚠</div>
+          <div className="error-icon" style={{ fontSize: '48px', textAlign: 'center', marginBottom: '16px' }}>?</div>
           <h1 style={{ textAlign: 'center', marginBottom: '8px' }}>Something went wrong</h1>
           <p style={{ textAlign: 'center', color: 'var(--muted)', marginBottom: '24px' }}>
             An unexpected error occurred. Our team has been notified.
@@ -848,30 +430,30 @@ function App() {
               </select>
             </div>
 <div className="topbar-actions">
-              <label className="language-picker"><span>文</span>
+              <label className="language-picker"><span>?</span>
                 <select aria-label="Language" value={language} onChange={(event) => setLanguage(event.target.value)}>
                   {languages.map(([key, label]) => <option value={key} key={key}>{label}</option>)}
                 </select>
               </label>
               <button className={`ai-trigger ${aiOpen ? 'active' : ''}`} type="button" onClick={toggleAi}>
-                <span>✦</span> Naut AI
+                <span>?</span> Naut AI
               </button>
               <button className="icon-button" type="button" aria-label="Notifications" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen(!notificationsOpen)}>
-                <span>♧</span>
+                <span>?</span>
                 {roleUnread > 0 && <em>{roleUnread}</em>}
               </button>
               <button className="icon-button" type="button" aria-label="Messages" aria-expanded={messagesOpen} onClick={() => setMessagesOpen(!messagesOpen)}>
-                <span>✉</span>
+                <span>?</span>
               </button>
-              {canSignOut && <button className="icon-button topbar-signout" type="button" aria-label="Sign out" title="Sign out" onClick={() => signOut()}><span>⎋</span></button>}
+              {canSignOut && <button className="icon-button topbar-signout" type="button" aria-label="Sign out" title="Sign out" onClick={() => signOut()}><span>?</span></button>}
               <button className="profile mobile-profile" type="button" aria-label={`Signed in as ${identity.name}`}><span className="avatar">{identity.initials}</span></button>
             </div>
           </header>
         <PWASetup />
         <PWADetectOffline onOfflineChange={(offline) => showNotice(offline ? 'You are offline. Changes will sync when reconnected.' : 'Back online. Syncing...')} />
-        {notice && <div className="notice" role="status"><span>✓</span>{notice}<button type="button" aria-label="Dismiss notification" onClick={dismissNotice}>×</button></div>}
+        {notice && <div className="notice" role="status"><span>?</span>{notice}<button type="button" aria-label="Dismiss notification" onClick={dismissNotice}>×</button></div>}
         {aiOpen && <AiPanel role={role} input={aiInput} setInput={setAiInput} messages={aiMessages} askAi={askAi} close={closeAi} aiLoading={aiLoading} aiSource={aiSource} aiFallbackReason={aiFallbackReason} />}
-        {!ready && <section className="access-gate panel"><span className="access-lock">⌁</span><p className="eyebrow">Preparing secure workspace</p><h1>Setting up your accounts.</h1><p>Nautica is generating the local account registry and its credentials on this device. This takes a moment and needs no network access.</p>        </section>}
+        {!ready && <section className="access-gate panel"><span className="access-lock">?</span><p className="eyebrow">Preparing secure workspace</p><h1>Setting up your accounts.</h1><p>Nautica is generating the local account registry and its credentials on this device. This takes a moment and needs no network access.</p>        </section>}
         {notificationsOpen && (
           <Suspense fallback={null}>
             <NotificationsPanel
@@ -958,175 +540,6 @@ function App() {
             applyForSellerApproval={applyForSellerApproval}
             refreshSellerApproval={refreshSellerApproval}
             completeSellerApproval={completeSellerApproval}
-            demandForecast={demandForecast}
-            demandPotential={demandPotential}
-            demandHeatmap={demandHeatmap}
-            driverLeaderboard={driverLeaderboard}
-            driverMetrics={driverMetrics}
-            dispatchPlan={dispatchPlan}
-            dispatchStats={dispatchStats}
-            fleetDrivers={fleetDrivers}
-            driverLocations={driverLocations}
-            maintenancePredictions={maintenancePredictions}
-            maintenanceAlerts={maintenanceAlerts}
-            maintenanceSummary={maintenanceSummary}
-            supplyChain={supplyChain}
-            warehouseStatus={warehouseStatus}
-            supplyChainOptimizations={supplyChainOptimizations}
-            supplyChainSummary={supplyChainSummary}
-            churnPredictions={churnPredictions}
-            atRiskCustomers={atRiskCustomers}
-            churnSummary={churnSummary}
-            revenueAnalysis={revenueAnalysis}
-            revenueRecommendations={revenueRecommendations}
-            revenueSummary={revenueSummary}
-            qualitySources={qualitySources}
-            qualityAlerts={qualityAlerts}
-            qualitySummary={qualitySummary}
-            fleetUtilization={fleetUtilization}
-            fleetSummary={fleetSummary}
-            zoneUtilization={zoneUtilization}
-            fleetRecommendations={fleetRecommendations}
-            marketData={marketData}
-            competitorAnalysis={competitorAnalysis}
-            pricingIntelligence={pricingIntelligence}
-            trendForecasts={trendForecasts}
-            marketSummary={marketSummary}
-            energyData={energyData}
-            efficiencyRecommendations={efficiencyRecommendations}
-            evTransitionPlan={evTransitionPlan}
-            carbonFootprint={carbonFootprint}
-            energySummary={energySummary}
-            subscriptionData={subscriptionData}
-            churnRisk={churnRisk}
-            upsellOpportunities={upsellOpportunities}
-            subscriptionForecast={subscriptionForecast}
-            lifecycleMetrics={lifecycleMetrics}
-            subscriptionSummary={subscriptionSummary}
-            sustainabilityData={sustainabilityData}
-            waterFootprint={waterFootprint}
-            circularEconomy={circularEconomy}
-            sdgAlignment={sdgAlignment}
-            certifications={certifications}
-            sustainabilitySummary={sustainabilitySummary}
-            waterSourceAnalysis={waterSourceAnalysis}
-            primarySource={primarySource}
-            secondarySource={secondarySource}
-            backupSources={backupSources}
-            sourceAlerts={sourceAlerts}
-            optimalMix={optimalMix}
-            complianceStatus={complianceStatus}
-            complianceScore={complianceScore}
-            complianceCriticalAlerts={complianceCriticalAlerts}
-            complianceHighAlerts={complianceHighAlerts}
-            complianceSummary={complianceSummary}
-            emergencies={emergencies}
-            activeEmergency={activeEmergency}
-            responsePlans={responsePlans}
-            emergencyActiveCount={emergencyActiveCount}
-            emergencyCriticalCount={emergencyCriticalCount}
-            generateResponsePlan={generateResponsePlan}
-            executeResponsePlan={executeResponsePlan}
-            resolveEmergency={resolveEmergency}
-            carbonFootprintData={carbonFootprintData}
-            totalEmissions={totalEmissions}
-            emissionsPerGallon={emissionsPerGallon}
-            carbonProgress={carbonProgress}
-            reductionOpportunities={reductionOpportunities}
-            carbonTrend={carbonTrend}
-            smartSchedule={smartSchedule}
-            scheduleOptimization={scheduleOptimization}
-            scheduledCount={scheduledCount}
-            conflictCount={conflictCount}
-            scheduleEfficiency={scheduleEfficiency}
-            distanceSaved={distanceSaved}
-            qualityPredictions={qualityPredictions}
-            qualityAnomalies={qualityAnomalies}
-            qualityCriticalCount={qualityCriticalCount}
-            qualityHighRiskCount={qualityHighRiskCount}
-            avgPredictedScore={avgPredictedScore}
-            qualityTrend={qualityTrend}
-            qualityPredictionAlerts={qualityPredictionAlerts}
-            sentimentAnalysis={sentimentAnalysis}
-            overallSentiment={overallSentiment}
-            nps={nps}
-            churnRiskCount={churnRiskCount}
-            sentimentCriticalAlerts={sentimentCriticalAlerts}
-            sentimentInsights={sentimentInsights}
-            sentimentSegments={sentimentSegments}
-            revenueLeaks={revenueLeaks}
-            leakSummary={leakSummary}
-            totalLeakAmount={totalLeakAmount}
-            netLeak={netLeak}
-            leakCriticalCount={leakCriticalCount}
-            leakHighCount={leakHighCount}
-            predictivePricingAnalysis={predictivePricingAnalysis}
-            pricingRecommendations={pricingRecommendations}
-            pricingLoading={pricingLoading}
-            refreshPricing={refreshPricing}
-            currentPrice={currentPrice}
-            optimalPrice={optimalPrice}
-            elasticity={elasticity}
-            routeV2Optimization={routeV2Optimization}
-            routeV2Routes={routeV2Routes}
-            routeV2Loading={routeV2Loading}
-            routeV2Error={routeV2Error}
-            refreshRouteV2={refreshRouteV2}
-            reoptimizeRoute={reoptimizeRoute}
-            assignOrderToRoute={assignOrderToRoute}
-            routeV2Savings={routeV2Savings}
-            routeV2SavingsPercent={routeV2SavingsPercent}
-            routeV2Unassigned={routeV2Unassigned}
-            getRouteV2DriverRoute={getRouteV2DriverRoute}
-            inventoryForecasts={inventoryForecasts}
-            inventoryAlerts={inventoryAlerts}
-            inventoryLoading={inventoryLoading}
-            inventoryError={inventoryError}
-            refreshInventory={refreshInventory}
-            placeInventoryOrder={placeInventoryOrder}
-            updateReorderPoint={updateReorderPoint}
-            getProductForecast={getProductForecast}
-            getInventoryCriticalAlerts={getInventoryCriticalAlerts}
-            getTotalInventoryValue={getTotalInventoryValue}
-            inventoryCriticalCount={inventoryCriticalCount}
-            inventoryHighCount={inventoryHighCount}
-            atRiskProducts={atRiskProducts}
-            driverBehaviorAnalysis={driverBehaviorAnalysis}
-            driverBehaviorCoachingAlerts={driverBehaviorCoachingAlerts}
-            driverBehaviorLoading={driverBehaviorLoading}
-            driverBehaviorError={driverBehaviorError}
-            refreshDriverBehavior={refreshDriverBehavior}
-            getDriverAnalysis={getDriverAnalysis}
-            getCoachingCandidates={getCoachingCandidates}
-            acknowledgeDriverAlert={acknowledgeDriverAlert}
-            driverBehaviorSummary={driverBehaviorSummary}
-            driverBehaviorCriticalAlerts={driverBehaviorCriticalAlerts}
-            driverBehaviorHighAlerts={driverBehaviorHighAlerts}
-            clvSegments={clvSegments}
-            clvAnalysis={clvAnalysis}
-            clvLoading={clvLoading}
-            clvError={clvError}
-            refreshCLV={refreshCLV}
-            getCustomerCLV={getCustomerCLV}
-            getHighValueCustomers={getHighValueCustomers}
-            getChurnRiskCustomers={getChurnRiskCustomers}
-            getRetentionRecommendations={getRetentionRecommendations}
-            clvSummary={clvSummary}
-            topCustomers={topCustomers}
-            clvChurnRiskCount={clvChurnRiskCount}
-            demandSensingForecast={demandSensingForecast}
-            demandSensingAnomalies={demandSensingAnomalies}
-            demandSensingLoading={demandSensingLoading}
-            demandSensingError={demandSensingError}
-            refreshDemandSensing={refreshDemandSensing}
-            getDemandAtDate={getDemandAtDate}
-            getWeeklyDemand={getWeeklyDemand}
-            adjustForecast={adjustForecast}
-            totalForecast={totalForecast}
-            avgDailyDemand={avgDailyDemand}
-            peakDemand={peakDemand}
-            demandSensingAnomalyCount={demandSensingAnomalyCount}
-            highSeverityAnomalies={highSeverityAnomalies}
           />
         ) : (
           <SellerAccessGate
@@ -1202,173 +615,6 @@ function App() {
           <InstitutionDashboard 
             orders={orders} 
             showNotice={showNotice}
-            demandForecast={demandForecast}
-            demandPotential={demandPotential}
-            demandHeatmap={demandHeatmap}
-            driverLeaderboard={driverLeaderboard}
-            driverMetrics={driverMetrics}
-            fleetDrivers={fleetDrivers}
-            driverLocations={driverLocations}
-            maintenancePredictions={maintenancePredictions}
-            maintenanceAlerts={maintenanceAlerts}
-            maintenanceSummary={maintenanceSummary}
-            supplyChain={supplyChain}
-            warehouseStatus={warehouseStatus}
-            supplyChainOptimizations={supplyChainOptimizations}
-            supplyChainSummary={supplyChainSummary}
-            churnPredictions={churnPredictions}
-            atRiskCustomers={atRiskCustomers}
-            churnSummary={churnSummary}
-            revenueAnalysis={revenueAnalysis}
-            revenueRecommendations={revenueRecommendations}
-            revenueSummary={revenueSummary}
-            qualitySources={qualitySources}
-            qualityAlerts={qualityAlerts}
-            qualitySummary={qualitySummary}
-            fleetUtilization={fleetUtilization}
-            fleetSummary={fleetSummary}
-            zoneUtilization={zoneUtilization}
-            fleetRecommendations={fleetRecommendations}
-            marketData={marketData}
-            competitorAnalysis={competitorAnalysis}
-            pricingIntelligence={pricingIntelligence}
-            trendForecasts={trendForecasts}
-            marketSummary={marketSummary}
-            energyData={energyData}
-            efficiencyRecommendations={efficiencyRecommendations}
-            evTransitionPlan={evTransitionPlan}
-            carbonFootprint={carbonFootprint}
-            energySummary={energySummary}
-            subscriptionData={subscriptionData}
-            churnRisk={churnRisk}
-            upsellOpportunities={upsellOpportunities}
-            subscriptionForecast={subscriptionForecast}
-            lifecycleMetrics={lifecycleMetrics}
-            subscriptionSummary={subscriptionSummary}
-            sustainabilityData={sustainabilityData}
-            waterFootprint={waterFootprint}
-            circularEconomy={circularEconomy}
-            sdgAlignment={sdgAlignment}
-            certifications={certifications}
-            sustainabilitySummary={sustainabilitySummary}
-            waterSourceAnalysis={waterSourceAnalysis}
-            primarySource={primarySource}
-            secondarySource={secondarySource}
-            backupSources={backupSources}
-            sourceAlerts={sourceAlerts}
-            optimalMix={optimalMix}
-            complianceStatus={complianceStatus}
-            complianceScore={complianceScore}
-            complianceCriticalAlerts={complianceCriticalAlerts}
-            complianceHighAlerts={complianceHighAlerts}
-            complianceSummary={complianceSummary}
-            emergencies={emergencies}
-            activeEmergency={activeEmergency}
-            responsePlans={responsePlans}
-            emergencyActiveCount={emergencyActiveCount}
-            emergencyCriticalCount={emergencyCriticalCount}
-            generateResponsePlan={generateResponsePlan}
-            executeResponsePlan={executeResponsePlan}
-            resolveEmergency={resolveEmergency}
-            carbonFootprintData={carbonFootprintData}
-            totalEmissions={totalEmissions}
-            emissionsPerGallon={emissionsPerGallon}
-            carbonProgress={carbonProgress}
-            reductionOpportunities={reductionOpportunities}
-            carbonTrend={carbonTrend}
-            smartSchedule={smartSchedule}
-            scheduleOptimization={scheduleOptimization}
-            scheduledCount={scheduledCount}
-            conflictCount={conflictCount}
-            scheduleEfficiency={scheduleEfficiency}
-            distanceSaved={distanceSaved}
-            qualityPredictions={qualityPredictions}
-            qualityAnomalies={qualityAnomalies}
-            qualityCriticalCount={qualityCriticalCount}
-            qualityHighRiskCount={qualityHighRiskCount}
-            avgPredictedScore={avgPredictedScore}
-            qualityTrend={qualityTrend}
-            qualityPredictionAlerts={qualityPredictionAlerts}
-            sentimentAnalysis={sentimentAnalysis}
-            overallSentiment={overallSentiment}
-            nps={nps}
-            churnRiskCount={churnRiskCount}
-            sentimentCriticalAlerts={sentimentCriticalAlerts}
-            sentimentInsights={sentimentInsights}
-            sentimentSegments={sentimentSegments}
-            revenueLeaks={revenueLeaks}
-            leakSummary={leakSummary}
-            totalLeakAmount={totalLeakAmount}
-            netLeak={netLeak}
-            leakCriticalCount={leakCriticalCount}
-            leakHighCount={leakHighCount}
-            predictivePricingAnalysis={predictivePricingAnalysis}
-            pricingRecommendations={pricingRecommendations}
-            pricingLoading={pricingLoading}
-            refreshPricing={refreshPricing}
-            currentPrice={currentPrice}
-            optimalPrice={optimalPrice}
-            elasticity={elasticity}
-            routeV2Optimization={routeV2Optimization}
-            routeV2Routes={routeV2Routes}
-            routeV2Loading={routeV2Loading}
-            routeV2Error={routeV2Error}
-            refreshRouteV2={refreshRouteV2}
-            reoptimizeRoute={reoptimizeRoute}
-            assignOrderToRoute={assignOrderToRoute}
-            routeV2Savings={routeV2Savings}
-            routeV2SavingsPercent={routeV2SavingsPercent}
-            routeV2Unassigned={routeV2Unassigned}
-            getRouteV2DriverRoute={getRouteV2DriverRoute}
-            inventoryForecasts={inventoryForecasts}
-            inventoryAlerts={inventoryAlerts}
-            inventoryLoading={inventoryLoading}
-            inventoryError={inventoryError}
-            refreshInventory={refreshInventory}
-            placeInventoryOrder={placeInventoryOrder}
-            updateReorderPoint={updateReorderPoint}
-            getProductForecast={getProductForecast}
-            getInventoryCriticalAlerts={getInventoryCriticalAlerts}
-            getTotalInventoryValue={getTotalInventoryValue}
-            inventoryCriticalCount={inventoryCriticalCount}
-            inventoryHighCount={inventoryHighCount}
-            atRiskProducts={atRiskProducts}
-            driverBehaviorAnalysis={driverBehaviorAnalysis}
-            driverBehaviorCoachingAlerts={driverBehaviorCoachingAlerts}
-            driverBehaviorLoading={driverBehaviorLoading}
-            driverBehaviorError={driverBehaviorError}
-            refreshDriverBehavior={refreshDriverBehavior}
-            getDriverAnalysis={getDriverAnalysis}
-            getCoachingCandidates={getCoachingCandidates}
-            acknowledgeDriverAlert={acknowledgeDriverAlert}
-            driverBehaviorSummary={driverBehaviorSummary}
-            driverBehaviorCriticalAlerts={driverBehaviorCriticalAlerts}
-            driverBehaviorHighAlerts={driverBehaviorHighAlerts}
-            clvSegments={clvSegments}
-            clvAnalysis={clvAnalysis}
-            clvLoading={clvLoading}
-            clvError={clvError}
-            refreshCLV={refreshCLV}
-            getCustomerCLV={getCustomerCLV}
-            getHighValueCustomers={getHighValueCustomers}
-            getChurnRiskCustomers={getChurnRiskCustomers}
-            getRetentionRecommendations={getRetentionRecommendations}
-            clvSummary={clvSummary}
-            topCustomers={topCustomers}
-            clvChurnRiskCount={clvChurnRiskCount}
-            demandSensingForecast={demandSensingForecast}
-            demandSensingAnomalies={demandSensingAnomalies}
-            demandSensingLoading={demandSensingLoading}
-            demandSensingError={demandSensingError}
-            refreshDemandSensing={refreshDemandSensing}
-            getDemandAtDate={getDemandAtDate}
-            getWeeklyDemand={getWeeklyDemand}
-            adjustForecast={adjustForecast}
-            totalForecast={totalForecast}
-            avgDailyDemand={avgDailyDemand}
-            peakDemand={peakDemand}
-            demandSensingAnomalyCount={demandSensingAnomalyCount}
-            highSeverityAnomalies={highSeverityAnomalies}
           />
         )}
         {ready && role === 'ops' && (adminAuthenticated ? <Suspense fallback={null}><OpsView orders={orders} downloadReport={downloadReport} opsToken={opsToken} showNotice={showNotice} sellerPerfSummary={sellerPerfSummary} sellerRanked={sellerRanked} reliabilitySummary={reliabilitySummaryData} reliabilityRanked={reliabilityRanked} driverRatingsSummary={driverRatingsSummary} /></Suspense> : <AdminAccessGate onSignIn={signInWithPassword} error={signInError} onGoogle={signInWithGoogleIdentity} onMeta={signInWithMetaIdentity} showNotice={showNotice} />)}
@@ -1419,7 +665,7 @@ function BuyerAccessGate({ onSignedIn, startSignIn, confirmCode, generatedCode, 
 
   const known = localPhone.trim() ? accountExists(localPhone) : null;
 
-  return <section className="access-gate panel"><span className="access-lock">⌁</span><p className="eyebrow">Verified buyer access</p><h1>Sign in to view your orders.</h1><p>Enter the phone number on your account. Nautica checks it against the account registry, then generates a one-time code.</p>{registering ? <form onSubmit={handleRegister}><div className="otp-delivery"><span className="section-kicker">NEW ACCOUNT</span><strong>{formatPhoneForDisplay(normalizePhone(localPhone) ?? localPhone)}</strong><small>An account will be created for this number with a generated password.</small></div><input aria-label="New buyer phone" value={localPhone} onChange={(event) => setLocalPhone(event.target.value)} placeholder="Phone number" inputMode="tel" /><button className="primary-button" type="submit">Create account →</button><button className="text-button" type="button" onClick={() => setRegistering(false)}>Back to sign in</button></form> : step === 'phone' ? <form onSubmit={handleSend}><input aria-label="Buyer phone number" value={localPhone} onChange={(event) => setLocalPhone(event.target.value)} placeholder="Phone number" inputMode="tel" />{known === false && <p className="form-hint">No account uses that number yet.</p>}<button className="primary-button" type="submit">Send OTP →</button></form> : <form onSubmit={handleVerify}><div className="otp-delivery"><span className="section-kicker">GENERATED BY NAUTICAL</span><strong data-testid="otp-code">{generatedCode || '···'}</strong><small>For {formatPhoneForDisplay(identifier)} · expires in 5 minutes</small></div><input aria-label="Buyer OTP" value={otp} onChange={(event) => setOtp(event.target.value)} placeholder="Enter the generated code" inputMode="numeric" />{error && <p className="form-error" role="alert">{error}</p>}<button className="primary-button" type="submit">Verify OTP →</button><button className="text-button" type="button" onClick={() => { setStep('phone'); setOtp(''); }}>Use a different number</button></form>}{!registering && step === 'phone' && <button className="text-button" type="button" onClick={() => setRegistering(true)}>Create an account →</button>}{error && step === 'phone' && <p className="form-error" role="alert">{error}</p>}<small>Create an account below to get started. Codes are generated on this device by the browser&apos;s Web Crypto API and verified locally against a real account. No SMS or email provider is involved, so the code is shown here instead of being sent.</small><SocialSignInDivider /><GoogleSignInButton role="buyer" onVerified={onGoogle} showNotice={showNotice} /><MetaSignInButton role="buyer" onVerified={onMeta} showNotice={showNotice} /></section>;
+  return <section className="access-gate panel"><span className="access-lock">?</span><p className="eyebrow">Verified buyer access</p><h1>Sign in to view your orders.</h1><p>Enter the phone number on your account. Nautica checks it against the account registry, then generates a one-time code.</p>{registering ? <form onSubmit={handleRegister}><div className="otp-delivery"><span className="section-kicker">NEW ACCOUNT</span><strong>{formatPhoneForDisplay(normalizePhone(localPhone) ?? localPhone)}</strong><small>An account will be created for this number with a generated password.</small></div><input aria-label="New buyer phone" value={localPhone} onChange={(event) => setLocalPhone(event.target.value)} placeholder="Phone number" inputMode="tel" /><button className="primary-button" type="submit">Create account ?</button><button className="text-button" type="button" onClick={() => setRegistering(false)}>Back to sign in</button></form> : step === 'phone' ? <form onSubmit={handleSend}><input aria-label="Buyer phone number" value={localPhone} onChange={(event) => setLocalPhone(event.target.value)} placeholder="Phone number" inputMode="tel" />{known === false && <p className="form-hint">No account uses that number yet.</p>}<button className="primary-button" type="submit">Send OTP ?</button></form> : <form onSubmit={handleVerify}><div className="otp-delivery"><span className="section-kicker">GENERATED BY NAUTICAL</span><strong data-testid="otp-code">{generatedCode || '···'}</strong><small>For {formatPhoneForDisplay(identifier)} · expires in 5 minutes</small></div><input aria-label="Buyer OTP" value={otp} onChange={(event) => setOtp(event.target.value)} placeholder="Enter the generated code" inputMode="numeric" />{error && <p className="form-error" role="alert">{error}</p>}<button className="primary-button" type="submit">Verify OTP ?</button><button className="text-button" type="button" onClick={() => { setStep('phone'); setOtp(''); }}>Use a different number</button></form>}{!registering && step === 'phone' && <button className="text-button" type="button" onClick={() => setRegistering(true)}>Create an account ?</button>}{error && step === 'phone' && <p className="form-error" role="alert">{error}</p>}<small>Create an account below to get started. Codes are generated on this device by the browser&apos;s Web Crypto API and verified locally against a real account. No SMS or email provider is involved, so the code is shown here instead of being sent.</small><SocialSignInDivider /><GoogleSignInButton role="buyer" onVerified={onGoogle} showNotice={showNotice} /><MetaSignInButton role="buyer" onVerified={onMeta} showNotice={showNotice} /></section>;
 }
 
 function DriverAccessGate({ startSignIn, confirmCode, generatedCode, identifier, error, onRegister, accountExists, onGoogle, onMeta, showNotice }) {
@@ -1451,7 +697,7 @@ function DriverAccessGate({ startSignIn, confirmCode, generatedCode, identifier,
 
   return (
     <section className="access-gate panel">
-      <span className="access-lock">⇢</span>
+      <span className="access-lock">?</span>
       <p className="eyebrow">Verified driver access</p>
       <h1>Sign in to see your deliveries.</h1>
       <p>
@@ -1467,14 +713,14 @@ function DriverAccessGate({ startSignIn, confirmCode, generatedCode, identifier,
             <small>An account will be created for this number with a generated password.</small>
           </div>
           <input aria-label="New driver phone" value={localPhone} onChange={(event) => setLocalPhone(event.target.value)} placeholder="Phone number" inputMode="tel" />
-          <button className="primary-button" type="submit">Create account →</button>
+          <button className="primary-button" type="submit">Create account ?</button>
           <button className="text-button" type="button" onClick={() => setRegistering(false)}>Back to sign in</button>
         </form>
       ) : step === 'phone' ? (
         <form onSubmit={handleSend}>
           <input aria-label="Driver phone number" value={localPhone} onChange={(event) => setLocalPhone(event.target.value)} placeholder="Phone number" inputMode="tel" />
           {known === false && <p className="form-hint">No account uses that number yet.</p>}
-          <button className="primary-button" type="submit">Send OTP →</button>
+          <button className="primary-button" type="submit">Send OTP ?</button>
           <button className="text-button" type="button" onClick={() => setRegistering(true)}>Create a driver account</button>
         </form>
       ) : (
@@ -1486,7 +732,7 @@ function DriverAccessGate({ startSignIn, confirmCode, generatedCode, identifier,
           </div>
           <input aria-label="Driver OTP" value={otp} onChange={(event) => setOtp(event.target.value)} placeholder="Enter the generated code" inputMode="numeric" />
           {error && <p className="form-error" role="alert">{error}</p>}
-          <button className="primary-button" type="submit">Verify OTP →</button>
+          <button className="primary-button" type="submit">Verify OTP ?</button>
           <button className="text-button" type="button" onClick={() => { setStep('phone'); setOtp(''); }}>Use a different number</button>
         </form>
       )}
@@ -1522,10 +768,10 @@ function SellerAccessGate({ sellerProfile, setSellerProfile, onApply, onRefresh,
   }
 
   if (submitted) {
-    return <section className="access-gate panel seller-gate"><span className="access-lock">↗</span><p className="eyebrow">Seller signup & approval</p><h1>Application awaiting approval.</h1><p>Nautica Ops must verify your identity, vehicle, and water-source documents before you can receive jobs.</p><div className="pending-approval"><strong>Pending operator review</strong><small>An operator has to approve this application on the server. There is no code to enter and no way to approve it from this screen, because the previous version generated its own approval code and anyone could have approved themselves.</small><small>Application reference: <span data-testid="seller-application-id">{applicationId || 'submitted'}</span></small><button className="primary-button" type="button" onClick={handleRefresh} disabled={busy}>{busy ? 'Checking…' : 'Check approval status'}</button></div></section>;
+    return <section className="access-gate panel seller-gate"><span className="access-lock">?</span><p className="eyebrow">Seller signup & approval</p><h1>Application awaiting approval.</h1><p>Nautica Ops must verify your identity, vehicle, and water-source documents before you can receive jobs.</p><div className="pending-approval"><strong>Pending operator review</strong><small>An operator has to approve this application on the server. There is no code to enter and no way to approve it from this screen, because the previous version generated its own approval code and anyone could have approved themselves.</small><small>Application reference: <span data-testid="seller-application-id">{applicationId || 'submitted'}</span></small><button className="primary-button" type="button" onClick={handleRefresh} disabled={busy}>{busy ? 'Checking…' : 'Check approval status'}</button></div></section>;
   }
 
-  return <section className="access-gate panel seller-gate"><span className="access-lock">↗</span><p className="eyebrow">Seller signup & approval</p><h1>Create your seller account.</h1><p>Complete your business and vehicle details. Your seller workspace stays locked until an operator approves the application.</p><form onSubmit={handleApply}><input aria-label="Business name" name="business" value={sellerProfile.business} onChange={update} placeholder="Business or trading name" /><input aria-label="Seller phone" name="phone" value={sellerProfile.phone} onChange={update} placeholder="Registered phone number" /><input aria-label="Vehicle registration" name="vehicle" value={sellerProfile.vehicle} onChange={update} placeholder="Vehicle registration" /><select aria-label="Tank capacity" name="capacity" value={sellerProfile.capacity} onChange={update}><option>1,000 gallons</option><option>2,000 gallons</option><option>5,000 gallons</option></select><button className="primary-button" type="submit" disabled={busy}>{busy ? 'Submitting…' : 'Submit signup for review →'}</button></form><SocialSignInDivider /><GoogleSignInButton role="seller" onVerified={onGoogle} showNotice={showNotice} /><MetaSignInButton role="seller" onVerified={onMeta} showNotice={showNotice} /><small>Required controls: ID, vehicle registration, tank capacity, water-source evidence, approval audit trail, and payout verification.</small></section>;
+  return <section className="access-gate panel seller-gate"><span className="access-lock">?</span><p className="eyebrow">Seller signup & approval</p><h1>Create your seller account.</h1><p>Complete your business and vehicle details. Your seller workspace stays locked until an operator approves the application.</p><form onSubmit={handleApply}><input aria-label="Business name" name="business" value={sellerProfile.business} onChange={update} placeholder="Business or trading name" /><input aria-label="Seller phone" name="phone" value={sellerProfile.phone} onChange={update} placeholder="Registered phone number" /><input aria-label="Vehicle registration" name="vehicle" value={sellerProfile.vehicle} onChange={update} placeholder="Vehicle registration" /><select aria-label="Tank capacity" name="capacity" value={sellerProfile.capacity} onChange={update}><option>1,000 gallons</option><option>2,000 gallons</option><option>5,000 gallons</option></select><button className="primary-button" type="submit" disabled={busy}>{busy ? 'Submitting…' : 'Submit signup for review ?'}</button></form><SocialSignInDivider /><GoogleSignInButton role="seller" onVerified={onGoogle} showNotice={showNotice} /><MetaSignInButton role="seller" onVerified={onMeta} showNotice={showNotice} /><small>Required controls: ID, vehicle registration, tank capacity, water-source evidence, approval audit trail, and payout verification.</small></section>;
 }
 
 function AdminAccessGate({ onSignIn, error, onGoogle, onMeta, showNotice }) {
@@ -1538,11 +784,11 @@ function AdminAccessGate({ onSignIn, error, onGoogle, onMeta, showNotice }) {
     if (result?.ok) setPassword('');
   }
 
-  return <section className="access-gate panel admin-gate"><span className="access-lock">▣</span><p className="eyebrow">Restricted admin area</p><h1>Operations data needs a verified admin.</h1><p>Sign in with the account registered for ops. The identifier is matched against the account registry and the password is checked against a salted PBKDF2 hash.</p><form onSubmit={handleSubmit}><input aria-label="Admin account" value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder="Admin email or phone" autoComplete="username" /><input aria-label="Admin password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" type="password" autoComplete="current-password" />{error && <p className="form-error" role="alert">{error}</p>}<button className="primary-button" type="submit">Open admin console →</button></form><small>Five failed attempts lock the account for five minutes. The operations account is created once from your deployment environment and its password is never displayed here.</small><GoogleSignInButton role="ops" onVerified={onGoogle} showNotice={showNotice} /><MetaSignInButton role="ops" onVerified={onMeta} showNotice={showNotice} /></section>;
+  return <section className="access-gate panel admin-gate"><span className="access-lock">?</span><p className="eyebrow">Restricted admin area</p><h1>Operations data needs a verified admin.</h1><p>Sign in with the account registered for ops. The identifier is matched against the account registry and the password is checked against a salted PBKDF2 hash.</p><form onSubmit={handleSubmit}><input aria-label="Admin account" value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder="Admin email or phone" autoComplete="username" /><input aria-label="Admin password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" type="password" autoComplete="current-password" />{error && <p className="form-error" role="alert">{error}</p>}<button className="primary-button" type="submit">Open admin console ?</button></form><small>Five failed attempts lock the account for five minutes. The operations account is created once from your deployment environment and its password is never displayed here.</small><GoogleSignInButton role="ops" onVerified={onGoogle} showNotice={showNotice} /><MetaSignInButton role="ops" onVerified={onMeta} showNotice={showNotice} /></section>;
 }
 
 function ReportActions({ downloadReport }) {
-  return <section className="report-actions"><span><strong>Intervention reporting</strong><small>Export demand and deployment data for partners and internal planning.</small></span><button className="outline-button" type="button" onClick={() => downloadReport('Regional demand report')}>Download JSON report ↓</button><button className="primary-button" type="button" onClick={() => downloadReport('Partner intervention brief')}>Create partner brief →</button></section>;
+  return <section className="report-actions"><span><strong>Intervention reporting</strong><small>Export demand and deployment data for partners and internal planning.</small></span><button className="outline-button" type="button" onClick={() => downloadReport('Regional demand report')}>Download JSON report ?</button><button className="primary-button" type="button" onClick={() => downloadReport('Partner intervention brief')}>Create partner brief ?</button></section>;
 }
 
 function PageHeader({ eyebrow, title, copy, action }) {
@@ -1580,24 +826,24 @@ function BuyerView({ booking, updateBooking, requestDelivery, orders, showNotice
       : { strong: 'No email linked', small: 'You signed in with a phone number. Linking an email also lets you sign in that way.', showEmailForm: true };
 
   return <>
-    <PageHeader eyebrow={todayLabel} title={`${dayGreeting}.`} copy="Get your next delivery sorted in a few taps." action={<button className="outline-button" type="button" onClick={() => showNotice('Referral link copied to your clipboard.')}>↗ Invite a friend <span>+GH₵20</span></button>} />
+    <PageHeader eyebrow={todayLabel} title={`${dayGreeting}.`} copy="Get your next delivery sorted in a few taps." action={<button className="outline-button" type="button" onClick={() => showNotice('Referral link copied to your clipboard.')}>? Invite a friend <span>+GH?20</span></button>} />
     <section className="auth-strip panel"><div><span className="section-kicker">ACCOUNT & SECURITY</span><strong>{emailState.strong}</strong><small>{emailState.small}</small></div>{emailState.showEmailForm ? <form className="auth-form" onSubmit={(event) => { event.preventDefault(); sendOtp(); }}><input aria-label="Email address" value={email} onChange={(event) => setEmail(event.target.value)} type="email" /><button className="outline-button" type="submit">Send OTP</button></form> : <form className="auth-form" onSubmit={async (event) => { event.preventDefault(); const result = await confirmEmailCode(emailOtp); if (result?.ok) setEmailOtp(''); }}><input aria-label="OTP code" value={emailOtp} onChange={(event) => setEmailOtp(event.target.value)} placeholder="Enter 6-digit OTP" inputMode="numeric" /><button className="primary-button" type="submit">Verify</button></form>}</section>
-    <section className="saved-addresses panel"><div><span className="section-kicker">FAST REBOOK</span><strong>Saved addresses</strong><small>Repeat a trusted delivery without typing it again.</small></div><div className="saved-address-list">{savedAddresses.map((address) => <button type="button" key={address} onClick={() => repeatBooking(address)}>⌖ {address}</button>)}<button type="button" onClick={() => { const typed = booking.location.trim(); if (!typed) { showNotice('Type a delivery location first, then save it here.'); return; } if (savedAddresses.includes(typed)) { showNotice('That address is already saved.'); return; } setSavedAddresses([...savedAddresses, typed]); showNotice(`Saved ${typed} for quick rebooking.`); }}>+ Save this address</button></div></section>
+    <section className="saved-addresses panel"><div><span className="section-kicker">FAST REBOOK</span><strong>Saved addresses</strong><small>Repeat a trusted delivery without typing it again.</small></div><div className="saved-address-list">{savedAddresses.map((address) => <button type="button" key={address} onClick={() => repeatBooking(address)}>? {address}</button>)}<button type="button" onClick={() => { const typed = booking.location.trim(); if (!typed) { showNotice('Type a delivery location first, then save it here.'); return; } if (savedAddresses.includes(typed)) { showNotice('That address is already saved.'); return; } setSavedAddresses([...savedAddresses, typed]); showNotice(`Saved ${typed} for quick rebooking.`); }}>+ Save this address</button></div></section>
     <div className="buyer-grid">
-      <section className="panel booking-panel"><div className="panel-title"><div><span className="section-kicker">NEW BOOKING · {t.book}</span><h2>{t.location}</h2></div><span className="verified-pill">✓ Verified sellers</span></div><form onSubmit={requestDelivery}><label>Delivery location<div className="input-wrap"><span>⌖</span><input name="location" value={booking.location} onChange={updateBooking} placeholder="Enter an address or landmark" /></div></label><label>Email for the receipt <small className="field-hint">(required — your receipt and payment confirmation go here)</small><div className="input-wrap"><span>✉</span><input name="receiptEmail" type="email" value={booking.receiptEmail} onChange={updateBooking} placeholder="you@example.com" autoComplete="email" /></div></label><label>WhatsApp number <small className="field-hint">(optional, if different from your phone)</small><div className="input-wrap"><span>✆</span><input name="whatsapp" value={booking.whatsapp} onChange={updateBooking} placeholder="e.g. 0551234567" inputMode="tel" /></div></label><div className="form-row"><label>Water volume<select name="volume" value={booking.volume} onChange={updateBooking}><option>1,000 gallons</option><option>2,000 gallons</option><option>5,000 gallons</option></select></label><label>Delivery window<select name="window" value={booking.window} onChange={updateBooking}><option>As soon as possible</option><option>Today, 12:00–14:00</option><option>Tomorrow morning</option></select></label></div><div className="quote"><span><small>YOUR PRICE</small><strong>Calculated on the server</strong></span><span className="quote-note">The exact amount, including the service charge, is calculated when you book and shown before you pay. It is not quoted here because the server is the only place that sets it.</span></div><label className="payment-label">Payment method<select name="payment" value={booking.payment} onChange={updateBooking}><option>Mobile money or card via Paystack</option><option>Cash on delivery (pay the driver)</option></select></label><p className="escrow-note">Card and mobile money payments are taken by Paystack and confirmed before your order counts as paid. Cash on delivery is settled with the driver.</p><button className="primary-button full" type="submit">{t.book} <span>→</span></button></form></section>
-      <div className="side-stack"><section className="panel rewards-panel"><div className="panel-title"><div><span className="section-kicker">YOUR REWARDS</span><h2>{tier} tier</h2></div><span className="tier-badge">✦</span></div><div className="reward-progress"><strong>{points}</strong>{nextTier ? <span>{points} / {points + pointsToNext} to {nextTier}</span> : <span>Top of the ladder</span>}<div><i style={{ width: `${Math.round(progress * 100)}%` }} /></div></div><div className="reward-foot"><span>{loyaltyProfile ? `2% cashback available · ${cashback}` : 'No paid orders yet, so no cashback has been earned.'}</span><button type="button" onClick={() => showNotice(loyaltyProfile ? `Your wallet balance is ${walletBalance}.` : 'Your wallet balance is GH₵0.00 — pay for one order to start earning.')}>View wallet →</button></div></section><DeliveryEstimateCard order={orders.find(o => o.status === 'Assigned' || o.status === 'En Route')} estimateForOrder={estimateForOrder} orders={orders} /><LiveAgentCard role="buyer" driverUpdate={driverUpdate} refreshDriverUpdate={refreshDriverUpdate} showNotice={showNotice} /></div>
+      <section className="panel booking-panel"><div className="panel-title"><div><span className="section-kicker">NEW BOOKING · {t.book}</span><h2>{t.location}</h2></div><span className="verified-pill">? Verified sellers</span></div><form onSubmit={requestDelivery}><label>Delivery location<div className="input-wrap"><span>?</span><input name="location" value={booking.location} onChange={updateBooking} placeholder="Enter an address or landmark" /></div></label><label>Email for the receipt <small className="field-hint">(required — your receipt and payment confirmation go here)</small><div className="input-wrap"><span>?</span><input name="receiptEmail" type="email" value={booking.receiptEmail} onChange={updateBooking} placeholder="you@example.com" autoComplete="email" /></div></label><label>WhatsApp number <small className="field-hint">(optional, if different from your phone)</small><div className="input-wrap"><span>?</span><input name="whatsapp" value={booking.whatsapp} onChange={updateBooking} placeholder="e.g. 0551234567" inputMode="tel" /></div></label><div className="form-row"><label>Water volume<select name="volume" value={booking.volume} onChange={updateBooking}><option>1,000 gallons</option><option>2,000 gallons</option><option>5,000 gallons</option></select></label><label>Delivery window<select name="window" value={booking.window} onChange={updateBooking}><option>As soon as possible</option><option>Today, 12:00–14:00</option><option>Tomorrow morning</option></select></label></div><div className="quote"><span><small>YOUR PRICE</small><strong>Calculated on the server</strong></span><span className="quote-note">The exact amount, including the service charge, is calculated when you book and shown before you pay. It is not quoted here because the server is the only place that sets it.</span></div><label className="payment-label">Payment method<select name="payment" value={booking.payment} onChange={updateBooking}><option>Mobile money or card via Paystack</option><option>Cash on delivery (pay the driver)</option></select></label><p className="escrow-note">Card and mobile money payments are taken by Paystack and confirmed before your order counts as paid. Cash on delivery is settled with the driver.</p><button className="primary-button full" type="submit">{t.book} <span>?</span></button></form></section>
+      <div className="side-stack"><section className="panel rewards-panel"><div className="panel-title"><div><span className="section-kicker">YOUR REWARDS</span><h2>{tier} tier</h2></div><span className="tier-badge">?</span></div><div className="reward-progress"><strong>{points}</strong>{nextTier ? <span>{points} / {points + pointsToNext} to {nextTier}</span> : <span>Top of the ladder</span>}<div><i style={{ width: `${Math.round(progress * 100)}%` }} /></div></div><div className="reward-foot"><span>{loyaltyProfile ? `2% cashback available · ${cashback}` : 'No paid orders yet, so no cashback has been earned.'}</span><button type="button" onClick={() => showNotice(loyaltyProfile ? `Your wallet balance is ${walletBalance}.` : 'Your wallet balance is GH?0.00 — pay for one order to start earning.')}>View wallet ?</button></div></section><DeliveryEstimateCard order={orders.find(o => o.status === 'Assigned' || o.status === 'En Route')} estimateForOrder={estimateForOrder} orders={orders} /><LiveAgentCard role="buyer" driverUpdate={driverUpdate} refreshDriverUpdate={refreshDriverUpdate} showNotice={showNotice} /></div>
     </div>
-    <section className="orders-section"><div className="section-heading"><div><span className="section-kicker">ACTIVITY</span><h2>{t.recent}</h2></div><button className="text-button" type="button" onClick={() => showNotice('Showing all delivery history.')}>View all →</button></div><div className="orders-table"><div className="table-head"><span>ORDER</span><span>LOCATION</span><span>VOLUME</span><span>STATUS</span><span>PAYMENT</span></div>{orders.map((order) => {
+    <section className="orders-section"><div className="section-heading"><div><span className="section-kicker">ACTIVITY</span><h2>{t.recent}</h2></div><button className="text-button" type="button" onClick={() => showNotice('Showing all delivery history.')}>View all ?</button></div><div className="orders-table"><div className="table-head"><span>ORDER</span><span>LOCATION</span><span>VOLUME</span><span>STATUS</span><span>PAYMENT</span></div>{orders.map((order) => {
             const rated = ratedOrders.find((r) => r.id === order.id);
-            return <div className="order-row" key={order.id}><strong>{order.id}<small>{order.date}</small></strong><span>{order.location}</span><span>{order.volume}</span><span><i className={`status ${order.status.toLowerCase()}`}>{order.status}</i>{order.status === 'En Route' && <button className="confirm-button" type="button" onClick={() => showNotice(order.driverName ? `${order.driverName} is on the way. Position updated from the seller app.` : 'A driver is on the way. Position updated from the seller app.')}>Driver position</button>}{order.status === 'Delivered' && order.payment !== 'Released' && <span className="confirm-row"><input aria-label={`Delivery code for ${order.id}`} value={deliveryCodes[order.id] ?? ''} onChange={(event) => setDeliveryCodes({ ...deliveryCodes, [order.id]: event.target.value })} placeholder="Delivery code" /><button className="confirm-button" type="button" onClick={() => confirmDelivery(order.id, deliveryCodes[order.id])}>Confirm receipt</button></span>}{order.status === 'Delivered' && <button className="confirm-button" type="button" onClick={() => showNotice(`Receipt for ${order.id} is ready to download or email.`)}>Receipt</button>}{order.status === 'Delivered' && <button className="confirm-button" type="button" onClick={() => requestRefund(order.id)}>Request refund</button>}{order.status === 'Delivered' && rated?.rating ? <span className="rating-chip"><span className="stars rated">{[1,2,3,4,5].map(s => <span key={s} className={s <= rated.rating ? 'filled' : ''}>★</span>)}</span><small>{rated.rating}/5</small></span> : order.status === 'Delivered' && <button className="confirm-button" type="button" onClick={() => onRateOrder(order)}>★ Rate delivery</button>}</span><b>{order.payment}<small>{order.price}</small></b></div>;
-          })}</div></section><section className="support-card panel"><div><span className="section-kicker">HUMAN SUPPORT</span><h2>{t.support}</h2><p>Accra support: phone, email, WhatsApp, or a ticket for late deliveries, refunds, quality concerns, or payment receipts.</p></div><div className="support-actions"><a href="tel:+233302000123">☎ Call +233 30 200 0123</a><a href="mailto:support@nautica.gh">✉ support@nautica.gh</a><a href="https://wa.me/233545009046" target="_blank" rel="noreferrer">◌ WhatsApp 0545009046</a><button type="button" onClick={() => showNotice('Support ticket created. Reference: SUP-2048.')}>Open support ticket</button></div></section>
+            return <div className="order-row" key={order.id}><strong>{order.id}<small>{order.date}</small></strong><span>{order.location}</span><span>{order.volume}</span><span><i className={`status ${order.status.toLowerCase()}`}>{order.status}</i>{order.status === 'En Route' && <button className="confirm-button" type="button" onClick={() => showNotice(order.driverName ? `${order.driverName} is on the way. Position updated from the seller app.` : 'A driver is on the way. Position updated from the seller app.')}>Driver position</button>}{order.status === 'Delivered' && order.payment !== 'Released' && <span className="confirm-row"><input aria-label={`Delivery code for ${order.id}`} value={deliveryCodes[order.id] ?? ''} onChange={(event) => setDeliveryCodes({ ...deliveryCodes, [order.id]: event.target.value })} placeholder="Delivery code" /><button className="confirm-button" type="button" onClick={() => confirmDelivery(order.id, deliveryCodes[order.id])}>Confirm receipt</button></span>}{order.status === 'Delivered' && <button className="confirm-button" type="button" onClick={() => showNotice(`Receipt for ${order.id} is ready to download or email.`)}>Receipt</button>}{order.status === 'Delivered' && <button className="confirm-button" type="button" onClick={() => requestRefund(order.id)}>Request refund</button>}{order.status === 'Delivered' && rated?.rating ? <span className="rating-chip"><span className="stars rated">{[1,2,3,4,5].map(s => <span key={s} className={s <= rated.rating ? 'filled' : ''}>?</span>)}</span><small>{rated.rating}/5</small></span> : order.status === 'Delivered' && <button className="confirm-button" type="button" onClick={() => onRateOrder(order)}>? Rate delivery</button>}</span><b>{order.payment}<small>{order.price}</small></b></div>;
+          })}</div></section><section className="support-card panel"><div><span className="section-kicker">HUMAN SUPPORT</span><h2>{t.support}</h2><p>Accra support: phone, email, WhatsApp, or a ticket for late deliveries, refunds, quality concerns, or payment receipts.</p></div><div className="support-actions"><a href="tel:+233302000123">? Call +233 30 200 0123</a><a href="mailto:support@nautica.gh">? support@nautica.gh</a><a href="https://wa.me/233545009046" target="_blank" rel="noreferrer">? WhatsApp 0545009046</a><button type="button" onClick={() => showNotice('Support ticket created. Reference: SUP-2048.')}>Open support ticket</button></div></section>
   </>;
 }
 
 function SellerView({ available, setAvailable, showNotice, orders, updateOrderStatus, issueDeliveryCode, sellerProfile, setSellerProfile }) {
   const activeOrder = orders[0];
-  // Real orders only. The panel this replaced showed a fixed GH₵8,420 month,
-  // 52 deliveries, a 4.8★ rating, and a job queue of three invented Accra
+  // Real orders only. The panel this replaced showed a fixed GH?8,420 month,
+  // 52 deliveries, a 4.8? rating, and a job queue of three invented Accra
   // locations with made-up prices and timestamps.
   const summary = summarise(orders);
   const jobQueue = orders.filter((order) => order.status !== 'Delivered');
@@ -1606,12 +852,12 @@ function SellerView({ available, setAvailable, showNotice, orders, updateOrderSt
     setSellerProfile({ ...sellerProfile, [event.target.name]: event.target.value });
   }
 
-  return <><PageHeader eyebrow="Seller workspace · Accra" title="Ready for the next job?" copy="Keep your status current and turn more deliveries into income." action={<button className={`availability ${available ? 'online' : ''}`} type="button" onClick={() => { setAvailable(!available); showNotice(available ? 'You are now offline.' : 'You are back online and visible to buyers.'); }}><i />{available ? 'Online and accepting jobs' : 'Offline'}</button>} /><section className="seller-onboarding panel"><div><span className="section-kicker">SELLER ONBOARDING</span><h2>Complete your verification profile</h2><p>Ops manually reviews these details before you receive paid jobs.</p></div><form className="seller-form" onSubmit={(event) => { event.preventDefault(); showNotice('Seller profile submitted. Ops will review your documents within one business day.'); }}><input aria-label="Business name" name="business" value={sellerProfile.business} onChange={updateProfile} placeholder="Business name" /><input aria-label="Seller phone" name="phone" value={sellerProfile.phone} onChange={updateProfile} placeholder="Phone number" /><input aria-label="Vehicle registration" name="vehicle" value={sellerProfile.vehicle} onChange={updateProfile} placeholder="Vehicle registration" /><select aria-label="Tank capacity" name="capacity" value={sellerProfile.capacity} onChange={updateProfile}><option>1,000 gallons</option><option>2,000 gallons</option><option>5,000 gallons</option></select><select aria-label="Verification document" name="document" value={sellerProfile.document} onChange={updateProfile}><option>ID document not uploaded</option><option>ID document uploaded</option><option>ID + vehicle documents uploaded</option></select><button className="primary-button" type="submit">Submit for review →</button></form></section>{activeOrder && <section className="panel handover-panel"><div><span className="section-kicker">HANDOVER</span><h2>Issue a delivery code</h2><p>The handover code is how the buyer confirms they received the delivery. <b>{activeOrder.id}</b> · {activeOrder.location} · {activeOrder.status}</p></div><div className="handover-actions">{activeOrder.status === 'Delivered' ? <><strong className="issued-code">{activeOrder.confirmCode || 'No code issued'}</strong><button className="primary-button" type="button" onClick={() => issueDeliveryCode(activeOrder.id)}>{activeOrder.confirmCode ? 'Reissue code' : 'Generate code'}</button></> : <button className="outline-button" type="button" onClick={() => updateOrderStatus(activeOrder.id, 'Delivered')}>Mark as delivered</button>}<button className="outline-button" type="button" onClick={() => updateOrderStatus(activeOrder.id, 'En Route')}>Start delivery</button></div></section>}<div className="seller-stats"><div><span>ORDERS</span><strong>{summary.totalCount}</strong><small>{summary.paidCount} paid</small></div><div><span>DELIVERED</span><strong>{summary.deliveredCount}</strong><small>Confirmed by the buyer</small></div><div><span>YOUR SHARE</span><strong>{formatCedi(summary.sellerReceivesMinor)}</strong><small>Across paid orders</small></div></div><section className="orders-section seller-jobs"><div className="section-heading"><div><span className="section-kicker">JOB QUEUE</span><h2>Incoming requests</h2></div><span className="queue-count">Manual dispatch</span></div>{jobQueue.length === 0 ? <p className="empty-feed">No open jobs. This queue fills when a buyer books a delivery in your area.</p> : jobQueue.map((job) => <div className="job-card" key={job.id}><span className="job-time">{job.status}</span><div><strong>{job.location}</strong><p>{job.volume ? `${job.volume} · ` : ''}{formatCedi(job.chargedMinor ?? 0)}</p></div><button className="primary-button" type="button" onClick={() => showNotice(`Job ${job.code} accepted for ${job.location}.`)}>Accept job →</button></div>)}</section><section className="seller-mvp-note"><span>JOB LIFECYCLE</span><strong>Confirmed → En Route → Delivered</strong><small>Seller marks delivered on arrival. Buyer confirmation records the handover; seller payout is handled by operations.</small></section></>;
+  return <><PageHeader eyebrow="Seller workspace · Accra" title="Ready for the next job?" copy="Keep your status current and turn more deliveries into income." action={<button className={`availability ${available ? 'online' : ''}`} type="button" onClick={() => { setAvailable(!available); showNotice(available ? 'You are now offline.' : 'You are back online and visible to buyers.'); }}><i />{available ? 'Online and accepting jobs' : 'Offline'}</button>} /><section className="seller-onboarding panel"><div><span className="section-kicker">SELLER ONBOARDING</span><h2>Complete your verification profile</h2><p>Ops manually reviews these details before you receive paid jobs.</p></div><form className="seller-form" onSubmit={(event) => { event.preventDefault(); showNotice('Seller profile submitted. Ops will review your documents within one business day.'); }}><input aria-label="Business name" name="business" value={sellerProfile.business} onChange={updateProfile} placeholder="Business name" /><input aria-label="Seller phone" name="phone" value={sellerProfile.phone} onChange={updateProfile} placeholder="Phone number" /><input aria-label="Vehicle registration" name="vehicle" value={sellerProfile.vehicle} onChange={updateProfile} placeholder="Vehicle registration" /><select aria-label="Tank capacity" name="capacity" value={sellerProfile.capacity} onChange={updateProfile}><option>1,000 gallons</option><option>2,000 gallons</option><option>5,000 gallons</option></select><select aria-label="Verification document" name="document" value={sellerProfile.document} onChange={updateProfile}><option>ID document not uploaded</option><option>ID document uploaded</option><option>ID + vehicle documents uploaded</option></select><button className="primary-button" type="submit">Submit for review ?</button></form></section>{activeOrder && <section className="panel handover-panel"><div><span className="section-kicker">HANDOVER</span><h2>Issue a delivery code</h2><p>The handover code is how the buyer confirms they received the delivery. <b>{activeOrder.id}</b> · {activeOrder.location} · {activeOrder.status}</p></div><div className="handover-actions">{activeOrder.status === 'Delivered' ? <><strong className="issued-code">{activeOrder.confirmCode || 'No code issued'}</strong><button className="primary-button" type="button" onClick={() => issueDeliveryCode(activeOrder.id)}>{activeOrder.confirmCode ? 'Reissue code' : 'Generate code'}</button></> : <button className="outline-button" type="button" onClick={() => updateOrderStatus(activeOrder.id, 'Delivered')}>Mark as delivered</button>}<button className="outline-button" type="button" onClick={() => updateOrderStatus(activeOrder.id, 'En Route')}>Start delivery</button></div></section>}<div className="seller-stats"><div><span>ORDERS</span><strong>{summary.totalCount}</strong><small>{summary.paidCount} paid</small></div><div><span>DELIVERED</span><strong>{summary.deliveredCount}</strong><small>Confirmed by the buyer</small></div><div><span>YOUR SHARE</span><strong>{formatCedi(summary.sellerReceivesMinor)}</strong><small>Across paid orders</small></div></div><section className="orders-section seller-jobs"><div className="section-heading"><div><span className="section-kicker">JOB QUEUE</span><h2>Incoming requests</h2></div><span className="queue-count">Manual dispatch</span></div>{jobQueue.length === 0 ? <p className="empty-feed">No open jobs. This queue fills when a buyer books a delivery in your area.</p> : jobQueue.map((job) => <div className="job-card" key={job.id}><span className="job-time">{job.status}</span><div><strong>{job.location}</strong><p>{job.volume ? `${job.volume} · ` : ''}{formatCedi(job.chargedMinor ?? 0)}</p></div><button className="primary-button" type="button" onClick={() => showNotice(`Job ${job.code} accepted for ${job.location}.`)}>Accept job ?</button></div>)}</section><section className="seller-mvp-note"><span>JOB LIFECYCLE</span><strong>Confirmed ? En Route ? Delivered</strong><small>Seller marks delivered on arrival. Buyer confirmation records the handover; seller payout is handled by operations.</small></section></>;
 }
 
 function LiveAgentCard({ role, driverUpdate, refreshDriverUpdate, showNotice }) {
   const buyer = role === 'buyer';
-  return <section className="live-agent-card panel"><div className="live-agent-head"><span className="ai-label">● LIVE AGENT AI</span><span className="agent-online">Online</span></div><strong>{buyer ? driverUpdate : 'Your route is clear.'}</strong><p>{buyer ? 'Updates are shared by the assigned seller. Ask for help at any time.' : 'I can prepare job notes from your active queue and warn you about late-delivery risk.'}</p><div className="live-agent-actions">{buyer ? <button type="button" onClick={refreshDriverUpdate}>Refresh position</button> : <button type="button" onClick={() => showNotice('There are no active jobs to build a route brief from.')}>Prepare route brief</button>}<button type="button" onClick={() => showNotice('Live agent is reviewing this request.')}>Talk to agent</button></div></section>;
+  return <section className="live-agent-card panel"><div className="live-agent-head"><span className="ai-label">? LIVE AGENT AI</span><span className="agent-online">Online</span></div><strong>{buyer ? driverUpdate : 'Your route is clear.'}</strong><p>{buyer ? 'Updates are shared by the assigned seller. Ask for help at any time.' : 'I can prepare job notes from your active queue and warn you about late-delivery risk.'}</p><div className="live-agent-actions">{buyer ? <button type="button" onClick={refreshDriverUpdate}>Refresh position</button> : <button type="button" onClick={() => showNotice('There are no active jobs to build a route brief from.')}>Prepare route brief</button>}<button type="button" onClick={() => showNotice('Live agent is reviewing this request.')}>Talk to agent</button></div></section>;
 }
 
 /**
@@ -1636,12 +882,12 @@ function DeliveryEstimateCard({ order, estimateForOrder, orders }) {
 }
 
 function InstitutionAgentCard({ showNotice }) {
-  return <section className="live-agent-card panel institution-agent"><div className="live-agent-head"><span className="ai-label">✦ LIVE AGENT AI</span><span className="agent-online">Online</span></div><strong>No scheduling model is connected</strong><p>I cannot tell you when demand peaks or how much reserve to hold. That needs a forecasting model and your actual delivery history, and neither is connected here, so I will not recommend a schedule I cannot justify.</p><div className="live-agent-actions"><button type="button" onClick={() => showNotice('Add your real delivery history and Naut can summarise actual delivery windows from it.')}>How to enable this</button><button type="button" onClick={() => showNotice('Institution support has been notified.')}>Talk to agent</button></div></section>;
+  return <section className="live-agent-card panel institution-agent"><div className="live-agent-head"><span className="ai-label">? LIVE AGENT AI</span><span className="agent-online">Online</span></div><strong>No scheduling model is connected</strong><p>I cannot tell you when demand peaks or how much reserve to hold. That needs a forecasting model and your actual delivery history, and neither is connected here, so I will not recommend a schedule I cannot justify.</p><div className="live-agent-actions"><button type="button" onClick={() => showNotice('Add your real delivery history and Naut can summarise actual delivery windows from it.')}>How to enable this</button><button type="button" onClick={() => showNotice('Institution support has been notified.')}>Talk to agent</button></div></section>;
 }
 
 function InstitutionView({ orders = [], showNotice }) {
   const summary = summarise(orders);
-  // This workspace used to show a "Reliability Plus" plan at GH₵3,500/month, a
+  // This workspace used to show a "Reliability Plus" plan at GH?3,500/month, a
   // renewal date, "14 deliveries remaining", three scheduled drops at a fixed
   // rate, and a "100% — certificates up to date" water-quality score.
   //
@@ -1692,7 +938,7 @@ function OpsView({ orders = [], downloadReport, opsToken, showNotice, sellerPerf
   // computed rather than hardcoded so that if a `disputed` status is ever added,
   // the inbox starts listing real cases instead of still showing nothing.
   const disputeOrders = orders.filter((order) => order.disputed === true);
-  return <><PageHeader eyebrow="Admin dashboard · All regions" title="The network is moving." copy="Approve sellers and review orders. Assignment is automatic, and this app does not yet track disputes or quality certification." action={<span className="live-console"><i /> Manual ops mode</span>} /><OpsStats orders={orders} /><section className="ai-insights panel"><div><span className="ai-label">✦ NAUT AI INTELLIGENCE</span><h2>What this deployment can and cannot say</h2><p>No demand forecasting model and no live vehicle telemetry are connected here, so this panel does not predict demand or suggest truck counts. The order figures above are summed from real orders and nothing on this page is a forecast.</p></div><div className="insight-metrics"><strong>{formatCedi(summarise(orders).chargedMinor)}</strong><span>collected on paid orders</span></div></section><div className="admin-grid"><section className="panel admin-panel"><div className="section-heading"><div><span className="section-kicker">DISPATCH VIEW</span><h2>Orders awaiting assignment</h2></div>        <span className="queue-count">{pendingOrders.length} awaiting assignment</span></div>{pendingOrders.length === 0 ? <p className="empty-feed">No orders are waiting on assignment. Assignment is automatic, so this fills only if auto-dispatch failed.</p> : pendingOrders.map((order) => <div className="admin-row" key={order.id}><span>{order.code} · {order.location}<small>Awaiting payment · {formatCedi(order.chargedMinor ?? 0)}</small></span></div>)}</section><SellerApprovalQueue opsToken={opsToken} onNotice={showNotice} /></div><div className="admin-grid"><section className="panel admin-panel"><div className="section-heading"><div><span className="section-kicker">DRIVER REPUTATION</span><h2>Scored from buyer feedback</h2></div><span className="queue-count">{driverRatingsSummary ? `${driverRatingsSummary.count} review${driverRatingsSummary.count !== 1 ? 's' : ''}` : 'No ratings'}</span></div>{driverRatingsSummary ? (<><div className="rating-summary-grid"><article className="rating-card overall"><span className="rating-card-label">Fleet average</span><strong className="rating-card-value">{driverRatingsSummary.averages?.overall ?? '—'}</strong><small>out of 5.0</small></article>{driverRatingsSummary.averages && Object.entries(driverRatingsSummary.averages).filter(([k]) => k !== 'overall' && k !== 'total').map(([cat, value]) => (<article key={cat} className="rating-card category"><span className="rating-card-label">{cat.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}</span><strong className="rating-card-value">{value ?? '—'}</strong><small>out of 5.0</small></article>))}</div><div className="panel-divider" /><div className="panel-title"><span className="section-kicker">TOP DRIVERS</span><h2>Highest-rated this month</h2></div><div className="admin-row-list">{driverRatingsSummary.ratings.length === 0 ? <p className="empty-feed">No ratings have been submitted yet.</p> : driverRatingsSummary.ratings.slice(0, 10).map((r) => (<div key={r.id} className="admin-row"><span>{r.driverId || 'Unassigned driver'}<small>{r.orderId} · {new Date(r.createdAt).toLocaleDateString()}</small></span><span className="rating-chip"><span className="stars rated">{[1,2,3,4,5].map(s => <span key={s} className={s <= (r.overall || 0) ? 'filled' : ''}>★</span>)}</span><small>{r.overall}/5</small></span></div>))}</div></>) : <p className="empty-feed">No ratings have been submitted yet.</p>}</section></div><div className="admin-grid"><section className="panel admin-panel"><div className="section-heading"><div><span className="section-kicker">SELLER PERFORMANCE</span><h2>Scored from real orders</h2></div><span className="queue-count">{sellerPerfSummary ? `${sellerPerfSummary.totalSellers} sellers` : 'No orders'}</span></div>{sellerRanked.length === 0 ? <p className="empty-feed">No seller has a completed order yet, so there is nothing to score. Every figure here is summed from real orders and nothing is invented.</p> : <div className="admin-list">{sellerRanked.map((s) => <div className="admin-row" key={s.sellerId}><span>{s.sellerId}<small>#{s.rank} · {s.band.label} · {s.completed} completed of {s.orders} · {s.cancellationRate}% cancelled</small></span><strong>{s.score}</strong></div>)}</div>}{disputeOrders.length === 0 ? <p className="empty-feed">No disputes are open. This app does not yet record delivery complaints, so there is nothing here to resolve and no refund has been issued.</p> : disputeOrders.map((order) => <div className="admin-row" key={order.id}><span>{order.code} · {order.location}<small>Flagged by the buyer</small></span><button className="outline-button" type="button">Resolve</button></div>)}</section><section className="panel admin-panel"><div className="section-heading"><div><span className="section-kicker">RELIABILITY &amp; DELIVERY TIME</span><h2>How dependable is each seller?</h2></div><span className="queue-count">{relSummary ? `${relSummary.totalSellers} sellers` : 'No orders'}</span></div>{reliabilityRanked.length === 0 ? <p className="empty-feed">No seller has a completed order yet, so there is no reliability score and no delivery window to estimate.</p> : <div className="admin-list">{reliabilityRanked.map((s) => <div className="admin-row" key={s.sellerId}><span>{s.sellerId}<small>#{s.rank} · {s.score} reliability · {s.completed} completed · {s.timedDeliveries} timed</small></span><strong>{s.slaMeasured ? `${s.slaHours}h median` : 'unmeasured'}</strong></div>)}</div>}{relSummary && relSummary.fastestSla ? <p className="empty-feed">Fastest observed delivery window: {relSummary.fastestSla.sellerId} at {relSummary.fastestSla.slaHours}h, from {relSummary.timedSellers} timed seller(s). This is an estimate, not a guarantee.</p> : <p className="empty-feed">Delivery timing is not recorded for any seller yet, so no delivery window can be estimated. Timing is recorded when an order is marked Assigned and then Delivered.</p>}</section><section className="panel admin-panel"><div className="section-heading"><div><span className="section-kicker">QUALITY CERTIFICATION</span><h2>Review documents</h2></div></div><p className="empty-feed">No certifications have been submitted. This app does not accept or store water-quality documents, so there is nothing to approve and no verified-water badge can be issued yet. Do not publish a quality claim until a seller has supplied test results.</p></section></div></>;
+  return <><PageHeader eyebrow="Admin dashboard · All regions" title="The network is moving." copy="Approve sellers and review orders. Assignment is automatic, and this app does not yet track disputes or quality certification." action={<span className="live-console"><i /> Manual ops mode</span>} /><OpsStats orders={orders} /><section className="ai-insights panel"><div><span className="ai-label">? NAUT AI INTELLIGENCE</span><h2>What this deployment can and cannot say</h2><p>No demand forecasting model and no live vehicle telemetry are connected here, so this panel does not predict demand or suggest truck counts. The order figures above are summed from real orders and nothing on this page is a forecast.</p></div><div className="insight-metrics"><strong>{formatCedi(summarise(orders).chargedMinor)}</strong><span>collected on paid orders</span></div></section><div className="admin-grid"><section className="panel admin-panel"><div className="section-heading"><div><span className="section-kicker">DISPATCH VIEW</span><h2>Orders awaiting assignment</h2></div>        <span className="queue-count">{pendingOrders.length} awaiting assignment</span></div>{pendingOrders.length === 0 ? <p className="empty-feed">No orders are waiting on assignment. Assignment is automatic, so this fills only if auto-dispatch failed.</p> : pendingOrders.map((order) => <div className="admin-row" key={order.id}><span>{order.code} · {order.location}<small>Awaiting payment · {formatCedi(order.chargedMinor ?? 0)}</small></span></div>)}</section><SellerApprovalQueue opsToken={opsToken} onNotice={showNotice} /></div><div className="admin-grid"><section className="panel admin-panel"><div className="section-heading"><div><span className="section-kicker">DRIVER REPUTATION</span><h2>Scored from buyer feedback</h2></div><span className="queue-count">{driverRatingsSummary ? `${driverRatingsSummary.count} review${driverRatingsSummary.count !== 1 ? 's' : ''}` : 'No ratings'}</span></div>{driverRatingsSummary ? (<><div className="rating-summary-grid"><article className="rating-card overall"><span className="rating-card-label">Fleet average</span><strong className="rating-card-value">{driverRatingsSummary.averages?.overall ?? '—'}</strong><small>out of 5.0</small></article>{driverRatingsSummary.averages && Object.entries(driverRatingsSummary.averages).filter(([k]) => k !== 'overall' && k !== 'total').map(([cat, value]) => (<article key={cat} className="rating-card category"><span className="rating-card-label">{cat.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}</span><strong className="rating-card-value">{value ?? '—'}</strong><small>out of 5.0</small></article>))}</div><div className="panel-divider" /><div className="panel-title"><span className="section-kicker">TOP DRIVERS</span><h2>Highest-rated this month</h2></div><div className="admin-row-list">{driverRatingsSummary.ratings.length === 0 ? <p className="empty-feed">No ratings have been submitted yet.</p> : driverRatingsSummary.ratings.slice(0, 10).map((r) => (<div key={r.id} className="admin-row"><span>{r.driverId || 'Unassigned driver'}<small>{r.orderId} · {new Date(r.createdAt).toLocaleDateString()}</small></span><span className="rating-chip"><span className="stars rated">{[1,2,3,4,5].map(s => <span key={s} className={s <= (r.overall || 0) ? 'filled' : ''}>?</span>)}</span><small>{r.overall}/5</small></span></div>))}</div></>) : <p className="empty-feed">No ratings have been submitted yet.</p>}</section></div><div className="admin-grid"><section className="panel admin-panel"><div className="section-heading"><div><span className="section-kicker">SELLER PERFORMANCE</span><h2>Scored from real orders</h2></div><span className="queue-count">{sellerPerfSummary ? `${sellerPerfSummary.totalSellers} sellers` : 'No orders'}</span></div>{sellerRanked.length === 0 ? <p className="empty-feed">No seller has a completed order yet, so there is nothing to score. Every figure here is summed from real orders and nothing is invented.</p> : <div className="admin-list">{sellerRanked.map((s) => <div className="admin-row" key={s.sellerId}><span>{s.sellerId}<small>#{s.rank} · {s.band.label} · {s.completed} completed of {s.orders} · {s.cancellationRate}% cancelled</small></span><strong>{s.score}</strong></div>)}</div>}{disputeOrders.length === 0 ? <p className="empty-feed">No disputes are open. This app does not yet record delivery complaints, so there is nothing here to resolve and no refund has been issued.</p> : disputeOrders.map((order) => <div className="admin-row" key={order.id}><span>{order.code} · {order.location}<small>Flagged by the buyer</small></span><button className="outline-button" type="button">Resolve</button></div>)}</section><section className="panel admin-panel"><div className="section-heading"><div><span className="section-kicker">RELIABILITY &amp; DELIVERY TIME</span><h2>How dependable is each seller?</h2></div><span className="queue-count">{relSummary ? `${relSummary.totalSellers} sellers` : 'No orders'}</span></div>{reliabilityRanked.length === 0 ? <p className="empty-feed">No seller has a completed order yet, so there is no reliability score and no delivery window to estimate.</p> : <div className="admin-list">{reliabilityRanked.map((s) => <div className="admin-row" key={s.sellerId}><span>{s.sellerId}<small>#{s.rank} · {s.score} reliability · {s.completed} completed · {s.timedDeliveries} timed</small></span><strong>{s.slaMeasured ? `${s.slaHours}h median` : 'unmeasured'}</strong></div>)}</div>}{relSummary && relSummary.fastestSla ? <p className="empty-feed">Fastest observed delivery window: {relSummary.fastestSla.sellerId} at {relSummary.fastestSla.slaHours}h, from {relSummary.timedSellers} timed seller(s). This is an estimate, not a guarantee.</p> : <p className="empty-feed">Delivery timing is not recorded for any seller yet, so no delivery window can be estimated. Timing is recorded when an order is marked Assigned and then Delivered.</p>}</section><section className="panel admin-panel"><div className="section-heading"><div><span className="section-kicker">QUALITY CERTIFICATION</span><h2>Review documents</h2></div></div><p className="empty-feed">No certifications have been submitted. This app does not accept or store water-quality documents, so there is nothing to approve and no verified-water badge can be issued yet. Do not publish a quality claim until a seller has supplied test results.</p></section></div></>;
 }
 
 export function AiPanel({ role, input, setInput, messages, askAi, close, aiLoading, aiSource, aiFallbackReason }) {
@@ -1705,7 +951,7 @@ export function AiPanel({ role, input, setInput, messages, askAi, close, aiLoadi
     const label = aiSource === 'gemini' ? 'Gemini' : 'Local rules';
     return <span className={`ai-source ${aiSource}`}>{label}</span>;
   };
-  return <section className="ai-panel" aria-label="Naut AI assistant"><div className="ai-panel-head"><div><span className="ai-label">✦ NAUT AI</span><strong>{role === 'ops' ? 'Operations copilot' : 'Your water-delivery copilot'}</strong><SourceBadge /></div><button type="button" aria-label="Close Naut AI" onClick={close}>×</button></div><div className="ai-messages">{messages.slice(-4).map((message, index) => <p className={message.from + (message.from === 'ai' && aiLoading && index === messages.length - 1 ? ' loading' : '')} key={`${message.from}-${index}`}>{message.text}</p>)}{aiLoading && <p className="ai loading">●</p>}</div>{aiSource === 'fallback' && <p className="ai-fallback-note" role="status">{aiFallbackMessage(aiFallbackReason)}</p>}<div className="ai-quick-actions">{quickActions.map((action) => <button type="button" key={action} onClick={() => setInput(action)}>{action}</button>)}</div><form className="ai-form" onSubmit={askAi}><input aria-label="Ask Naut AI" value={input} onChange={(event) => setInput(event.target.value)} placeholder="Ask about orders, pricing, or demand..." disabled={aiLoading} /><button type="submit" disabled={aiLoading}>Ask <span>→</span></button></form><small className="ai-disclaimer">Answers come from Gemini when this server can reach it. When it cannot, the assistant reads your real orders on this device and says so above. Confirm payment, quality, and dispatch actions in the workspace.</small></section>;
+  return <section className="ai-panel" aria-label="Naut AI assistant"><div className="ai-panel-head"><div><span className="ai-label">? NAUT AI</span><strong>{role === 'ops' ? 'Operations copilot' : 'Your water-delivery copilot'}</strong><SourceBadge /></div><button type="button" aria-label="Close Naut AI" onClick={close}>×</button></div><div className="ai-messages">{messages.slice(-4).map((message, index) => <p className={message.from + (message.from === 'ai' && aiLoading && index === messages.length - 1 ? ' loading' : '')} key={`${message.from}-${index}`}>{message.text}</p>)}{aiLoading && <p className="ai loading">?</p>}</div>{aiSource === 'fallback' && <p className="ai-fallback-note" role="status">{aiFallbackMessage(aiFallbackReason)}</p>}<div className="ai-quick-actions">{quickActions.map((action) => <button type="button" key={action} onClick={() => setInput(action)}>{action}</button>)}</div><form className="ai-form" onSubmit={askAi}><input aria-label="Ask Naut AI" value={input} onChange={(event) => setInput(event.target.value)} placeholder="Ask about orders, pricing, or demand..." disabled={aiLoading} /><button type="submit" disabled={aiLoading}>Ask <span>?</span></button></form><small className="ai-disclaimer">Answers come from Gemini when this server can reach it. When it cannot, the assistant reads your real orders on this device and says so above. Confirm payment, quality, and dispatch actions in the workspace.</small></section>;
 }
 
 function OperationalRiskPanel({ orders = [], sellerPerfSummary, sellerRanked }) {
@@ -1715,7 +961,7 @@ function OperationalRiskPanel({ orders = [], sellerPerfSummary, sellerRanked }) 
   // job-decline tracking and no escrow, so every one of those figures was
   // fabricated. What is left is what the order list can actually support.
   const flagged = sellerRanked ? sellerRanked.filter(s => s.score < 60) : [];
-  return <section className="operational-risk panel"><div className="section-heading"><div><span className="ai-label">✦ OPERATIONS</span><h2>Business health signals</h2></div></div><div className="risk-grid"><article><span className="risk-icon warning">!</span><div><strong>Unpaid orders</strong><p>{summary.unpaidCount} order(s) awaiting payment, totalling {formatCedi(summary.unpaidMinor)}.</p></div></article><article><span className="risk-icon good">v</span><div><strong>Collected</strong><p>{formatCedi(summary.chargedMinor)} confirmed by Paystack across {summary.paidCount} paid order(s).</p></div></article><article><span className="risk-icon alert">!</span><div><strong>Sellers at risk</strong><p>{sellerPerfSummary ? `${sellerPerfSummary.flaggedCount} of ${sellerPerfSummary.totalSellers} sellers scored below the watch threshold.` : 'No seller performance data is available yet.'}</p></div></article></div></section>;
+  return <section className="operational-risk panel"><div className="section-heading"><div><span className="ai-label">? OPERATIONS</span><h2>Business health signals</h2></div></div><div className="risk-grid"><article><span className="risk-icon warning">!</span><div><strong>Unpaid orders</strong><p>{summary.unpaidCount} order(s) awaiting payment, totalling {formatCedi(summary.unpaidMinor)}.</p></div></article><article><span className="risk-icon good">v</span><div><strong>Collected</strong><p>{formatCedi(summary.chargedMinor)} confirmed by Paystack across {summary.paidCount} paid order(s).</p></div></article><article><span className="risk-icon alert">!</span><div><strong>Sellers at risk</strong><p>{sellerPerfSummary ? `${sellerPerfSummary.flaggedCount} of ${sellerPerfSummary.totalSellers} sellers scored below the watch threshold.` : 'No seller performance data is available yet.'}</p></div></article></div></section>;
 }
 
 function FinanceEmpty({ title, copy }) {
@@ -1738,7 +984,7 @@ function BuyerFinance({ orders, showNotice }) {
     return <FinanceEmpty title="Your money, explained." copy="Fees on every booking, once one is paid." />;
   }
   const lastPaid = orders.find((order) => order.status === 'Paid');
-  return <section className="finance-workspace"><div className="finance-heading"><div><span className="section-kicker">BUYER FINANCE</span><h2>Your money, explained.</h2><p>What you paid, and what Nautica charged, across your paid orders.</p></div><button className="outline-button" type="button" onClick={() => showNotice(`${summary.paidCount} paid order(s), ${formatCedi(summary.chargedMinor)} total.`)}>Summarise ↓</button></div><div className="finance-grid buyer-finance"><article><span>LAST PAID ORDER</span><strong>{formatCedi(lastPaid?.chargedMinor ?? 0)}</strong><small>{lastPaid?.code ?? '—'}</small></article><article><span>TOTAL PAID</span><strong>{formatCedi(summary.chargedMinor)}</strong><small>The full amount you were charged</small></article><article><span>STILL TO PAY</span><strong>{formatCedi(summary.unpaidMinor)}</strong><small>{summary.unpaidCount} unpaid order(s)</small></article></div></section>;
+  return <section className="finance-workspace"><div className="finance-heading"><div><span className="section-kicker">BUYER FINANCE</span><h2>Your money, explained.</h2><p>What you paid, and what Nautica charged, across your paid orders.</p></div><button className="outline-button" type="button" onClick={() => showNotice(`${summary.paidCount} paid order(s), ${formatCedi(summary.chargedMinor)} total.`)}>Summarise ?</button></div><div className="finance-grid buyer-finance"><article><span>LAST PAID ORDER</span><strong>{formatCedi(lastPaid?.chargedMinor ?? 0)}</strong><small>{lastPaid?.code ?? '—'}</small></article><article><span>TOTAL PAID</span><strong>{formatCedi(summary.chargedMinor)}</strong><small>The full amount you were charged</small></article><article><span>STILL TO PAY</span><strong>{formatCedi(summary.unpaidMinor)}</strong><small>{summary.unpaidCount} unpaid order(s)</small></article></div></section>;
 }
 
 function SellerFinance({ orders, showNotice }) {
@@ -1746,7 +992,7 @@ function SellerFinance({ orders, showNotice }) {
   if (!summary.paidCount) {
     return <FinanceEmpty title="Know what you take home." copy="Your share of each paid delivery, once there is one." />;
   }
-  return <section className="finance-workspace"><div className="finance-heading"><div><span className="section-kicker">SELLER FINANCE</span><h2>Know what you take home.</h2><p>Your allocated share of orders that have been paid.</p></div><button className="outline-button" type="button" onClick={() => showNotice(`Seller share across ${summary.paidCount} paid order(s): ${formatCedi(summary.sellerReceivesMinor)}.`)}>Summarise ↓</button></div><div className="finance-grid seller-finance"><article><span>YOUR SHARE</span><strong>{formatCedi(summary.sellerReceivesMinor)}</strong><small>Water seller allocation</small></article><article><span>ORDER VALUE</span><strong>{formatCedi(summary.grossMinor)}</strong><small>Before fees, {summary.paidCount} paid order(s)</small></article><article><span>NAUTICAL COMMISSION</span><strong>-{formatCedi(summary.platformCommissionMinor)}</strong><small>Platform allocation</small></article><article className="finance-highlight"><span>NOT PAID OUT</span><strong>{formatCedi(summary.unpaidMinor)}</strong><small>Orders that have not been paid, so nothing is owed yet</small></article></div></section>;
+  return <section className="finance-workspace"><div className="finance-heading"><div><span className="section-kicker">SELLER FINANCE</span><h2>Know what you take home.</h2><p>Your allocated share of orders that have been paid.</p></div><button className="outline-button" type="button" onClick={() => showNotice(`Seller share across ${summary.paidCount} paid order(s): ${formatCedi(summary.sellerReceivesMinor)}.`)}>Summarise ?</button></div><div className="finance-grid seller-finance"><article><span>YOUR SHARE</span><strong>{formatCedi(summary.sellerReceivesMinor)}</strong><small>Water seller allocation</small></article><article><span>ORDER VALUE</span><strong>{formatCedi(summary.grossMinor)}</strong><small>Before fees, {summary.paidCount} paid order(s)</small></article><article><span>NAUTICAL COMMISSION</span><strong>-{formatCedi(summary.platformCommissionMinor)}</strong><small>Platform allocation</small></article><article className="finance-highlight"><span>NOT PAID OUT</span><strong>{formatCedi(summary.unpaidMinor)}</strong><small>Orders that have not been paid, so nothing is owed yet</small></article></div></section>;
 }
 
 function InstitutionFinance({ orders, showNotice }) {
@@ -1754,15 +1000,15 @@ function InstitutionFinance({ orders, showNotice }) {
   if (!summary.paidCount) {
     return <FinanceEmpty title="Plan the month with confidence." copy="Delivery spend and usage, once orders are paid." />;
   }
-  return <section className="finance-workspace"><div className="finance-heading"><div><span className="section-kicker">INSTITUTION FINANCE</span><h2>Plan the month with confidence.</h2><p>Spend and delivery volume, summed from paid orders.</p></div><button className="outline-button" type="button" onClick={() => showNotice(`${summary.paidCount} paid order(s), ${formatCedi(summary.chargedMinor)} total.`)}>Summarise ↓</button></div><div className="finance-grid institution-finance"><article className="finance-highlight"><span>TOTAL SPEND</span><strong>{formatCedi(summary.chargedMinor)}</strong><small>Paid orders including fees</small></article><article><span>DELIVERIES</span><strong>{summary.deliveredCount}</strong><small>Confirmed at handover</small></article><article><span>ORDERS IN FLIGHT</span><strong>{summary.unpaidCount}</strong><small>Awaiting payment</small></article><article><span>AVG ORDER VALUE</span><strong>{formatCedi(summary.paidCount ? Math.round(summary.grossMinor / summary.paidCount) : 0)}</strong><small>Before fees</small></article></div></section>;
+  return <section className="finance-workspace"><div className="finance-heading"><div><span className="section-kicker">INSTITUTION FINANCE</span><h2>Plan the month with confidence.</h2><p>Spend and delivery volume, summed from paid orders.</p></div><button className="outline-button" type="button" onClick={() => showNotice(`${summary.paidCount} paid order(s), ${formatCedi(summary.chargedMinor)} total.`)}>Summarise ?</button></div><div className="finance-grid institution-finance"><article className="finance-highlight"><span>TOTAL SPEND</span><strong>{formatCedi(summary.chargedMinor)}</strong><small>Paid orders including fees</small></article><article><span>DELIVERIES</span><strong>{summary.deliveredCount}</strong><small>Confirmed at handover</small></article><article><span>ORDERS IN FLIGHT</span><strong>{summary.unpaidCount}</strong><small>Awaiting payment</small></article><article><span>AVG ORDER VALUE</span><strong>{formatCedi(summary.paidCount ? Math.round(summary.grossMinor / summary.paidCount) : 0)}</strong><small>Before fees</small></article></div></section>;
 }
 
 function RevenueFinance({ orders = [], showNotice }) {
   const summary = summarise(orders);
-  // The old tiles read GH₵18,540 GMV, GH₵1,020 buyer commissions, GH₵892 seller
-  // commissions and GH₵637 institutional MRR with invented revenue-mix labels.
+  // The old tiles read GH?18,540 GMV, GH?1,020 buyer commissions, GH?892 seller
+  // commissions and GH?637 institutional MRR with invented revenue-mix labels.
   // Every figure here is summed from paid orders, so an empty workspace shows
-  // GH₵0.00 rather than a plausible-looking market.
+  // GH?0.00 rather than a plausible-looking market.
   const hasData = summary.paidCount > 0;
   const sellerShare = summary.sellerReceivesMinor;
   const driverShare = summary.driverReceivesMinor;
@@ -1771,8 +1017,9 @@ function RevenueFinance({ orders = [], showNotice }) {
   const sellerPct = totalOut > 0 ? Math.round((sellerShare / totalOut) * 100) : 0;
   const driverPct = totalOut > 0 ? Math.round((driverShare / totalOut) * 100) : 0;
   const platformPct = totalOut > 0 ? Math.round((platformShare / totalOut) * 100) : 0;
-  return <section className="finance-workspace"><div className="finance-heading"><div><span className="section-kicker">REVENUE CONTROL TOWER</span><h2>Money moving through the network.</h2><p>Marketplace take, outstanding payments and revenue mix, summed from paid orders.</p></div><button className="outline-button" type="button" onClick={() => showNotice(hasData ? `GMV ${formatCedi(summary.chargedMinor)} across ${summary.paidCount} paid order(s).` : 'No paid orders yet, so there is no GMV to report.')}>Generate report ↓</button></div><div className="finance-grid ops-finance"><article><span>GMV COLLECTED</span><strong>{formatCedi(summary.chargedMinor)}</strong><small>{summary.paidCount} paid order(s) confirmed by Paystack</small></article><article><span>SELLER SHARE</span><strong>{formatCedi(sellerShare)}</strong><small>{sellerPct}% of paid-out money</small></article><article><span>DRIVER SHARE</span><strong>{formatCedi(driverShare)}</strong><small>{driverPct}% of paid-out money</small></article><article><span>NAUTICAL SHARE</span><strong>{formatCedi(platformShare)}</strong><small>{platformPct}% of paid-out money</small></article><article className="finance-warning"><span>AWAITING PAYMENT</span><strong>{formatCedi(summary.unpaidMinor)}</strong><small>{summary.unpaidCount} order(s) not yet paid</small></article><article className="finance-warning"><span>NO DISPUTE DATA</span><strong>0</strong><small>Dispute tracking is not connected to this deployment</small></article></div></section>;
+  return <section className="finance-workspace"><div className="finance-heading"><div><span className="section-kicker">REVENUE CONTROL TOWER</span><h2>Money moving through the network.</h2><p>Marketplace take, outstanding payments and revenue mix, summed from paid orders.</p></div><button className="outline-button" type="button" onClick={() => showNotice(hasData ? `GMV ${formatCedi(summary.chargedMinor)} across ${summary.paidCount} paid order(s).` : 'No paid orders yet, so there is no GMV to report.')}>Generate report ?</button></div><div className="finance-grid ops-finance"><article><span>GMV COLLECTED</span><strong>{formatCedi(summary.chargedMinor)}</strong><small>{summary.paidCount} paid order(s) confirmed by Paystack</small></article><article><span>SELLER SHARE</span><strong>{formatCedi(sellerShare)}</strong><small>{sellerPct}% of paid-out money</small></article><article><span>DRIVER SHARE</span><strong>{formatCedi(driverShare)}</strong><small>{driverPct}% of paid-out money</small></article><article><span>NAUTICAL SHARE</span><strong>{formatCedi(platformShare)}</strong><small>{platformPct}% of paid-out money</small></article><article className="finance-warning"><span>AWAITING PAYMENT</span><strong>{formatCedi(summary.unpaidMinor)}</strong><small>{summary.unpaidCount} order(s) not yet paid</small></article><article className="finance-warning"><span>NO DISPUTE DATA</span><strong>0</strong><small>Dispute tracking is not connected to this deployment</small></article></div></section>;
 }
 
 export default App;
+
 

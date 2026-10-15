@@ -7,42 +7,13 @@ import usePredictiveAnalytics from '../hooks/usePredictiveAnalytics';
 import useDynamicPricing from '../hooks/useDynamicPricing';
 import useSellerInventory from '../hooks/useSellerInventory';
 import useLoadBalancing from '../hooks/useLoadBalancing';
-import usePredictiveInventory from '../hooks/usePredictiveInventory';
-import useRouteOptimization from '../hooks/useRouteOptimization';
 import useCustomerIntelligence from '../hooks/useCustomerIntelligence';
 import { useSellerRatings } from '../hooks/useRatings';
 import useNotifications from '../hooks/useNotifications';
 import WaterQualityPanel from './WaterQualityPanel';
 import PredictiveInventoryPanel from './PredictiveInventoryPanel';
 import RouteOptimizationPanel from './RouteOptimizationPanel';
-import RouteOptimizationV2Panel from './RouteOptimizationV2Panel';
 import CustomerIntelligencePanel from './CustomerIntelligencePanel';
-import DemandForecastingPanel from './DemandForecastingPanel';
-import DriverPerformancePanel from './DriverPerformancePanel';
-import AutomatedDispatchPanel from './AutomatedDispatchPanel';
-import PredictiveMaintenancePanel from './PredictiveMaintenancePanel';
-import SupplyChainOptimizationPanel from './SupplyChainOptimizationPanel';
-import CustomerChurnPredictionPanel from './CustomerChurnPredictionPanel';
-import RevenueOptimizationPanel from './RevenueOptimizationPanel';
-import QualityAssurancePanel from './QualityAssurancePanel';
-import FleetUtilizationPanel from './FleetUtilizationPanel';
-import MarketIntelligencePanel from './MarketIntelligencePanel';
-import EnergyOptimizationPanel from './EnergyOptimizationPanel';
-import SubscriptionManagementPanel from './SubscriptionManagementPanel';
-import SustainabilityTrackingPanel from './SustainabilityTrackingPanel';
-import WaterSourceOptimizationPanel from './WaterSourceOptimizationPanel';
-import ComplianceMonitoringPanel from './ComplianceMonitoringPanel';
-import EmergencyResponsePanel from './EmergencyResponsePanel';
-import CarbonFootprintTrackingPanel from './CarbonFootprintTrackingPanel';
-import SmartDeliverySchedulingPanel from './SmartDeliverySchedulingPanel';
-import WaterQualityPredictionPanel from './WaterQualityPredictionPanel';
-import CustomerSentimentAnalysisPanel from './CustomerSentimentAnalysisPanel';
-import RevenueLeakDetectionPanel from './RevenueLeakDetectionPanel';
-import PredictivePricingPanel from './PredictivePricingPanel';
-import InventoryForecastingPanel from './InventoryForecastingPanel';
-import DriverBehaviorPanel from './DriverBehaviorPanel';
-import CustomerLifetimeValuePanel from './CustomerLifetimeValuePanel';
-import DemandSensingPanel from './DemandSensingPanel';
 
 function JobCard({ order, driver, onAccept, onStart, onComplete, onView }) {
   const statusColors = {
@@ -229,13 +200,10 @@ export function SellerDashboard({
   const { assignments, optimizationQueue, autoAssignEnabled, setAutoAssignEnabled, fleetStats, assignOrder, autoAssignAll, optimizeRoutes, applyOptimization, lastOptimization } = useSmartAssignment({ orders, driverPositions: driverLocations, onNotice: showNotice, updateOrderStatus });
   const { churnAnalysis, ltvPredictions, segments, anomalies: predAnomalies, revenueForecast, summary: analyticsSummary, loading: analyticsLoading, refresh: refreshAnalytics } = usePredictiveAnalytics({ orders, customers: [], driverPositions: driverLocations });
   const { pricing, experiments, customerProfile, loading: pricingLoading, refresh: refreshPricing, getPriceForVolume, getPriceExplanation, summary: pricingSummary } = useDynamicPricing({ orders, driverPositions: driverLocations, customerId: sellerProfile?.identifier, region: sellerProfile?.region });
-  const { inventory, equipment, lowInventory, pendingMaintenance, reorderRecommendations, summary: inventorySummary, loading: inventoryLoading, recordDelivery, recordRestock, recordMaintenance } = useSellerInventory({ sellerProfile, orders, driverPositions: driverLocations, forecast });
+  const { inventory, equipment, lowInventory, pendingMaintenance, reorderRecommendations, summary: inventorySummary, loading: inventoryLoading, recordDelivery, recordRestock } = useSellerInventory({ sellerProfile, orders, driverPositions: driverLocations, forecast });
   const { zoneLoads, driverWorkloads, rebalancingSuggestions, autoRebalanceEnabled, setAutoRebalanceEnabled, surgeMode, activateSurge, fleetSummary, refreshLoads } = useLoadBalancing({ orders, driverPositions: driverLocations, onNotice: showNotice });
 
-  // Advanced AI features
-  const { inventory: predInventory, predictions, alerts: invAlerts, summary: predInvSummary, recordRestock: predRecordRestock } = usePredictiveInventory({ sellerProfile, orders, driverPositions: driverLocations, forecast, onNotice: showNotice });
-  const { zoneLoads: routeZones, optimizationQueue: routeOptimizations, rebalancingSuggestions: routeRebalancing, fleetSummary: routeFleet, optimizeRoutes: runOptimization, applyOptimization: routeApplyOptimization, applyRebalancing } = useRouteOptimization({ orders, driverPositions: driverLocations, onNotice: showNotice });
-  const { customers: enrichedCustomers, churnAnalysis: custChurnAnalysis, ltvPredictions: custLTV, anomalies: custAnomalies, summary: custSummary } = useCustomerIntelligence({ orders, customers: [], driverPositions: driverLocations, onNotice: showNotice });
+  const { customers: enrichedCustomers } = useCustomerIntelligence({ orders, customers: [], driverPositions: driverLocations, onNotice: showNotice });
 
   const [activeTab, setActiveTab] = useState('jobs');
   const [smartTab, setSmartTab] = useState('forecast');
@@ -570,36 +538,9 @@ export function SellerDashboard({
             <button className={smartTab === 'waterquality' ? 'active' : ''} onClick={() => setSmartTab('waterquality')}>Water Quality</button>
             <button className={smartTab === 'inventory' ? 'active' : ''} onClick={() => setSmartTab('inventory')}>Predictive Inventory</button>
             <button className={smartTab === 'routing' ? 'active' : ''} onClick={() => setSmartTab('routing')}>Route Optimization</button>
-            <button className={smartTab === 'routing-v2' ? 'active' : ''} onClick={() => setSmartTab('routing-v2')}>Route Optimization V2</button>
             <button className={smartTab === 'customers' ? 'active' : ''} onClick={() => setSmartTab('customers')}>Customer Intelligence</button>
             <button className={smartTab === 'notifications' ? 'active' : ''} onClick={() => setSmartTab('notifications')}>Smart Alerts</button>
             <button className={smartTab === 'loadbalance' ? 'active' : ''} onClick={() => setSmartTab('loadbalance')}>Load Balancing</button>
-            <button className={smartTab === 'demand-forecasting' ? 'active' : ''} onClick={() => setSmartTab('demand-forecasting')}>Demand Forecasting</button>
-            <button className={smartTab === 'driver-performance' ? 'active' : ''} onClick={() => setSmartTab('driver-performance')}>Driver Performance</button>
-            <button className={smartTab === 'automated-dispatch' ? 'active' : ''} onClick={() => setSmartTab('automated-dispatch')}>Automated Dispatch</button>
-            <button className={smartTab === 'predictive-maintenance' ? 'active' : ''} onClick={() => setSmartTab('predictive-maintenance')}>Predictive Maintenance</button>
-            <button className={smartTab === 'supply-chain' ? 'active' : ''} onClick={() => setSmartTab('supply-chain')}>Supply Chain</button>
-            <button className={smartTab === 'churn-prediction' ? 'active' : ''} onClick={() => setSmartTab('churn-prediction')}>Churn Prediction</button>
-            <button className={smartTab === 'revenue-optimization' ? 'active' : ''} onClick={() => setSmartTab('revenue-optimization')}>Revenue Optimization</button>
-            <button className={smartTab === 'quality-assurance' ? 'active' : ''} onClick={() => setSmartTab('quality-assurance')}>Quality Assurance</button>
-            <button className={smartTab === 'fleet-utilization' ? 'active' : ''} onClick={() => setSmartTab('fleet-utilization')}>Fleet Utilization</button>
-            <button className={smartTab === 'market-intelligence' ? 'active' : ''} onClick={() => setSmartTab('market-intelligence')}>Market Intelligence</button>
-            <button className={smartTab === 'energy-optimization' ? 'active' : ''} onClick={() => setSmartTab('energy-optimization')}>Energy Optimization</button>
-            <button className={smartTab === 'subscription-management' ? 'active' : ''} onClick={() => setSmartTab('subscription-management')}>Subscription Mgmt</button>
-            <button className={smartTab === 'sustainability-tracking' ? 'active' : ''} onClick={() => setSmartTab('sustainability-tracking')}>Sustainability</button>
-            <button className={smartTab === 'water-source' ? 'active' : ''} onClick={() => setSmartTab('water-source')}>Water Source</button>
-            <button className={smartTab === 'compliance' ? 'active' : ''} onClick={() => setSmartTab('compliance')}>Compliance</button>
-            <button className={smartTab === 'emergency' ? 'active' : ''} onClick={() => setSmartTab('emergency')}>Emergency</button>
-            <button className={smartTab === 'carbon' ? 'active' : ''} onClick={() => setSmartTab('carbon')}>Carbon Footprint</button>
-            <button className={smartTab === 'smart-scheduling' ? 'active' : ''} onClick={() => setSmartTab('smart-scheduling')}>Smart Scheduling</button>
-            <button className={smartTab === 'quality-prediction' ? 'active' : ''} onClick={() => setSmartTab('quality-prediction')}>Quality Prediction</button>
-            <button className={smartTab === 'sentiment' ? 'active' : ''} onClick={() => setSmartTab('sentiment')}>Sentiment</button>
-            <button className={smartTab === 'revenue-leaks' ? 'active' : ''} onClick={() => setSmartTab('revenue-leaks')}>Revenue Leaks</button>
-            <button className={smartTab === 'predictive-pricing' ? 'active' : ''} onClick={() => setSmartTab('predictive-pricing')}>Predictive Pricing</button>
-            <button className={smartTab === 'inventory-forecasting' ? 'active' : ''} onClick={() => setSmartTab('inventory-forecasting')}>Inventory Forecasting</button>
-            <button className={smartTab === 'driver-behavior' ? 'active' : ''} onClick={() => setSmartTab('driver-behavior')}>Driver Behavior</button>
-            <button className={smartTab === 'customer-lifetime-value' ? 'active' : ''} onClick={() => setSmartTab('customer-lifetime-value')}>Customer LTV</button>
-            <button className={smartTab === 'demand-sensing' ? 'active' : ''} onClick={() => setSmartTab('demand-sensing')}>Demand Sensing</button>
           </div>
 
           {smartTab === 'forecast' && (
@@ -958,280 +899,6 @@ export function SellerDashboard({
               onNotice={showNotice} 
               customers={enrichedCustomers}
               driverPositions={driverLocations}
-            />
-          )}
-
-          {smartTab === 'demand-forecasting' && (
-            <DemandForecastingPanel 
-              orders={orders} 
-              weather="clear" 
-              weatherForecast={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'driver-performance' && (
-            <DriverPerformancePanel 
-              drivers={fleetDrivers} 
-              orders={orders} 
-              driverLocations={driverLocations}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'automated-dispatch' && (
-            <AutomatedDispatchPanel 
-              orders={orders} 
-              drivers={fleetDrivers} 
-              driverLocations={driverLocations}
-              zoneLoads={zoneLoads}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'predictive-maintenance' && (
-            <PredictiveMaintenancePanel 
-              vehicles={[]} 
-              orders={orders} 
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'supply-chain' && (
-            <SupplyChainOptimizationPanel 
-              suppliers={[]} 
-              warehouses={[]} 
-              orders={orders} 
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'churn-prediction' && (
-            <CustomerChurnPredictionPanel 
-              customers={enrichedCustomers} 
-              orders={orders} 
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'revenue-optimization' && (
-            <RevenueOptimizationPanel 
-              orders={orders} 
-              pricing={pricing} 
-              customers={enrichedCustomers}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'quality-assurance' && (
-            <QualityAssurancePanel 
-              qualityRecords={waterQualityRecords} 
-              sources={[]} 
-              orders={orders} 
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'fleet-utilization' && (
-            <FleetUtilizationPanel 
-              fleetDrivers={fleetDrivers} 
-              orders={orders} 
-              driverLocations={driverLocations}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'market-intelligence' && (
-            <MarketIntelligencePanel 
-              orders={orders} 
-              customers={[]}
-              competitors={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'energy-optimization' && (
-            <EnergyOptimizationPanel 
-              fleetDrivers={fleetDrivers} 
-              orders={orders} 
-              driverLocations={driverLocations}
-              vehicles={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'subscription-management' && (
-            <SubscriptionManagementPanel 
-              customers={[]}
-              orders={orders} 
-              subscriptions={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'sustainability-tracking' && (
-            <SustainabilityTrackingPanel 
-              orders={orders} 
-              qualityRecords={[]}
-              sources={[]}
-              fleetDrivers={fleetDrivers}
-              vehicles={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'water-source' && (
-            <WaterSourceOptimizationPanel 
-              sources={[]}
-              orders={orders} 
-              qualityRecords={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'compliance' && (
-            <ComplianceMonitoringPanel 
-              permits={[]}
-              inspections={[]}
-              regulations={[]}
-              facilities={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'emergency' && (
-            <EmergencyResponsePanel 
-              orders={orders} 
-              drivers={fleetDrivers} 
-              facilities={[]}
-              customers={[]}
-              weatherAlerts={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'carbon' && (
-            <CarbonFootprintPanel 
-              orders={orders} 
-              drivers={fleetDrivers} 
-              vehicles={[]}
-              routes={[]}
-              facilities={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'smart-scheduling' && (
-            <SmartDeliverySchedulingPanel 
-              orders={orders} 
-              drivers={fleetDrivers} 
-              vehicles={[]}
-              facilities={[]}
-              trafficData={[]}
-              weatherData={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'quality-prediction' && (
-            <WaterQualityPredictionPanel 
-              qualityRecords={[]} 
-              sources={[]}
-              weatherData={[]}
-              treatmentRecords={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'sentiment' && (
-            <CustomerSentimentPanel 
-              customers={[]} 
-              orders={orders} 
-              ratings={[]}
-              messages={[]}
-              supportTickets={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'revenue-leaks' && (
-            <RevenueLeakDetectionPanel 
-              orders={orders} 
-              payments={[]} 
-              invoices={[]}
-              pricing={{}}
-              drivers={fleetDrivers} 
-              facilities={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'predictive-pricing' && (
-            <PredictivePricingPanel 
-              orders={orders} 
-              pricing={{}} 
-              competitors={[]}
-              weatherData={[]}
-              events={[]}
-              historicalPricing={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'inventory-forecasting' && (
-            <InventoryForecastingPanel 
-              products={[]} 
-              orders={orders} 
-              suppliers={[]}
-              warehouses={[]}
-              usageHistory={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'driver-behavior' && (
-            <DriverBehaviorPanel 
-              drivers={fleetDrivers} 
-              trips={[]} 
-              vehicles={[]}
-              fuelRecords={[]}
-              maintenanceRecords={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'customer-lifetime-value' && (
-            <CustomerLifetimeValuePanel 
-              customers={[]} 
-              orders={orders} 
-              payments={[]}
-              subscriptions={[]}
-              interactions={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'demand-sensing' && (
-            <DemandSensingPanel 
-              orders={orders} 
-              customers={[]} 
-              weatherForecast={[]}
-              events={[]}
-              historicalData={[]}
-              marketIndicators={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'routing-v2' && (
-            <RouteOptimizationV2Panel 
-              orders={orders} 
-              drivers={fleetDrivers} 
-              vehicles={[]}
-              facilities={[]}
-              trafficData={[]}
-              timeWindows={[]}
-              onNotice={showNotice}
             />
           )}
 
