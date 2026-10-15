@@ -93,6 +93,29 @@ async function readJson(req) {
   return raw;
 }
 
+const loginFailures = new Map();
+const LOGIN_LOCKOUT_MS = 5 * 60 * 1000;
+const LOGIN_MAX_ATTEMPTS = 5;
+
+function isLoginLocked(email) {
+  const record = loginFailures.get(email);
+  if (!record) return false;
+  return Date.now() - record.first < LOGIN_LOCKOUT_MS && record.count >= LOGIN_MAX_ATTEMPTS;
+}
+
+function recordLoginFailure(email) {
+  const record = loginFailures.get(email);
+  if (!record || Date.now() - record.first >= LOGIN_LOCKOUT_MS) {
+    loginFailures.set(email, { first: Date.now(), count: 1 });
+  } else {
+    record.count++;
+  }
+}
+
+function clearLoginFailures(email) {
+  loginFailures.delete(email);
+}
+
 function hashPassword(password, salt = randomBytes(16).toString('hex')) {
   const derived = scryptSync(password, salt, 64).toString('hex');
   return { salt, hash: derived };
@@ -198,15 +221,20 @@ export const apiOpsLogin = onRequest({ secrets: [OPS_SESSION_SECRET] }, async (r
       return fail(res, 400, 'missing_credentials', 'An email address and password are required.');
     }
 
+    if (isLoginLocked(email)) {
+      return fail(res, 429, 'too_many_attempts', 'Too many failed attempts. Try again in 5 minutes.');
+    }
+
     const snapshot = await db.collection(COLLECTIONS.ops)
       .where('email', '==', email)
       .where('role', '==', 'ops')
       .limit(1)
       .get();
 
-    // One message for "no such operator" and "wrong password" alike, so this
-    // cannot be used to enumerate which addresses have admin accounts.
-    const invalid = () => fail(res, 401, 'invalid_credentials', 'Those sign-in details are not correct.');
+    const invalid = () => {
+      recordLoginFailure(email);
+      fail(res, 401, 'invalid_credentials', 'Those sign-in details are not correct.');
+    };
 
     if (snapshot.empty) {
       // Still spend the time hashing, so a missing account and a wrong password
@@ -218,6 +246,7 @@ export const apiOpsLogin = onRequest({ secrets: [OPS_SESSION_SECRET] }, async (r
     const operator = snapshot.docs[0].data();
     if (!verifyPassword(password, operator.salt, operator.passwordHash)) return invalid();
 
+    clearLoginFailures(email);
     await snapshot.docs[0].ref.update({ lastLoginAt: FieldValue.serverTimestamp() });
     logger.info('ops signed in', { email });
 
@@ -671,6 +700,7 @@ export const apiVerifyPayment = onRequest({ secrets: [PAYSTACK_SECRET_KEY] }, as
     const order = orderDoc.data();
     const verdict = checkSettlement({ transaction, order, currency: order.currency ?? CURRENCY });
 
+    let newStatus = order.status;
     if (verdict.settled && order.status !== 'Paid') {
       const oldStatus = order.status;
       await orderDoc.update({
@@ -680,12 +710,11 @@ export const apiVerifyPayment = onRequest({ secrets: [PAYSTACK_SECRET_KEY] }, as
       });
       // Send push notification for status change
       await notifyOrderStatusChange({ ...order, status: 'Paid' }, oldStatus);
+      newStatus = 'Paid';
     }
 
     return res.status(200).json({
-      // `settled` here means Paystack confirmed it AND it matched the order. The
-      // client can rely on this flag; nothing else in the app decides it.
-      settled: verdict.settled && order.status === 'Paid',
+      settled: verdict.settled && newStatus === 'Paid',
       status: verdict.settled ? 'settled' : 'pending',
       reason: verdict.reason,
       reference,
@@ -935,6 +964,25 @@ const SYSTEM_PROMPTS = {
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
+const aiUsage = new Map();
+const AI_RATE_LIMIT = 20;
+const AI_RATE_WINDOW_MS = 60 * 1000;
+
+function checkAiRateLimit(ip) {
+  const now = Date.now();
+  const window = aiUsage.get(ip);
+  if (!window || now - window.start > AI_RATE_WINDOW_MS) {
+    aiUsage.set(ip, { start: now, count: 1 });
+    return true;
+  }
+  window.count++;
+  if (window.count > AI_RATE_LIMIT) {
+    const retryAfter = Math.ceil((AI_RATE_WINDOW_MS - (now - window.start)) / 1000);
+    return { limited: true, retryAfter };
+  }
+  return true;
+}
+
 function formatCedi(minor) {
   const sign = minor < 0 ? '-' : '';
   const abs = Math.abs(minor);
@@ -984,6 +1032,12 @@ export const apiAiChat = onRequest({ secrets: [GEMINI_API_KEY] }, async (req, re
   if (req.method !== 'POST') return fail(res, 405, 'method_not_allowed', 'Use POST.');
 
   try {
+    const clientIp = req.get('x-forwarded-for')?.split(',')[0]?.trim() ?? req.get('x-appengine-user-ip') ?? 'unknown';
+    const rl = checkAiRateLimit(clientIp);
+    if (rl !== true) {
+      return res.status(429).json({ error: 'rate_limited', message: `Too many requests. Try again in ${rl.retryAfter} second(s).` });
+    }
+
     const body = await readJson(req);
     const { role, question, context } = buildContext(body);
 

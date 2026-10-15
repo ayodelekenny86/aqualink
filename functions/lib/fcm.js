@@ -169,16 +169,15 @@ export async function notifyDriverAssignment(driverPhone, order) {
  */
 export async function storeFcmToken(userId, token, platform = 'web') {
   const tokenHash = require('crypto').createHash('sha256').update(token).digest('hex').slice(0, 32);
-  
   await db.collection('fcmTokens').doc(tokenHash).set({
     userId,
+    tokenHash,
     token,
     platform,
     active: true,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }, { merge: true });
-
   return { success: true };
 }
 
