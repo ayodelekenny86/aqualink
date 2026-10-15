@@ -9,6 +9,7 @@ import useNotifications from './hooks/useNotifications';
 import { usePushNotifications, useFCMTokenSync } from './hooks/usePushNotifications';
 import useLoyalty from './hooks/useLoyalty';
 import useSellerPerformance from './hooks/useSellerPerformance';
+import useAdminPricing from './hooks/useAdminPricing';
 import { formatPhoneForDisplay, normalizePhone } from './lib/accounts';
 import { seedProducts } from './lib/collections';
 import { formatCedi } from './lib/money';
