@@ -57,7 +57,7 @@ const anonKey = env.VITE_SUPABASE_ANON_KEY || '';
  */
 const sites = (
   process.env.NAUTICAL_SITE_URLS
-    || 'https://nautical.web.app'
+    || 'https://viviluxy-assistant.web.app,https://nautica.web.app'
 ).split(',').map((value) => value.trim()).filter(Boolean);
 
 /**
