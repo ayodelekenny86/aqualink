@@ -794,11 +794,11 @@ function SellerAccessGate({ sellerProfile, setSellerProfile, onApply, onRefresh,
           onChange={(e) => setTermsAccepted(e.target.checked)}
           required
         />
-        <span>
-          I agree to the <a href="#" onClick={(e) => { e.preventDefault(); showNotice('For full terms, please see our LEGAL.md file.') }>Terms and Conditions</a>, 
-          <a href="#" onClick={(e) => { e.preventDefault(); showNotice('For refund policy details, please see our LEGAL.md file.') }>Refund Policy</a>, and
-          <a href="#" onClick={(e) => { e.preventDefault(); showNotice('For privacy details, please see our LEGAL.md file.') }>Privacy Policy</a>.
-        </span>
+         <span>
+           I agree to the <a href="#" onClick={(e) => { e.preventDefault(); showNotice('For full terms, please see our LEGAL.md file.'); }}>Terms and Conditions</a>, 
+           <a href="#" onClick={(e) => { e.preventDefault(); showNotice('For refund policy details, please see our LEGAL.md file.'); }}>Refund Policy</a>, and
+           <a href="#" onClick={(e) => { e.preventDefault(); showNotice('For privacy details, please see our LEGAL.md file.'); }}>Privacy Policy</a>.
+         </span>
       </label>
     </div>
     <button className="primary-button" type="submit" disabled={busy || !termsAccepted}>
