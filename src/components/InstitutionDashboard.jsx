@@ -131,25 +131,26 @@ function BudgetAlert({ alert }) {
 }
 
 export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], driverLocations = {} }) {
-  const {
-    schedules,
-    upsertSchedule,
-    deleteSchedule,
-    toggleSchedule,
-    upcomingDeliveries,
-    qualityRecords,
-    addQualityRecord,
-    deleteQualityRecord,
-    budget,
-    updateBudget,
-    analytics,
-    refreshData,
-    refreshing,
-    qualityTrends,
-    complianceSummary,
-    supplyRisk,
-    savingsRecommendations,
-  } = useInstitutionDashboard({ orders, onNotice: showNotice });
+    const {
+      schedules,
+      upsertSchedule,
+      deleteSchedule,
+      toggleSchedule,
+      upcomingDeliveries,
+      qualityRecords,
+      addQualityRecord,
+      deleteQualityRecord,
+      budget,
+      updateBudget,
+      analytics,
+      refreshData,
+      refreshing,
+      qualityTrends,
+      complianceSummary,
+      supplyRisk,
+      savingsRecommendations,
+      predictiveCashFlow,
+    } = useInstitutionDashboard({ orders, onNotice: showNotice });
 
   // Smart features
   const { forecast, summary: forecastSummary, trend, anomalies, peakHours, loading: forecastLoading, refresh: refreshForecast } = useDemandForecast({ orders, region: 'ACCRA' });
@@ -1053,7 +1054,7 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
              </>
            )}
 
-           {/* Savings Recommendations */}
+             {/* Savings Recommendations */}
            {savingsRecommendations.length > 0 && (
              <>
                <div className="panel-divider" />
@@ -1082,6 +1083,40 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
                </div>
              </>
            )}
+           
+           {/* Predictive Cash Flow */}
+           <div className="panel-divider" />
+           
+           <div className="panel-title">
+             <span className="section-kicker">PREDICTIVE CASH FLOW</span>
+             <h2>Projected cash position for the next 30 days</h2>
+           </div>
+           <div className="cash-flow-grid">
+             <div className="cash-flow-item">
+               <div className="cash-flow-label">Projected Inflow</div>
+               <div className="cash-flow-value">{predictiveCashFlow.projectedInflow}</div>
+               <div className="cash-flow-subtext">From confirmed & pending orders</div>
+             </div>
+             <div className="cash-flow-item">
+               <div className="cash-flow-label">Projected Outflow</div>
+               <div className="cash-flow-value">{predictiveCashFlow.projectedOutflow}</div>
+               <div className="cash-flow-subtext">Estimated expenses</div>
+             </div>
+             <div className="cash-flow-item">
+               <div className="cash-flow-label">Net Cash Flow</div>
+               <div className="cash-flow-value">
+                 {predictiveCashFlow.netCashFlow.replace('-', '−')} {/* Use minus sign for better display */}
+               </div>
+               <div className="cash-flow-subtext">
+                 {predictiveCashFlow.netCashFlow.startsWith('-') ? 'Projected deficit' : 'Projected surplus'}
+               </div>
+             </div>
+             <div className="cash-flow-item">
+               <div className="cash-flow-label">Confidence</div>
+               <div className="cash-flow-value">{predictiveCashFlow.confidence}</div>
+               <div className="cash-flow-subtext">Based on data availability</div>
+             </div>
+           </div>
          </section>
       )}
 

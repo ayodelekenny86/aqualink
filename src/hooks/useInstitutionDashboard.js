@@ -407,30 +407,72 @@ export function useInstitutionDashboard({ orders, onNotice }) {
     return recs;
   }, [analytics, budget.monthly]);
 
-  return {
-    // Schedules
-    schedules,
-    upsertSchedule,
-    deleteSchedule,
-    toggleSchedule,
-    upcomingDeliveries,
-    // Quality
-    qualityRecords,
-    addQualityRecord,
-    deleteQualityRecord,
-    qualityTrends,
-    complianceSummary,
-    // Budget
-    budget,
-    updateBudget,
-    // Analytics
-    analytics,
-    supplyRisk,
-    savingsRecommendations,
-    // Actions
-    refreshData,
-    refreshing,
-  };
+  // Predictive cash flow forecasting
+  const predictiveCashFlow = useMemo(() => {
+    // Calculate projected cash inflow from upcoming orders
+    const upcomingOrders = orders.filter(o => 
+      ['Pending', 'Confirmed', 'Assigned', 'En Route'].includes(o.status) && 
+      new Date(o.date) >= new Date()
+    );
+    
+    const projectedInflow = upcomingOrders.reduce((sum, order) => {
+      return sum + (order.chargedMinor || 0);
+    }, 0);
+    
+    // Estimate monthly outflow based on historical spending
+    const monthlyOutflow = analytics.monthlyOrders > 0 
+      ? (analytics.totalSpentPesewas || 0) 
+      : 0;
+    
+    // Project net cash flow for next 30 days
+    const daysInMonth = 30;
+    const dailyOutflow = monthlyOutflow / daysInMonth;
+    const projectedOutflow = dailyOutflow * daysInMonth;
+    const netCashFlow = projectedInflow - projectedOutflow;
+    
+    // Calculate confidence based on data availability
+    const confidence = Math.min(95, 50 + (orders.length * 2)); // Increases with more data
+    
+    return {
+      projectedInflow: formatCedi(projectedInflow),
+      projectedOutflow: formatCedi(projectedOutflow),
+      netCashFlow: formatCedi(netCashFlow),
+      confidence: `${confidence}%`,
+      // Also return raw values for potential charts/gauges
+      raw: {
+        projectedInflow,
+        projectedOutflow,
+        netCashFlow,
+        confidence
+      }
+    };
+  }, [orders, analytics]);
+
+    return {
+      // Schedules
+      schedules,
+      upsertSchedule,
+      deleteSchedule,
+      toggleSchedule,
+      upcomingDeliveries,
+      // Quality
+      qualityRecords,
+      addQualityRecord,
+      deleteQualityRecord,
+      qualityTrends,
+      complianceSummary,
+      // Budget
+      budget,
+      updateBudget,
+      // Analytics
+      analytics,
+      supplyRisk,
+      savingsRecommendations,
+      predictiveCashFlow,
+      // Actions
+      refreshData,
+      refreshing,
+    };
 }
 
 export default useInstitutionDashboard;
