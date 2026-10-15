@@ -21,7 +21,8 @@ const checker = await readFile('scripts/verify-live.mjs', 'utf8');
 test('every origin this project serves from is probed', () => {
   // Each deployment found in the wild belongs in the default list. A URL that is
   // not probed is a URL nobody looks at.
-  expect(checker).toMatch(/nautical\.web\.app/);
+  expect(checker).toMatch(/viviluxy-assistant\.web\.app/);
+  expect(checker).toMatch(/nautica\.web\.app/);
   expect(checker).not.toMatch(/nauticalgh1\.vercel\.app/);
 });
 
