@@ -274,6 +274,41 @@ function patchAccount(account, changes) {
   return { ...account, ...changes };
 }
 
+/**
+ * Update an account's role, display name, or password.
+ * Password is hashed if provided.
+ */
+export async function updateAccount(accountId, { role, displayName, password } = {}) {
+  const accounts = listAccounts();
+  const idx = accounts.findIndex(a => a.id === accountId);
+  if (idx === -1) return null;
+
+  const account = accounts[idx];
+  const changes = {};
+
+  if (role !== undefined) {
+    if (!ACCOUNT_ROLES.includes(role)) throw new ValidationError('Unknown account role.', 'role');
+    changes.role = role;
+  }
+
+  if (displayName !== undefined) {
+    changes.displayName = displayName.trim();
+  }
+
+  if (password !== undefined && password !== null && password !== '') {
+    if (String(password).length < 8) {
+      throw new ValidationError('Passwords must be at least 8 characters.', 'password');
+    }
+    if (account.provider !== 'local') {
+      throw new ValidationError('Only local accounts may store a password.', 'provider');
+    }
+    changes.passwordSalt = (await import('./secureCode')).generateSalt();
+    changes.passwordHash = await (await import('./secureCode')).hashPassword(password, changes.passwordSalt);
+  }
+
+  return patchAccount(account, changes);
+}
+
 function recordFailure(account) {
   const failedAttempts = (account.failedAttempts ?? 0) + 1;
   const lockedUntil = failedAttempts >= MAX_FAILED_ATTEMPTS ? Date.now() + LOCKOUT_MS : null;
