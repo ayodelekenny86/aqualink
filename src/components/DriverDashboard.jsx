@@ -385,7 +385,7 @@ export default function DriverDashboard({
         <GPSLocationTracker 
           driver={driver} 
           isOnline={!offline}
-          onLocationUpdate={(loc) => console.log('Driver location:', loc)}
+          onLocationUpdate={() => {}}
         />
       )}
 
