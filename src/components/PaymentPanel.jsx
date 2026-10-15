@@ -36,6 +36,7 @@ export default function PaymentPanel({ order, onPaid, showNotice }) {
   const [notice, setNotice] = useState('');
   const [receipt, setReceipt] = useState(null);
   const [history, setHistory] = useState(() => listReceipts());
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const isPaid = order?.status === 'Paid' || Boolean(receipt);
   const chargedMinor = order?.chargedMinor ?? 0;
@@ -95,25 +96,29 @@ export default function PaymentPanel({ order, onPaid, showNotice }) {
     );
   }
 
-  async function handlePay(event) {
-    event.preventDefault();
-    setError('');
-    setBusy(true);
-    try {
-      const initiated = await initialisePayment({ orderId: order.id ?? order.code, email, provider });
+   async function handlePay(event) {
+     event.preventDefault();
+     if (!termsAccepted) {
+       setError('Please accept the terms and conditions before proceeding with payment.');
+       return;
+     }
+     setError('');
+     setBusy(true);
+     try {
+       const initiated = await initialisePayment({ orderId: order.id ?? order.code, email, provider });
 
-      if (initiated.alreadyPaid) {
-        setNotice('This order is already paid.');
-        return;
-      }
-      // Hand the browser to the chosen provider. No further outcome is assumed
-      // here; the return leg above decides what happened.
-      window.location.assign(initiated.authorizationUrl);
-    } catch (caught) {
-      setError(caught.message);
-      setBusy(false);
-    }
-  }
+       if (initiated.alreadyPaid) {
+         setNotice('This order is already paid.');
+         return;
+       }
+       // Hand the browser to the chosen provider. No further outcome is assumed
+       // here; the return leg above decides what happened.
+       window.location.assign(initiated.authorizationUrl);
+     } catch (caught) {
+       setError(caught.message);
+       setBusy(false);
+     }
+   }
 
   return (
     <section className="payment-panel panel" aria-label="Payment and receipts">
@@ -152,27 +157,44 @@ export default function PaymentPanel({ order, onPaid, showNotice }) {
               required
             />
           </label>
-          <label>
-            Payment method
-            <select
-              aria-label="Payment provider"
-              value={provider}
-              onChange={(event) => setProvider(event.target.value)}
-              disabled={busy}
-            >
-              <option value="paystack">Paystack — MTN, Telecel, ATMo, card</option>
-              <option value="flutterwave">Flutterwave — MTN Mobile Money, card, bank transfer</option>
-            </select>
-          </label>
-          <p className="form-hint">
-            Both providers are live on this deployment and each needs its own key set in the
-            Supabase dashboard. The one you pick here is the gateway the money actually flows
-            through; the server asks that provider whether money arrived, and only that answer
-            can mark the order paid.
-          </p>
-          <button className="primary-button full" type="submit" disabled={busy}>
-            {busy ? 'Working…' : `Pay ${formatCedi(chargedMinor)}`}
-          </button>
+           <label>
+             Payment method
+             <select
+               aria-label="Payment provider"
+               value={provider}
+               onChange={(event) => setProvider(event.target.value)}
+               disabled={busy}
+             >
+               <option value="paystack">Paystack — MTN, Telecel, ATMo, card</option>
+               <option value="flutterwave">Flutterwave — MTN Mobile Money, card, bank transfer</option>
+             </select>
+           </label>
+           <p className="form-hint">
+             Both providers are live on this deployment and each needs its own key set in the
+             Supabase dashboard. The one you pick here is the gateway the money actually flows
+             through; the server asks that provider whether money arrived, and only that answer
+             can mark the order paid.
+           </p>
+           
+           <div className="terms-checkbox">
+             <label>
+               <input
+                 type="checkbox"
+                 checked={termsAccepted}
+                 onChange={(e) => setTermsAccepted(e.target.checked)}
+                 required
+               />
+               <span>
+                 I agree to the <a href="#" onClick={(e) => { e.preventDefault(); showNotice('For full terms, please see our LEGAL.md file.') }>Terms and Conditions</a>, 
+                 <a href="#" onClick={(e) => { e.preventDefault(); showNotice('For refund policy details, please see our LEGAL.md file.') }>Refund Policy</a>, and
+                 <a href="#" onClick={(e) => { e.preventDefault(); showNotice('For privacy details, please see our LEGAL.md file.') }>Privacy Policy</a>.
+               </span>
+             </label>
+           </div>
+           
+           <button className="primary-button full" type="submit" disabled={busy || !termsAccepted}>
+             {busy ? 'Working…' : `Pay ${formatCedi(chargedMinor)}`}
+           </button>
         </form>
       )}
 
