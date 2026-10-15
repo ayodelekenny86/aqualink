@@ -15,8 +15,6 @@ import { formatCedi } from './lib/money';
 import { summarise } from './lib/summary';
 import { referenceFromLocation } from './lib/payments';
 import { rankReliability, reliabilitySummary, estimateForOrder } from './lib/reliability';
-import ContactButtons from './components/ContactButtons';
-import useAdminPricing from './hooks/useAdminPricing';
 import GoogleSignInButton from './components/GoogleSignInButton';
 import MetaSignInButton from './components/MetaSignInButton';
 import { PWASetup, PWADetectOffline } from './components/PWASetup';
@@ -30,7 +28,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { list, replaceAll } from './lib/collections';
 import { initWebVitals, trackEvent, EVENTS } from './lib/analytics';
 import RatingModal from './components/RatingModal';
-import { useRatings, useRatedOrders, useDriverRatings, useRatingsByBuyer } from './hooks/useRatings';
+import { useRatings, useRatedOrders, useDriverRatings } from './hooks/useRatings';
 
 // Admin-only and overlay surfaces load on demand.
 // admin console never downloads it, which keeps the initial bundle small.

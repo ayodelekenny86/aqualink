@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import ContactButtons, { orderMessage } from './ContactButtons';
 import { formatCedi } from '../lib/money';
-import { formatPhoneForDisplay, normalizePhone } from '../lib/accounts';
 import {
   DRIVER_STEPS,
   advanceAction,
@@ -9,9 +8,7 @@ import {
   driverStats,
   resolveDriver,
   stepIndex,
-  samePhone,
 } from '../lib/driver';
-import { list, insert, update, findBy } from '../lib/collections';
 import { trackEvent, EVENTS } from '../lib/analytics';
 import { useDriverRatings } from '../hooks/useRatings';
 

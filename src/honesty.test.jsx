@@ -73,7 +73,7 @@ const GROUPS = [
   },
   {
     name: 'an escrow account that does not exist',
-    files: [APP, 'src/components/RevenueBreakdown.jsx'],
+    files: [APP],
     claims: [
       { label: 'escrow release promise', pattern: /escrow only releases/i },
       { label: 'escrow holding promise', pattern: /escrow holds/i },

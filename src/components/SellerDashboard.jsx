@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { formatCedi } from '../lib/money';
 import useSellerDashboard from '../hooks/useSellerDashboard';
 import useDemandForecast from '../hooks/useDemandForecast';
