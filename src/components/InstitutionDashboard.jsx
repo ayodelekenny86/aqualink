@@ -4,39 +4,8 @@ import useInstitutionDashboard from '../hooks/useInstitutionDashboard';
 import useDemandForecast from '../hooks/useDemandForecast';
 import usePredictiveAnalytics from '../hooks/usePredictiveAnalytics';
 import useDynamicPricing from '../hooks/useDynamicPricing';
+import useSmartNotifications from '../hooks/useSmartNotifications';
 import useWaterQuality from '../hooks/useWaterQuality';
-import usePredictiveInventory from '../hooks/usePredictiveInventory';
-import useCustomerIntelligence from '../hooks/useCustomerIntelligence';
-import useNotifications from '../hooks/useNotifications';
-import SmartSchedulingPanel from './SmartSchedulingPanel';
-import PredictiveInventoryPanel from './PredictiveInventoryPanel';
-import CustomerIntelligencePanel from './CustomerIntelligencePanel';
-import DemandForecastingPanel from './DemandForecastingPanel';
-import DriverPerformancePanel from './DriverPerformancePanel';
-import AutomatedDispatchPanel from './AutomatedDispatchPanel';
-import PredictiveMaintenancePanel from './PredictiveMaintenancePanel';
-import SupplyChainOptimizationPanel from './SupplyChainOptimizationPanel';
-import CustomerChurnPredictionPanel from './CustomerChurnPredictionPanel';
-import RevenueOptimizationPanel from './RevenueOptimizationPanel';
-import QualityAssurancePanel from './QualityAssurancePanel';
-import FleetUtilizationPanel from './FleetUtilizationPanel';
-import MarketIntelligencePanel from './MarketIntelligencePanel';
-import EnergyOptimizationPanel from './EnergyOptimizationPanel';
-import SubscriptionManagementPanel from './SubscriptionManagementPanel';
-import SustainabilityTrackingPanel from './SustainabilityTrackingPanel';
-import WaterSourceOptimizationPanel from './WaterSourceOptimizationPanel';
-import ComplianceMonitoringPanel from './ComplianceMonitoringPanel';
-import EmergencyResponsePanel from './EmergencyResponsePanel';
-import CarbonFootprintTrackingPanel from './CarbonFootprintTrackingPanel';
-import SmartDeliverySchedulingPanel from './SmartDeliverySchedulingPanel';
-import WaterQualityPredictionPanel from './WaterQualityPredictionPanel';
-import CustomerSentimentAnalysisPanel from './CustomerSentimentAnalysisPanel';
-import RevenueLeakDetectionPanel from './RevenueLeakDetectionPanel';
-import PredictivePricingPanel from './PredictivePricingPanel';
-import InventoryForecastingPanel from './InventoryForecastingPanel';
-import DriverBehaviorPanel from './DriverBehaviorPanel';
-import CustomerLifetimeValuePanel from './CustomerLifetimeValuePanel';
-import DemandSensingPanel from './DemandSensingPanel';
 
 function ScheduleCard({ schedule, onToggle, onDelete, onEdit }) {
   const freqLabels = {
@@ -130,59 +99,35 @@ function BudgetAlert({ alert }) {
   );
 }
 
-export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], driverLocations = {} }) {
-    const {
-      schedules,
-      upsertSchedule,
-      deleteSchedule,
-      toggleSchedule,
-      upcomingDeliveries,
-      qualityRecords,
-      addQualityRecord,
-      deleteQualityRecord,
-      budget,
-      updateBudget,
-      analytics,
-      refreshData,
-      refreshing,
-      qualityTrends,
-      complianceSummary,
-      supplyRisk,
-      savingsRecommendations,
-      predictiveCashFlow,
-    } = useInstitutionDashboard({ orders, onNotice: showNotice });
+export function InstitutionDashboard({ orders, showNotice }) {
+  const {
+    schedules,
+    upsertSchedule,
+    deleteSchedule,
+    toggleSchedule,
+    upcomingDeliveries,
+    qualityRecords,
+    addQualityRecord,
+    deleteQualityRecord,
+    budget,
+    updateBudget,
+    analytics,
+    refreshData,
+    refreshing,
+  } = useInstitutionDashboard({ orders, onNotice: showNotice });
 
   // Smart features
   const { forecast, summary: forecastSummary, trend, anomalies, peakHours, loading: forecastLoading, refresh: refreshForecast } = useDemandForecast({ orders, region: 'ACCRA' });
   const { churnAnalysis, ltvPredictions, segments, anomalies: predAnomalies, revenueForecast, summary: analyticsSummary, loading: analyticsLoading, refresh: refreshAnalytics } = usePredictiveAnalytics({ orders, customers: [], driverPositions: {} });
   const { pricing, customerProfile, loading: pricingLoading, refresh: refreshPricing, getPriceForVolume, getPriceExplanation, summary: pricingSummary } = useDynamicPricing({ orders, driverPositions: {}, customerId: null, region: 'ACCRA' });
+  const { notifications, preferences, unreadCount, sendNotification, checkTriggers } = useSmartNotifications({ user: { identifier: 'institution', role: 'institution' }, orders, driverPositions: {}, schedules, budget, qualityRecords, onNotice: showNotice });
   const { records: waterRecords, compliance, trends, forecasts, certificates, sourceRisks, alerts, summary: qualitySummary, loading: qualityLoading, addQualityRecord: addWaterQualityRecord, getSourceSummary, refresh: refreshWaterQuality } = useWaterQuality({ qualityRecords, sources: [...new Set(qualityRecords.map(r => r.source))], onNotice: showNotice });
-
-  // Advanced AI features
-  const { inventory: predInventory, predictions: invPredictions, alerts: invAlerts, summary: predInvSummary, recordRestock } = usePredictiveInventory({ sellerProfile: { identifier: 'institution' }, orders, driverPositions: {}, forecast, onNotice: showNotice });
-  const { customers: enrichedCustomers, churnAnalysis: instChurn, ltvPredictions: instLTV, anomalies: instAnomalies, summary: instCustSummary } = useCustomerIntelligence({ orders, customers: [], driverPositions: {}, onNotice: showNotice });
-
-  // Zone loads for automated dispatch
-  const zoneLoads = useMemo(() => {
-    const loads = {};
-    orders.filter(o => ['Pending', 'Confirmed', 'Assigned', 'En Route'].includes(o.status)).forEach(order => {
-      const zone = order.zone || 'zone_1';
-      loads[zone] = (loads[zone] || 0) + 1;
-    });
-    return loads;
-  }, [orders]);
-
-  // Keep the budget form field in sync when the stored budget changes
-  useEffect(() => {
-    setBudgetInput(budget.monthly / 100);
-  }, [budget.monthly]);
 
   const [activeTab, setActiveTab] = useState('overview');
   const [smartTab, setSmartTab] = useState('forecast');
   const [showScheduleForm, setShowScheduleForm] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(null);
   const [showQualityForm, setShowQualityForm] = useState(false);
-  const [budgetInput, setBudgetInput] = useState(budget.monthly / 100);
   const [scheduleForm, setScheduleForm] = useState({
     name: '',
     frequency: 'weekly',
@@ -213,11 +158,6 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
     });
   }
 
-  // Notifications for Smart Hub
-  const { unreadCount: unreadCountFn, items: notifications } = useNotifications();
-  const unreadCount = unreadCountFn('institution');
-  const preferences = { pushEnabled: true, quietHoursEnabled: false };
-
   return (
     <>
       <div className="page-header">
@@ -245,13 +185,9 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
       <div className="institution-tabs">
         <button className={activeTab === 'overview' ? 'active' : ''} onClick={() => setActiveTab('overview')}>Overview</button>
         <button className={activeTab === 'schedules' ? 'active' : ''} onClick={() => setActiveTab('schedules')}>Schedules</button>
-        <button className={activeTab === 'smart-scheduling' ? 'active' : ''} onClick={() => setActiveTab('smart-scheduling')}>Smart Scheduling</button>
-        <button className={activeTab === 'inventory' ? 'active' : ''} onClick={() => setActiveTab('inventory')}>Predictive Inventory</button>
         <button className={activeTab === 'quality' ? 'active' : ''} onClick={() => setActiveTab('quality')}>Quality</button>
-        <button className={activeTab === 'customers' ? 'active' : ''} onClick={() => setActiveTab('customers')}>Customer Intelligence</button>
         <button className={activeTab === 'budget' ? 'active' : ''} onClick={() => setActiveTab('budget')}>Budget</button>
         <button className={activeTab === 'analytics' ? 'active' : ''} onClick={() => setActiveTab('analytics')}>Analytics</button>
-        <button className={activeTab === 'insights' ? 'active' : ''} onClick={() => setActiveTab('insights')}>Insights</button>
         <button className={activeTab === 'smart' ? 'active' : ''} onClick={() => setActiveTab('smart')}>Smart Hub</button>
       </div>
 
@@ -302,41 +238,6 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
 
           <div className="panel-divider" />
 
-          <div className="overview-grid">
-            <article className="overview-card">
-              <span>TOTAL VOLUME DELIVERED</span>
-              <strong>{analytics.totalPaidVolume}</strong>
-              <small>Paid orders only</small>
-            </article>
-            <article className="overview-card highlight">
-              <span>TOTAL PAID SPEND</span>
-              <strong>{analytics.totalPaidSpend}</strong>
-              <small>Confirmed deliveries</small>
-            </article>
-            <article className="overview-card">
-              <span>AVG DAYS BETWEEN DELIVERIES</span>
-              <strong>{analytics.avgDaysBetweenDeliveries || '—'}</strong>
-              <small>{analytics.avgDaysBetweenDeliveries ? 'days' : 'Insufficient data'}</small>
-            </article>
-            <article className="overview-card">
-              <span>ACTIVE SCHEDULES</span>
-              <strong>{schedules.filter(s => s.active).length}</strong>
-              <small>{schedules.length} total</small>
-            </article>
-            <article className="overview-card">
-              <span>QUALITY TESTS</span>
-              <strong>{complianceSummary.totalTests}</strong>
-              <small>{complianceSummary.passRate.toFixed(1)}% pass rate</small>
-            </article>
-            <article className="overview-card">
-              <span>SOURCES MONITORED</span>
-              <strong>{complianceSummary.sourcesMonitored}</strong>
-              <small>Water sources</small>
-            </article>
-          </div>
-
-          <div className="panel-divider" />
-
           <div className="panel-title">
             <span className="section-kicker">UPCOMING DELIVERIES</span>
             <h2>Next 5 scheduled drops</h2>
@@ -354,58 +255,6 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
                   </div>
                   <span className="status status-online">Scheduled</span>
                 </div>
-              ))}
-            </div>
-          )}
-
-          <div className="panel-divider" />
-
-          <div className="panel-title">
-            <span className="section-kicker">TOP SELLERS</span>
-            <h2>By delivery volume for your institution</h2>
-          </div>
-          {analytics.sellerStats.length === 0 ? (
-            <p className="empty-feed">No seller data yet. Complete deliveries to see rankings.</p>
-          ) : (
-            <div className="seller-ranking">
-              {analytics.sellerStats.slice(0, 5).map((seller, i) => (
-                <div key={seller.name} className="ranking-item">
-                  <span className="rank">{i + 1}</span>
-                  <div className="ranking-info">
-                    <strong>{seller.name}</strong>
-                    <small>{seller.orders} orders · {seller.volume} gal · {seller.onTimeRate}% on-time</small>
-                  </div>
-                  <div className="ranking-value">
-                    <strong>{seller.avgOrderValue}</strong>
-                    <small>Avg/order</small>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="panel-divider" />
-
-          <div className="panel-title">
-            <span className="section-kicker">ZONE ANALYSIS</span>
-            <h2>Delivery distribution by zone</h2>
-          </div>
-          {analytics.zoneStats.length === 0 ? (
-            <p className="empty-feed">No zone data available.</p>
-          ) : (
-            <div className="zone-grid">
-              {analytics.zoneStats.map((zone) => (
-                <article key={zone.zone} className="zone-card panel">
-                  <div className="zone-header">
-                    <strong>{zone.zone}</strong>
-                    <span className="zone-orders">{zone.orders} orders</span>
-                  </div>
-                  <div className="zone-stats">
-                    <div><span>Volume:</span> <strong>{zone.volume} gal</strong></div>
-                    <div><span>Spend:</span> <strong>{formatCedi(zone.spend)}</strong></div>
-                    <div><span>Avg/Order:</span> <strong>{zone.avgOrderValue}</strong></div>
-                  </div>
-                </article>
               ))}
             </div>
           )}
@@ -484,10 +333,6 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
         </section>
       )}
 
-      {activeTab === 'smart-scheduling' && (
-        <SmartSchedulingPanel orders={orders} showNotice={showNotice} customers={[]} />
-      )}
-
       {activeTab === 'quality' && (
         <section className="panel">
           <div className="panel-toolbar">
@@ -495,40 +340,10 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
               <span className="section-kicker">WATER QUALITY & COMPLIANCE</span>
               <h2>Quality test records</h2>
             </div>
-            <div className="toolbar-actions">
-              <button className="primary-button" type="button" onClick={() => setShowQualityForm(true)}>
-                + Add Test Record
-              </button>
-              {complianceSummary.totalTests > 0 && (
-                <button className="outline-button" type="button" onClick={() => showNotice('Quality compliance certificate generated.')}>
-                  Generate Certificate
-                </button>
-              )}
-            </div>
+            <button className="primary-button" type="button" onClick={() => setShowQualityForm(true)}>
+              + Add Test Record
+            </button>
           </div>
-
-           {/* Compliance Summary at Top */}
-           {complianceSummary.totalTests > 0 && (
-             <div className="compliance-overview">
-               <article className="compliance-stat-card">
-                 <span>TOTAL TESTS</span>
-                 <strong>{complianceSummary.totalTests}</strong>
-               </article>
-               <article className="compliance-stat-card highlight">
-                 <span>OVERALL PASS RATE</span>
-                 <strong>{complianceSummary.passRate.toFixed(1)}%</strong>
-               </article>
-               <article className="compliance-stat-card">
-                 <span>SOURCES MONITORED</span>
-                 <strong>{complianceSummary.sourcesMonitored}</strong>
-               </article>
-               <article className="compliance-stat-card warning">
-                 <span>PARAMETERS FAILING</span>
-                 <strong>{Object.values(complianceSummary.byParameter).filter(p => p.passRate < 100).length}</strong>
-               </article>
-               <div className="panel-divider" />
-             </div>
-           )}
 
           {showQualityForm && (
             <form className="quality-form panel" onSubmit={(event) => {
@@ -573,69 +388,17 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
 
           {qualityRecords.length === 0 ? (
             <div className="quality-empty">
-              <div className="empty-icon">💧</div>
               <p className="empty-feed">No quality records yet.</p>
               <p className="quality-note">This app does not store water-quality certificates by default. A seller or operator must supply test results before any quality claim is made. Add records above to build your compliance history.</p>
-              <button className="primary-button" type="button" onClick={() => setShowQualityForm(true)}>
-                Add First Test Record
-              </button>
             </div>
           ) : (
-            <>
-              <div className="quality-list">
-                {qualityRecords.map((record) => (
-                  <QualityCard key={record.id} record={record} onDelete={() => deleteQualityRecord(record.id)} />
-                ))}
-              </div>
-              
-              <div className="panel-divider" />
-              
-              <div className="panel-title">
-                <span className="section-kicker">PARAMETER COMPLIANCE</span>
-                <h2>WHO / Ghana Standards compliance by parameter</h2>
-              </div>
-              <div className="compliance-grid">
-                {Object.entries(complianceSummary.byParameter).map(([param, data]) => (
-                  <article key={param} className="compliance-card panel">
-                    <div className="compliance-header">
-                      <strong>{param.toUpperCase()}</strong>
-                      <span className={`status ${data.passRate >= 90 ? 'status-delivered' : data.passRate >= 70 ? 'status-online' : 'status-cancelled'}`}>
-                        {data.passRate}% PASS
-                      </span>
-                    </div>
-                    <div className="compliance-stats">
-                      <div><span>Tests:</span> <strong>{data.total}</strong></div>
-                      <div><span>Passed:</span> <strong>{data.passed}</strong></div>
-                      <div><span>Failed:</span> <strong>{data.total - data.passed}</strong></div>
-                    </div>
-                    <div className="compliance-bar">
-                      <div className="compliance-fill" style={{ width: `${data.passRate}%` }} />
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </>
+            <div className="quality-list">
+              {qualityRecords.map((record) => (
+                <QualityCard key={record.id} record={record} onDelete={() => deleteQualityRecord(record.id)} />
+              ))}
+            </div>
           )}
         </section>
-      )}
-
-      {activeTab === 'inventory' && (
-        <PredictiveInventoryPanel 
-          orders={orders} 
-          onNotice={showNotice} 
-          sellerProfile={{ identifier: 'institution' }}
-          driverPositions={{}}
-          forecast={forecast}
-        />
-      )}
-
-      {activeTab === 'customers' && (
-        <CustomerIntelligencePanel 
-          orders={orders} 
-          onNotice={showNotice} 
-          customers={enrichedCustomers}
-          driverPositions={{}}
-        />
       )}
 
       {activeTab === 'budget' && (
@@ -647,133 +410,37 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
             </div>
           </div>
 
-          {/* Budget Alerts */}
-          {budget.alerts.length > 0 && (
-            <div className="budget-alerts">
-              {budget.alerts.map((alert, i) => (
-                <BudgetAlert key={i} alert={alert} />
-              ))}
-            </div>
-          )}
-
-           <div className="budget-summary">
-             <article className="budget-card">
-               <span>MONTHLY BUDGET</span>
-               <strong>{formatCedi(budget.monthly)}</strong>
-             </article>
-             <article className="budget-card highlight">
-               <span>SPENT THIS MONTH</span>
-               <strong>{formatCedi(budget.spent)}</strong>
-             </article>
-             <article className="budget-card">
-               <span>REMAINING</span>
-               <strong>{formatCedi(Math.max(0, budget.monthly - budget.spent))}</strong>
-             </article>
-             <article className="budget-card">
-               <span>UTILIZATION</span>
-               <strong>{analytics.budgetUtilization}%</strong>
-             </article>
-           </div>
-
-          {/* Budget Progress Bar */}
-          {budget.monthly > 0 && (
-            <div className="budget-progress">
-              <div className="progress-bar">
-                <div 
-                  className="progress-fill" 
-                  style={{ 
-                    width: `${Math.min(100, (budget.spent / budget.monthly) * 100)}%`,
-                    background: budget.spent > budget.monthly ? 'linear-gradient(90deg, var(--coral), #f88)' : 
-                                budget.spent > budget.monthly * 0.9 ? 'linear-gradient(90deg, #f0a202, #fdd)' : 
-                                'linear-gradient(90deg, var(--teal), var(--mint))'
-                  }} 
-                />
-              </div>
-              <div className="progress-labels">
-                <span>0%</span>
-                <span>50%</span>
-                <span>90%</span>
-                <span>100%</span>
-              </div>
-            </div>
-          )}
-
-          <div className="panel-divider" />
-
-          {/* Budget Forecasting */}
-          <div className="panel-title">
-            <span className="section-kicker">BUDGET FORECAST</span>
-            <h2>Projected spending based on current trends</h2>
-          </div>
-          <div className="budget-forecast">
-            <article className="forecast-card">
-              <span>Projected Monthly</span>
-              <strong>{analytics.monthlyOrders > 0 ? formatCedi(Math.round(budget.spent / Math.max(1, new Date().getDate()) * 30)) : '—'}</strong>
-              <small>Based on {new Date().getDate()} days of data</small>
+          <div className="budget-summary">
+            <article className="budget-card">
+              <span>MONTHLY BUDGET</span>
+              <strong>GH₵{formatCedi(budget.monthly)}</strong>
             </article>
-            <article className="forecast-card">
-              <span>Avg Daily Spend</span>
-              <strong>{analytics.monthlyOrders > 0 ? formatCedi(Math.round(budget.spent / Math.max(1, new Date().getDate()))) : '—'}</strong>
-              <small>Per day this month</small>
+            <article className="budget-card highlight">
+              <span>SPENT THIS MONTH</span>
+              <strong>GH₵{formatCedi(budget.spent)}</strong>
             </article>
-            <article className="forecast-card">
-              <span>Days Until Budget</span>
-              <strong>{budget.monthly > 0 && budget.spent > 0 ? Math.max(0, Math.floor((budget.monthly - budget.spent) / Math.max(1, budget.spent / new Date().getDate()))) : '—'}</strong>
-              <small>At current rate</small>
+            <article className="budget-card">
+              <span>REMAINING</span>
+              <strong>GH₵{formatCedi(Math.max(0, budget.monthly - budget.spent))}</strong>
             </article>
-            <article className="forecast-card">
-              <span>Projected Yearly</span>
-              <strong>{analytics.monthlyOrders > 0 ? formatCedi(Math.round(budget.spent / Math.max(1, new Date().getDate()) * 365)) : '—'}</strong>
-              <small>Extrapolated annually</small>
+            <article className="budget-card">
+              <span>UTILIZATION</span>
+              <strong>{analytics.budgetUtilization}%</strong>
             </article>
           </div>
 
           <div className="panel-divider" />
 
-          {/* Monthly Comparison */}
-          <div className="panel-title">
-            <span className="section-kicker">MONTHLY COMPARISON</span>
-            <h2>Budget vs actual spending (last 6 months)</h2>
-          </div>
-          <div className="monthly-comparison">
-            {analytics.monthlyTrend.map((month, i) => (
-              <div key={month.month} className="comparison-bar-group">
-                <div className="comparison-bars">
-                  <div 
-                    className="comparison-bar-budget" 
-                    style={{ height: `${Math.max(5, (budget.monthly / Math.max(...analytics.monthlyTrend.map(m => m.spend), budget.monthly)) * 100)}%` }}
-                    title={`Budget: ${formatCedi(budget.monthly)}`}
-                  />
-                  <div 
-                    className="comparison-bar-actual" 
-                    style={{ height: `${Math.max(5, (month.spend / Math.max(...analytics.monthlyTrend.map(m => m.spend), budget.monthly)) * 100)}%` }}
-                    title={`${month.month}: ${formatCedi(month.spend)}`}
-                  />
-                </div>
-                <span className="comparison-label">{month.month}</span>
-                <div className="comparison-values">
-                  <span className="budget-val">Budget: {formatCedi(budget.monthly)}</span>
-                  <span className="actual-val">Actual: {formatCedi(month.spend)}</span>
-                </div>
-              </div>
-            ))}
-            <div className="comparison-legend">
-              <span className="legend-item budget"><span className="legend-color budget"></span> Budget</span>
-              <span className="legend-item actual"><span className="legend-color actual"></span> Actual</span>
+          <form className="budget-form" onSubmit={(event) => {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            updateBudget({ monthly: Number(formData.get('monthly')) * 100 });
+          }}>
+            <div className="form-row">
+              <label>Monthly budget (GH₵)<input type="number" name="monthly" value={budget.monthly / 100} onChange={(e) => {}} step="100" min="0" required /></label>
             </div>
-          </div>
-
-          <div className="panel-divider" />
-
-           <form className="budget-form" onSubmit={(event) => {
-             event.preventDefault();
-             updateBudget({ monthly: Number(budgetInput) * 100 });
-           }}>
-             <div className="form-row">
-               <label>Monthly budget (GH₵)<input type="number" name="monthly" value={budgetInput} onChange={(e) => setBudgetInput(e.target.value)} step="100" min="0" required /></label>
-             </div>
-             <button className="primary-button" type="submit">Update Budget</button>
-           </form>
+            <button className="primary-button" type="submit">Update Budget</button>
+          </form>
         </section>
       )}
 
@@ -814,7 +481,7 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
             </article>
             <article className="analytics-card">
               <h3>Cost per Unit</h3>
-              <p className="analytics-placeholder">Average cost per gallon across all deliveries: {analytics.avgOrderValue} / {analytics.monthlyVolume || '—'}.</p>
+              <p className="analytics-placeholder">Average cost per gallon across all deliveries: {analytics.avgOrderValue} / {analytics.monthlyVolume || 'N/A'}.</p>
             </article>
             <article className="analytics-card">
               <h3>Supplier Performance</h3>
@@ -842,285 +509,6 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
         </section>
       )}
 
-      {activeTab === 'insights' && (
-        <section className="panel">
-          <div className="panel-toolbar">
-            <div className="panel-title">
-              <span className="section-kicker">DEEP INSIGHTS</span>
-              <h2>Advanced analytics for your institution</h2>
-            </div>
-          </div>
-
-          {/* Monthly Trend Chart */}
-          <div className="panel-title">
-            <span className="section-kicker">MONTHLY TREND (Last 6 Months)</span>
-            <h2>Order volume and spend over time</h2>
-          </div>
-          <div className="trend-chart">
-            {analytics.monthlyTrend.map((month, i) => (
-              <div key={month.month} className="trend-bar-group">
-                <div className="trend-bars">
-                  <div 
-                    className="trend-bar-volume" 
-                    style={{ height: `${Math.max(5, (month.volume / Math.max(...analytics.monthlyTrend.map(m => m.volume), 1)) * 100)}%` }}
-                    title={`${month.month}: ${month.volume} gal`}
-                  />
-                  <div 
-                    className="trend-bar-spend" 
-                    style={{ height: `${Math.max(5, (month.spend / Math.max(...analytics.monthlyTrend.map(m => m.spend), 1)) * 100)}%` }}
-                    title={`${month.month}: ${formatCedi(month.spend)}`}
-                  />
-                </div>
-                <span className="trend-label">{month.month}</span>
-                <div className="trend-values">
-                  <span className="volume-val">{month.volume} gal</span>
-                  <span className="spend-val">{formatCedi(month.spend)}</span>
-                </div>
-              </div>
-            ))}
-            <div className="trend-legend">
-              <span className="legend-item volume"><span className="legend-color volume"></span> Volume (gal)</span>
-              <span className="legend-item spend"><span className="legend-color spend"></span> Spend (GH₵)</span>
-            </div>
-          </div>
-
-          <div className="panel-divider" />
-
-          {/* Seller Performance Details */}
-          <div className="panel-title">
-            <span className="section-kicker">SELLER PERFORMANCE</span>
-            <h2>Detailed seller rankings for your institution</h2>
-          </div>
-          {analytics.sellerStats.length === 0 ? (
-            <p className="empty-feed">No seller performance data yet.</p>
-          ) : (
-            <div className="seller-performance-table">
-              <div className="table-header">
-                <span>Rank</span>
-                <span>Seller</span>
-                <span>Orders</span>
-                <span>Volume</span>
-                <span>Total Spend</span>
-                <span>Avg/Order</span>
-                <span>On-Time %</span>
-              </div>
-              {analytics.sellerStats.map((seller, i) => (
-                <div key={seller.name} className="table-row">
-                  <span className="rank">{i + 1}</span>
-                  <span>{seller.name}</span>
-                  <span>{seller.orders}</span>
-                  <span>{seller.volume} gal</span>
-                  <span>{formatCedi(seller.spend)}</span>
-                  <span>{seller.avgOrderValue}</span>
-                  <span className={seller.onTimeRate >= 90 ? 'good' : seller.onTimeRate >= 70 ? 'warning' : 'critical'}>
-                    {seller.onTimeRate}%
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="panel-divider" />
-
-          {/* Driver Performance Details */}
-          <div className="panel-title">
-            <span className="section-kicker">DRIVER PERFORMANCE</span>
-            <h2>Detailed driver rankings for your institution</h2>
-          </div>
-          {analytics.driverStats.length === 0 ? (
-            <p className="empty-feed">No driver performance data yet.</p>
-          ) : (
-            <div className="driver-performance-table">
-              <div className="table-header">
-                <span>Rank</span>
-                <span>Driver</span>
-                <span>Orders</span>
-                <span>Volume</span>
-                <span>Total Spend</span>
-                <span>Avg/Order</span>
-                <span>On-Time %</span>
-              </div>
-              {analytics.driverStats.map((driver, i) => (
-                <div key={driver.name} className="table-row">
-                  <span className="rank">{i + 1}</span>
-                  <span>{driver.name}</span>
-                  <span>{driver.orders}</span>
-                  <span>{driver.volume} gal</span>
-                  <span>{formatCedi(driver.spend)}</span>
-                  <span>{driver.avgOrderValue}</span>
-                  <span className={driver.onTimeRate >= 90 ? 'good' : driver.onTimeRate >= 70 ? 'warning' : 'critical'}>
-                    {driver.onTimeRate}%
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="panel-divider" />
-
-          {/* Water Quality Trends */}
-          <div className="panel-title">
-            <span className="section-kicker">WATER QUALITY TRENDS (90 Days)</span>
-            <h2>Parameter trends over time</h2>
-          </div>
-          {qualityTrends && Object.keys(qualityTrends).length > 0 ? (
-            <div className="quality-trends-grid">
-              {Object.entries(qualityTrends).map(([param, trend]) => (
-                <article key={param} className="quality-trend-card panel">
-                  <div className="trend-header">
-                    <strong>{param.toUpperCase()}</strong>
-                    <span className={`trend-direction ${trend.trend}`}>
-                      {trend.trend === 'increasing' ? '↑' : trend.trend === 'decreasing' ? '↓' : '→'}
-                      {trend.changePercent > 0 ? '+' : ''}{trend.changePercent}%
-                    </span>
-                  </div>
-                  <div className="trend-values">
-                    <div><span>Current:</span> <strong>{trend.current}</strong></div>
-                    <div><span>Previous:</span> <strong>{trend.previous}</strong></div>
-                    <div><span>Change:</span> <strong>{trend.change > 0 ? '+' : ''}{trend.change}</strong></div>
-                  </div>
-                  <div className="trend-mini-chart">
-                    {trend.values.slice(-10).map((v, i) => (
-                      <div key={i} className="mini-bar" style={{ height: `${Math.max(2, (v.value / 14) * 100)}%` }} title={`${v.date}: ${v.value}`} />
-                    ))}
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p className="empty-feed">Add water quality records to see trend analysis.</p>
-          )}
-
-          <div className="panel-divider" />
-
-          {/* Compliance Summary */}
-          <div className="panel-title">
-            <span className="section-kicker">COMPLIANCE SUMMARY</span>
-            <h2>Parameter compliance rates</h2>
-          </div>
-           {complianceSummary.totalTests > 0 ? (
-             <div className="compliance-grid">
-               {Object.entries(complianceSummary.byParameter).map(([param, data]) => (
-                 <article key={param} className="compliance-card panel">
-                   <div className="compliance-header">
-                     <strong>{param.toUpperCase()}</strong>
-                     <span className={`status ${data.passRate >= 90 ? 'status-delivered' : data.passRate >= 70 ? 'status-online' : 'status-cancelled'}`}>
-                       {data.passRate}% PASS
-                     </span>
-                   </div>
-                   <div className="compliance-stats">
-                     <div><span>Tests:</span> <strong>{data.total}</strong></div>
-                     <div><span>Passed:</span> <strong>{data.passed}</strong></div>
-                     <div><span>Failed:</span> <strong>{data.total - data.passed}</strong></div>
-                   </div>
-                   <div className="compliance-bar">
-                     <div className="compliance-fill" style={{ width: `${data.passRate}%` }} />
-                   </div>
-                 </article>
-               ))}
-             </div>
-           ) : (
-             <p className="empty-feed">No water quality tests recorded yet.</p>
-           )}
-
-           {/* Supply Risk Assessment */}
-           {supplyRisk.length > 0 && (
-             <>
-               <div className="panel-divider" />
-               
-               <div className="panel-title">
-                 <span className="section-kicker">SUPPLY RISK ASSESSMENT</span>
-                 <h2>Supplier reliability and concentration risk</h2>
-               </div>
-               
-               <div className="supply-risk-grid">
-                 {supplyRisk.map((seller) => (
-                   <article key={seller.name} className="risk-card panel">
-                     <div className="risk-header">
-                       <strong>{seller.name}</strong>
-                       <span className={`risk-level ${seller.riskLevel}`}>
-                         {seller.riskLevel.toUpperCase()}
-                       </span>
-                     </div>
-                     <div className="risk-details">
-                       <div><span>Risk Score:</span> <strong>{seller.riskScore}/100</strong></div>
-                       <div><span>On-Time Rate:</span> <strong>{seller.onTimeRate}%</strong></div>
-                       <div><span>Spend Share:</span> <strong>{seller.spendShare}%</strong></div>
-                       <div><span>Orders:</span> <strong>{seller.orders}</strong></div>
-                     </div>
-                   </article>
-                 ))}
-               </div>
-             </>
-           )}
-
-             {/* Savings Recommendations */}
-           {savingsRecommendations.length > 0 && (
-             <>
-               <div className="panel-divider" />
-               
-               <div className="panel-title">
-                 <span className="section-kicker">SAVINGS RECOMMENDATIONS</span>
-                 <h2>Opportunities to optimize your water spending</h2>
-               </div>
-               
-               <div className="recommendations-list">
-                 {savingsRecommendations.map((rec) => (
-                   <article key={rec.id} className="recommendation-card panel">
-                     <div className="recommendation-header">
-                       <span className={`priority ${rec.priority}`}>{rec.priority.toUpperCase()}</span>
-                       <strong>{rec.title}</strong>
-                     </div>
-                     <p className="recommendation-description">{rec.description}</p>
-                     {rec.potentialSavings > 0 && (
-                       <div className="recommendation-savings">
-                         <span>Potential Savings:</span>
-                         <strong>{formatCedi(rec.potentialSavings)}</strong>
-                       </div>
-                     )}
-                   </article>
-                 ))}
-               </div>
-             </>
-           )}
-           
-           {/* Predictive Cash Flow */}
-           <div className="panel-divider" />
-           
-           <div className="panel-title">
-             <span className="section-kicker">PREDICTIVE CASH FLOW</span>
-             <h2>Projected cash position for the next 30 days</h2>
-           </div>
-           <div className="cash-flow-grid">
-             <div className="cash-flow-item">
-               <div className="cash-flow-label">Projected Inflow</div>
-               <div className="cash-flow-value">{predictiveCashFlow.projectedInflow}</div>
-               <div className="cash-flow-subtext">From confirmed & pending orders</div>
-             </div>
-             <div className="cash-flow-item">
-               <div className="cash-flow-label">Projected Outflow</div>
-               <div className="cash-flow-value">{predictiveCashFlow.projectedOutflow}</div>
-               <div className="cash-flow-subtext">Estimated expenses</div>
-             </div>
-              <div className="cash-flow-item">
-                <div className="cash-flow-label">Net Cash Flow</div>
-                <div className="cash-flow-value">
-                  {predictiveCashFlow.netCashFlow.replace('-', '−')}
-                </div>
-                {/* Use minus sign for better display */}
-                <div className="cash-flow-subtext">
-                  {predictiveCashFlow.netCashFlow.startsWith('-') ? 'Projected deficit' : 'Projected surplus'}
-                </div>
-              </div>
-             <div className="cash-flow-item">
-               <div className="cash-flow-label">Confidence</div>
-               <div className="cash-flow-value">{predictiveCashFlow.confidence}</div>
-               <div className="cash-flow-subtext">Based on data availability</div>
-             </div>
-           </div>
-         </section>
-      )}
-
       {activeTab === 'smart' && (
         <section className="panel">
           <div className="panel-toolbar">
@@ -1136,37 +524,11 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
             <button className={smartTab === 'pricing' ? 'active' : ''} onClick={() => setSmartTab('pricing')}>Dynamic Pricing</button>
             <button className={smartTab === 'waterquality' ? 'active' : ''} onClick={() => setSmartTab('waterquality')}>Water Quality</button>
             <button className={smartTab === 'notifications' ? 'active' : ''} onClick={() => setSmartTab('notifications')}>Smart Alerts</button>
-            <button className={smartTab === 'demand-forecasting' ? 'active' : ''} onClick={() => setSmartTab('demand-forecasting')}>Demand Forecasting</button>
-            <button className={smartTab === 'driver-performance' ? 'active' : ''} onClick={() => setSmartTab('driver-performance')}>Driver Performance</button>
-            <button className={smartTab === 'automated-dispatch' ? 'active' : ''} onClick={() => setSmartTab('automated-dispatch')}>Automated Dispatch</button>
-            <button className={smartTab === 'predictive-maintenance' ? 'active' : ''} onClick={() => setSmartTab('predictive-maintenance')}>Predictive Maintenance</button>
-            <button className={smartTab === 'supply-chain' ? 'active' : ''} onClick={() => setSmartTab('supply-chain')}>Supply Chain</button>
-            <button className={smartTab === 'churn-prediction' ? 'active' : ''} onClick={() => setSmartTab('churn-prediction')}>Churn Prediction</button>
-            <button className={smartTab === 'revenue-optimization' ? 'active' : ''} onClick={() => setSmartTab('revenue-optimization')}>Revenue Optimization</button>
-            <button className={smartTab === 'quality-assurance' ? 'active' : ''} onClick={() => setSmartTab('quality-assurance')}>Quality Assurance</button>
-            <button className={smartTab === 'fleet-utilization' ? 'active' : ''} onClick={() => setSmartTab('fleet-utilization')}>Fleet Utilization</button>
-            <button className={smartTab === 'market-intelligence' ? 'active' : ''} onClick={() => setSmartTab('market-intelligence')}>Market Intelligence</button>
-            <button className={smartTab === 'energy-optimization' ? 'active' : ''} onClick={() => setSmartTab('energy-optimization')}>Energy Optimization</button>
-            <button className={smartTab === 'subscription-management' ? 'active' : ''} onClick={() => setSmartTab('subscription-management')}>Subscription Mgmt</button>
-            <button className={smartTab === 'sustainability-tracking' ? 'active' : ''} onClick={() => setSmartTab('sustainability-tracking')}>Sustainability</button>
-            <button className={smartTab === 'water-source' ? 'active' : ''} onClick={() => setSmartTab('water-source')}>Water Source</button>
-            <button className={smartTab === 'compliance' ? 'active' : ''} onClick={() => setSmartTab('compliance')}>Compliance</button>
-            <button className={smartTab === 'emergency' ? 'active' : ''} onClick={() => setSmartTab('emergency')}>Emergency</button>
-            <button className={smartTab === 'carbon' ? 'active' : ''} onClick={() => setSmartTab('carbon')}>Carbon Footprint</button>
-            <button className={smartTab === 'smart-scheduling' ? 'active' : ''} onClick={() => setSmartTab('smart-scheduling')}>Smart Scheduling</button>
-            <button className={smartTab === 'quality-prediction' ? 'active' : ''} onClick={() => setSmartTab('quality-prediction')}>Quality Prediction</button>
-            <button className={smartTab === 'sentiment' ? 'active' : ''} onClick={() => setSmartTab('sentiment')}>Sentiment</button>
-            <button className={smartTab === 'revenue-leaks' ? 'active' : ''} onClick={() => setSmartTab('revenue-leaks')}>Revenue Leaks</button>
-            <button className={smartTab === 'predictive-pricing' ? 'active' : ''} onClick={() => setSmartTab('predictive-pricing')}>Predictive Pricing</button>
-            <button className={smartTab === 'inventory-forecasting' ? 'active' : ''} onClick={() => setSmartTab('inventory-forecasting')}>Inventory Forecasting</button>
-            <button className={smartTab === 'driver-behavior' ? 'active' : ''} onClick={() => setSmartTab('driver-behavior')}>Driver Behavior</button>
-            <button className={smartTab === 'customer-lifetime-value' ? 'active' : ''} onClick={() => setSmartTab('customer-lifetime-value')}>Customer LTV</button>
-            <button className={smartTab === 'demand-sensing' ? 'active' : ''} onClick={() => setSmartTab('demand-sensing')}>Demand Sensing</button>
           </div>
 
           {smartTab === 'forecast' && (
             <div className="smart-panel">
-              {forecastLoading ? <div className="loading-state"><div className="loading-spinner" /></div> : forecast?.error ? (
+              {forecastLoading ? <p>Loading forecast…</p> : forecast?.error ? (
                 <div className="empty-feed">{forecast.error} ({forecast.ordersCount} orders)</div>
               ) : forecast && forecast.length > 0 ? (
                 <>
@@ -1225,7 +587,7 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
 
           {smartTab === 'analytics' && (
             <div className="smart-panel">
-              {analyticsLoading ? <div className="loading-state"><div className="loading-spinner" /></div> : (
+              {analyticsLoading ? <p>Loading analytics…</p> : (
                 <>
                   <div className="analytics-summary">
                     <article className="analytics-card">
@@ -1281,7 +643,7 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
 
           {smartTab === 'pricing' && (
             <div className="smart-panel">
-              {pricingLoading ? <div className="loading-state"><div className="loading-spinner" /></div> : (
+              {pricingLoading ? <p>Loading pricing…</p> : (
                 <>
                   <div className="pricing-summary">
                     <article className="pricing-card">
@@ -1326,7 +688,7 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
 
           {smartTab === 'waterquality' && (
             <div className="smart-panel">
-              {qualityLoading ? <div className="loading-state"><div className="loading-spinner" /></div> : (
+              {qualityLoading ? <p>Loading water quality data…</p> : (
                 <>
                   <div className="quality-summary">
                     <article className="quality-stat-card">
@@ -1413,20 +775,20 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
 
           {smartTab === 'notifications' && (
             <div className="smart-panel">
-<div className="notification-stats">
-              <article className="summary-card">
-                <span>Unread</span>
-                <strong>{unreadCount}</strong>
-              </article>
-              <article className="summary-card">
-                <span>Push Enabled</span>
-                <strong>{preferences.pushEnabled ? 'ON' : 'OFF'}</strong>
-              </article>
-              <article className="summary-card">
-                <span>Quiet Hours</span>
-                <strong>{preferences.quietHoursEnabled ? 'ON' : 'OFF'}</strong>
-              </article>
-            </div>
+              <div className="notification-stats">
+                <article className="stat-card">
+                  <span>Unread</span>
+                  <strong>{unreadCount}</strong>
+                </article>
+                <article className="stat-card">
+                  <span>Push Enabled</span>
+                  <strong>{preferences.pushEnabled ? 'ON' : 'OFF'}</strong>
+                </article>
+                <article className="stat-card">
+                  <span>Quiet Hours</span>
+                  <strong>{preferences.quietHoursEnabled ? 'ON' : 'OFF'}</strong>
+                </article>
+              </div>
               <div className="panel-divider" />
               <h4>Recent Notifications</h4>
               <div className="notification-list">
@@ -1453,269 +815,6 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
               </div>
             </div>
           )}
-
-          {smartTab === 'demand-forecasting' && (
-            <DemandForecastingPanel 
-              orders={orders} 
-              weather="clear" 
-              weatherForecast={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'driver-performance' && (
-            <DriverPerformancePanel 
-              drivers={fleetDrivers} 
-              orders={orders} 
-              driverLocations={driverLocations}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'automated-dispatch' && (
-            <AutomatedDispatchPanel 
-              orders={orders} 
-              drivers={fleetDrivers} 
-              driverLocations={driverLocations}
-              zoneLoads={zoneLoads || {}}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'predictive-maintenance' && (
-            <PredictiveMaintenancePanel 
-              vehicles={[]} 
-              orders={orders} 
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'supply-chain' && (
-            <SupplyChainOptimizationPanel 
-              suppliers={[]} 
-              warehouses={[]} 
-              orders={orders} 
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'churn-prediction' && (
-            <CustomerChurnPredictionPanel 
-              customers={enrichedCustomers} 
-              orders={orders} 
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'revenue-optimization' && (
-            <RevenueOptimizationPanel 
-              orders={orders} 
-              pricing={{}} 
-              customers={enrichedCustomers}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'quality-assurance' && (
-            <QualityAssurancePanel 
-              qualityRecords={qualityRecords} 
-              sources={[]} 
-              orders={orders} 
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'fleet-utilization' && (
-            <FleetUtilizationPanel 
-              fleetDrivers={fleetDrivers} 
-              orders={orders} 
-              driverLocations={driverLocations}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'market-intelligence' && (
-            <MarketIntelligencePanel 
-              orders={orders} 
-              customers={[]}
-              competitors={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'energy-optimization' && (
-            <EnergyOptimizationPanel 
-              fleetDrivers={fleetDrivers} 
-              orders={orders} 
-              driverLocations={driverLocations}
-              vehicles={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'subscription-management' && (
-            <SubscriptionManagementPanel 
-              customers={[]}
-              orders={orders} 
-              subscriptions={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'sustainability-tracking' && (
-            <SustainabilityTrackingPanel 
-              orders={orders} 
-              qualityRecords={[]}
-              sources={[]}
-              fleetDrivers={fleetDrivers}
-              vehicles={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'water-source' && (
-            <WaterSourceOptimizationPanel 
-              sources={[]}
-              orders={orders} 
-              qualityRecords={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'compliance' && (
-            <ComplianceMonitoringPanel 
-              permits={[]}
-              inspections={[]}
-              regulations={[]}
-              facilities={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'emergency' && (
-            <EmergencyResponsePanel 
-              orders={orders} 
-              drivers={fleetDrivers} 
-              facilities={[]}
-              customers={[]}
-              weatherAlerts={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'carbon' && (
-            <CarbonFootprintPanel 
-              orders={orders} 
-              drivers={fleetDrivers} 
-              vehicles={[]}
-              routes={[]}
-              facilities={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'smart-scheduling' && (
-            <SmartDeliverySchedulingPanel 
-              orders={orders} 
-              drivers={fleetDrivers} 
-              vehicles={[]}
-              facilities={[]}
-              trafficData={[]}
-              weatherData={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'quality-prediction' && (
-            <WaterQualityPredictionPanel 
-              qualityRecords={[]} 
-              sources={[]}
-              weatherData={[]}
-              treatmentRecords={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'sentiment' && (
-            <CustomerSentimentPanel 
-              customers={[]} 
-              orders={orders} 
-              ratings={[]}
-              messages={[]}
-              supportTickets={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'revenue-leaks' && (
-            <RevenueLeakDetectionPanel 
-              orders={orders} 
-              payments={[]} 
-              invoices={[]}
-              pricing={{}}
-              drivers={fleetDrivers} 
-              facilities={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'predictive-pricing' && (
-            <PredictivePricingPanel 
-              orders={orders} 
-              pricing={{}} 
-              competitors={[]}
-              weatherData={[]}
-              events={[]}
-              historicalPricing={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'inventory-forecasting' && (
-            <InventoryForecastingPanel 
-              products={[]} 
-              orders={orders} 
-              suppliers={[]}
-              warehouses={[]}
-              usageHistory={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'driver-behavior' && (
-            <DriverBehaviorPanel 
-              drivers={fleetDrivers} 
-              trips={[]} 
-              vehicles={[]}
-              fuelRecords={[]}
-              maintenanceRecords={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'customer-lifetime-value' && (
-            <CustomerLifetimeValuePanel 
-              customers={[]} 
-              orders={orders} 
-              payments={[]}
-              subscriptions={[]}
-              interactions={[]}
-              onNotice={showNotice}
-            />
-          )}
-
-          {smartTab === 'demand-sensing' && (
-            <DemandSensingPanel 
-              orders={orders} 
-              customers={[]} 
-              weatherForecast={[]}
-              events={[]}
-              historicalData={[]}
-              marketIndicators={[]}
-              onNotice={showNotice}
-            />
-          )}
-
         </section>
       )}
     </>
