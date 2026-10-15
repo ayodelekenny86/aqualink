@@ -507,28 +507,28 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
             </div>
           </div>
 
-          {/* Compliance Summary at Top */}
-          {complianceSummary.totalTests > 0 && (
-            <div className="compliance-overview">
-              <article className="compliance-stat-card">
-                <span>TOTAL TESTS</span>
-                <strong>{complianceSummary.totalTests}</strong>
-              </article>
-              <article className="compliance-stat-card highlight">
-                <span>OVERALL PASS RATE</span>
-                <strong>{complianceSummary.passRate.toFixed(1)}%</strong>
-              </article>
-              <article className="compliance-stat-card">
-                <span>SOURCES MONITORED</span>
-                <strong>{complianceSummary.sourcesMonitored}</strong>
-              </article>
-              <article className="compliance-stat-card warning">
-                <span>PARAMETERS FAILING</span>
-                <strong>{Object.values(complianceSummary.byParameter).filter(p => p.passRate < 100).length}</strong>
-              </article>
-            </div>
-            <div className="panel-divider" />
-          )}
+           {/* Compliance Summary at Top */}
+           {complianceSummary.totalTests > 0 && (
+             <div className="compliance-overview">
+               <article className="compliance-stat-card">
+                 <span>TOTAL TESTS</span>
+                 <strong>{complianceSummary.totalTests}</strong>
+               </article>
+               <article className="compliance-stat-card highlight">
+                 <span>OVERALL PASS RATE</span>
+                 <strong>{complianceSummary.passRate.toFixed(1)}%</strong>
+               </article>
+               <article className="compliance-stat-card">
+                 <span>SOURCES MONITORED</span>
+                 <strong>{complianceSummary.sourcesMonitored}</strong>
+               </article>
+               <article className="compliance-stat-card warning">
+                 <span>PARAMETERS FAILING</span>
+                 <strong>{Object.values(complianceSummary.byParameter).filter(p => p.passRate < 100).length}</strong>
+               </article>
+               <div className="panel-divider" />
+             </div>
+           )}
 
           {showQualityForm && (
             <form className="quality-form panel" onSubmit={(event) => {
@@ -1102,15 +1102,16 @@ export function InstitutionDashboard({ orders, showNotice, fleetDrivers = [], dr
                <div className="cash-flow-value">{predictiveCashFlow.projectedOutflow}</div>
                <div className="cash-flow-subtext">Estimated expenses</div>
              </div>
-             <div className="cash-flow-item">
-               <div className="cash-flow-label">Net Cash Flow</div>
-               <div className="cash-flow-value">
-                 {predictiveCashFlow.netCashFlow.replace('-', '−')} {/* Use minus sign for better display */}
-               </div>
-               <div className="cash-flow-subtext">
-                 {predictiveCashFlow.netCashFlow.startsWith('-') ? 'Projected deficit' : 'Projected surplus'}
-               </div>
-             </div>
+              <div className="cash-flow-item">
+                <div className="cash-flow-label">Net Cash Flow</div>
+                <div className="cash-flow-value">
+                  {predictiveCashFlow.netCashFlow.replace('-', '−')}
+                </div>
+                {/* Use minus sign for better display */}
+                <div className="cash-flow-subtext">
+                  {predictiveCashFlow.netCashFlow.startsWith('-') ? 'Projected deficit' : 'Projected surplus'}
+                </div>
+              </div>
              <div className="cash-flow-item">
                <div className="cash-flow-label">Confidence</div>
                <div className="cash-flow-value">{predictiveCashFlow.confidence}</div>
