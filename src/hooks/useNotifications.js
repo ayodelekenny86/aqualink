@@ -71,6 +71,15 @@ export default function useNotifications() {
   const [sync, setSync] = useState(USE_SERVER ? NOTIFICATION_SYNC.blocked : NOTIFICATION_SYNC.unconfigured);
   const lastChecked = useRef(Date.now());
   const lastFingerprint = useRef('');
+  const [pendingCount, setPendingCount] = useState(() => readPendingCount());
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = () => {
+      setPendingCount(readPendingCount());
+    };
+    window.addEventListener('storage', handler);
+    return () => window.removeEventListener('storage', handler);
+  }, []);
 
   const refresh = useCallback(() => {
     const rows = list('notifications');
@@ -247,15 +256,6 @@ export default function useNotifications() {
   const forRole = useCallback((role) => items.filter((row) => row.role === role), [items]);
   const unreadCount = useCallback((role) => items.filter((row) => row.role === role && !row.read).length, [items]);
 
-  const [pendingCount, setPendingCount] = useState(() => readPendingCount());
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const handler = () => {
-      setPendingCount(readPendingCount());
-    };
-    window.addEventListener('storage', handler);
-    return () => window.removeEventListener('storage', handler);
-  }, []);
 
   return { items, forRole, unreadCount, notify, markRead, markAllRead, refresh, lastChecked, sync, pendingCount };
 }
